@@ -130,33 +130,51 @@ function makeId(title) {
 // ──────────────────────────────────────────────
 // Column header → recipe field. Both Hebrew and a few aliases accepted.
 const COL_ALIASES = {
-  title:      ['שם המתכון','שם','כותרת','title','name'],
-  cuisine:    ['סוג מטבח','מטבח','קטגוריה','cuisine','category'],
-  prep:       ['זמן הכנה','זמן הכנה (דקות)','prep','prep_time','preptime'],
-  cook:       ['זמן בישול','זמן בישול (דקות)','cook','cook_time','cooktime'],
-  desc:       ['תיאור','description','desc'],
-  ingredients:['מרכיבים','מצרכים','ingredients'],
-  steps:      ['הוראות הכנה','שלבים','הוראות','instructions','steps','directions'],
-  notes:      ['הערות','notes','remarks'],
-  mainImage:  ['תמונות ראשיות','תמונה ראשית','תמונה','main image','image'],
+  title:      ['שם המתכון','שם מתכון','שם','כותרת','מתכון','title','name','recipe'],
+  cuisine:    ['סוג מטבח','מטבח','קטגוריה','cuisine','category','type'],
+  prep:       ['זמן הכנה','זמן הכנה (דקות)','הכנה','prep','prep_time','preptime'],
+  cook:       ['זמן בישול','זמן בישול (דקות)','בישול','cook','cook_time','cooktime','זמן'],
+  desc:       ['תיאור','description','desc','about'],
+  ingredients:['מרכיבים','מצרכים','חומרים','ingredients','ingredient'],
+  steps:      ['הוראות הכנה','שלבים','הוראות','אופן ההכנה','הכנה','instructions','steps','directions'],
+  notes:      ['הערות','הערה','notes','remarks','tips'],
+  mainImage:  ['תמונות ראשיות','תמונה ראשית','תמונה','main image','image','photo'],
   gallery:    ['גלריית תמונות','גלריה','gallery','images'],
-  // Difficulty + public are intentionally ignored per the spec.
 };
 
 function normalizeHeader(h) {
-  return String(h || '').trim().toLowerCase();
+  return stripHTML(String(h || ''))
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function buildHeaderMap(headerRow) {
   const map = {};
   headerRow.forEach((h, i) => {
     const n = normalizeHeader(h);
+    if (!n) return;
     for (const key of Object.keys(COL_ALIASES)) {
-      if (COL_ALIASES[key].some(alias => normalizeHeader(alias) === n)) {
+      if (map[key] != null) continue; // already mapped
+      const aliases = COL_ALIASES[key].map(a => normalizeHeader(a));
+      if (aliases.some(alias => alias === n || n.includes(alias) || alias.includes(n))) {
         map[key] = i;
       }
     }
   });
+  // Debug: log what was found (remove later)
+  if (map.title == null) {
+    console.warn('[import] Headers found:', headerRow.map(normalizeHeader));
+  }
+  return map;
+}
+
+// Fallback: if title column not found, try to use first non-empty column
+function inferTitleColumn(map, headerRow) {
+  if (map.title != null) return map;
+  const firstText = headerRow.findIndex(h => normalizeHeader(h));
+  if (firstText >= 0) return { ...map, title: firstText };
   return map;
 }
 
@@ -237,9 +255,12 @@ function importFromFile(file, onDone) {
         onDone(null, []);
         return;
       }
-      const map = buildHeaderMap(rows[0]);
+      let map = buildHeaderMap(rows[0]);
+      map = inferTitleColumn(map, rows[0]);
       if (map.title == null) {
-        onDone(new Error('לא נמצאה עמודת "שם המתכון" בקובץ'), null);
+        onDone(new Error(
+          `לא נמצאה עמודת שם המתכון בקובץ. עמודות שנמצאו: ${rows[0].map(normalizeHeader).filter(Boolean).join(', ') || '(ריק)'}`
+        ), null);
         return;
       }
       const recs = rows.slice(1)
