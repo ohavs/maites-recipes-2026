@@ -642,6 +642,7 @@
     customElements.define('image-slot', ImageSlot);
   }
 
-  // Expose setSlot so React components can inject images directly
+  // Expose setSlot/getSlot so React components can inject/read images directly
   window.__setImageSlot = setSlot;
+  window.__getImageSlot = getSlot;
 })();

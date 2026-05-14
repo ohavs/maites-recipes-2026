@@ -222,6 +222,7 @@ function App() {
               onExport={handleExport}
               onImport={handleImport}
               categories={categories}
+              onAddCategory={() => setShowAddCategory(true)}
             />
           )}
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
@@ -249,6 +250,7 @@ function App() {
               onSave={updateRecipe}
               onCancel={() => setEditingRecipeId(null)}
               categories={categories}
+              onAddCategory={() => setShowAddCategory(true)}
             />
           </div>
         )}

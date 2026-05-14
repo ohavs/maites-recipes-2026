@@ -216,19 +216,12 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '' }) {
 
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: '50%',
-        boxShadow: '0 14px 30px -10px rgba(0,0,0,.35), inset 0 -8px 18px rgba(0,0,0,.08)',
-        overflow: 'hidden',
-      }}>
-        <FoodArt id={recipeId} size={size} />
-        <image-slot ref={slotRef}
-          id={`food-${recipeId}${slotIdSuffix}`}
-          shape="circle"
-          placeholder=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-        ></image-slot>
-      </div>
+      <image-slot ref={slotRef}
+        id={`food-${recipeId}${slotIdSuffix}`}
+        shape="circle"
+        placeholder=""
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+      ></image-slot>
     </div>
   );
 }
@@ -429,11 +422,10 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           }} data-shared-img={sharedId}>
             <div style={{
               position: 'absolute',
-              top: '50%', insetInlineStart: -imgPokeOut, // poke OUT past the card's inline-start edge
+              top: '50%', insetInlineStart: -imgPokeOut,
               transform: 'translateY(-50%)',
-              filter: 'drop-shadow(0 18px 24px rgba(0,0,0,.22))',
             }}>
-              <FoodImage recipeId={recipe.id} size={imgSize} />
+              <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} />
             </div>
           </div>
         </div>

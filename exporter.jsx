@@ -79,15 +79,17 @@ function parseIngredient(raw) {
   return { qty: '', name: t, icon: guessIcon(t) };
 }
 
-// Parse "כותרת. תיאור" or "כותרת - תיאור" or whole line as body.
-function parseStep(raw, idx) {
-  const t = String(raw).trim();
-  let m = t.match(/^(.+?)\s*[\-–—:]\s*(.+)$/);
-  if (m) return { title: m[1].trim(), body: m[2].trim() };
-  // first sentence as title if short enough
-  m = t.match(/^([^.!?\n]{2,40})[.!?]\s*(.+)$/);
-  if (m) return { title: m[1].trim(), body: m[2].trim() };
-  return { title: `שלב ${idx + 1}`, body: t };
+// Split steps from a raw cell: newlines first, then inline numbered list.
+function splitSteps(raw) {
+  if (raw == null) return [];
+  const s = stripHTML(String(raw)).trim();
+  if (!s) return [];
+  const byLines = s.split(/[\r\n;|]+/).map(x => x.trim()).filter(Boolean);
+  if (byLines.length > 1) return byLines;
+  // Detect "1. text 2. text" or "1) text 2) text" on a single line
+  const parts = s.split(/\s+(?=\d+[.)]\s)/).map(x => x.trim()).filter(Boolean);
+  if (parts.length > 1) return parts;
+  return [s];
 }
 
 // Heuristically pick an ingredient icon from the name (Hebrew keywords).
@@ -205,7 +207,9 @@ function rowToRecipe(row, map) {
   const notes = stripHTML(String(get('notes') || ''));
 
   const ingredients = splitMulti(get('ingredients')).map(parseIngredient);
-  const steps = splitMulti(get('steps')).map((s, i) => parseStep(s, i));
+  const steps = splitSteps(get('steps'))
+    .map(s => s.replace(/^\d+[.)]\s*/, '').trim()).filter(Boolean)
+    .map((s, i) => ({ title: `שלב ${i + 1}`, body: s }));
 
   // Image cells: not used to render (we don't fetch external URLs into the
   // image-slot component automatically), but we keep them in a meta field
@@ -274,7 +278,7 @@ function sheetToRecipe(sheetName, rows) {
   const galRaw     = get('גלריית תמונות','גלריה','gallery');
 
   const ingredients = splitMulti(ingRaw).map(parseIngredient).filter(i => i.name);
-  const steps = splitMulti(stepsRaw)
+  const steps = splitSteps(stepsRaw)
     .map(s => s.replace(/^\d+[.)]\s*/, '').trim())
     .filter(Boolean)
     .map((s, i) => ({ title: `שלב ${i + 1}`, body: s }));

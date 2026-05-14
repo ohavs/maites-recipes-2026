@@ -23,6 +23,16 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
     );
   }, [recipes, category, q]);
 
+  // Only show categories that have at least one recipe
+  const activeCats = uM(() => {
+    const used = new Set(recipes.map(r => r.category).filter(Boolean));
+    const all = categories || CATEGORIES;
+    return [
+      all.find(c => c.id === 'all') || { id: 'all', label: 'הכל', emoji: '🍽️' },
+      ...all.filter(c => c.id !== 'all' && used.has(c.id)),
+    ];
+  }, [recipes, categories]);
+
   return (
     <div className="scroll-y" style={{ height: '100%', position: 'relative' }}>
       {/* Brand bar: just "Maites" + density toggle + inline search */}
@@ -92,7 +102,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
       </div>
 
       <div style={{ padding: '12px 0 4px' }}>
-        <CategoryStrip active={category} onChange={onCategory} categories={categories} onAdd={onAddCategory}/>
+        <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory}/>
       </div>
 
       <div style={{ padding: '0 18px 130px', display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 }}>
@@ -169,7 +179,6 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             transform: `translateY(${-imgTranslate}px)`,
             transition: 'transform .05s linear',
             opacity: imgOpacity,
-            filter: `drop-shadow(0 30px 30px rgba(0,0,0,.18))`,
           }}>
             <ImageGallery recipeId={recipe.id}
               slots={recipe.gallery && recipe.gallery.length ? recipe.gallery : ['main']}
@@ -583,7 +592,7 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 // RecipeFormScreen — used for both "add new" and "edit existing".
 // Includes per-ingredient icon picker.
 // ───────────────────────────────────────────────────────────
-function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp }) {
+function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp, onAddCategory }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -596,6 +605,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [ings, setIngs] = uS(existing?.ingredients?.length ? existing.ingredients : [{ qty: '', name: '', icon: 'chef' }]);
   const [stepsArr, setStepsArr] = uS(existing?.steps?.length ? existing.steps : [{ title: '', body: '' }]);
   const [gallery, setGallery] = uS(existing?.gallery?.length ? existing.gallery : (defaultGallery ? defaultGallery() : ['main']));
+  const [mainSlot, setMainSlot] = uS(existing?.mainSlot || gallery[0] || 'main');
   // Stable ID for image slots — persists across re-renders so photos survive form edits
   const [recipeId] = uS(existing?.id || `new-${Date.now().toString(36)}`);
 
@@ -628,7 +638,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
       level: existing?.level || 'קל',
       favorite: existing?.favorite || false,
       notes: notes,
-      gallery,
+      gallery, mainSlot,
       ingredients: ings.filter(i => i.name.trim()).map(i => ({ qty: i.qty || '', name: i.name, icon: i.icon || 'chef' })),
       steps: stepsArr.filter(s => (s.title || '').trim() || (s.body || '').trim()),
     });
@@ -707,6 +717,13 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
                   boxShadow: '0 4px 10px rgba(0,0,0,.07)',
                 }}>{c.emoji} {c.label}</button>
             ))}
+            {onAddCategory && (
+              <button onClick={onAddCategory} style={{
+                border: '1.5px dashed rgba(0,0,0,.2)', cursor: 'pointer',
+                padding: '8px 14px', borderRadius: 999, background: 'transparent',
+                fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)',
+              }}>+ קטגוריה חדשה</button>
+            )}
           </div>
         </Field>
 
@@ -729,52 +746,14 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
         </Field>
 
         <Field label="תמונות המתכון">
-          <div style={{
-            background: p.bg, borderRadius: 18, padding: '16px 14px 12px', color: p.ink,
-            boxShadow: '0 4px 12px rgba(0,0,0,.06)',
-          }}>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              {gallery.map((slot, i) => (
-                <div key={slot} style={{ position: 'relative', flexShrink: 0 }}>
-                  <div style={{
-                    width: 88, height: 88, borderRadius: '50%', overflow: 'hidden',
-                    boxShadow: '0 6px 18px rgba(0,0,0,.18)',
-                    background: 'rgba(255,255,255,.25)',
-                  }}>
-                    <image-slot
-                      id={`food-${recipeId}-${slot}`}
-                      shape="circle"
-                      placeholder="הקישו"
-                      style={{ width: '100%', height: '100%', display: 'block' }}
-                    />
-                  </div>
-                  {gallery.length > 1 && (
-                    <button onClick={() => removeGallerySlot(slot)} style={{
-                      position: 'absolute', top: 0, insetInlineStart: 0,
-                      width: 22, height: 22, borderRadius: 999, border: 'none',
-                      background: 'rgba(28,22,32,.8)', color: '#fff',
-                      cursor: 'pointer', fontSize: 15, lineHeight: 1, display: 'grid', placeItems: 'center',
-                      boxShadow: '0 2px 6px rgba(0,0,0,.3)',
-                    }}>×</button>
-                  )}
-                </div>
-              ))}
-              <button onClick={addGallerySlot} style={{
-                width: 88, height: 88, borderRadius: '50%',
-                border: `2px dashed ${p.ink}55`,
-                background: 'rgba(255,255,255,.25)', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 4,
-                color: p.ink, fontFamily: 'inherit', fontSize: 11, fontWeight: 700,
-              }}>
-                <IconPlus size={20} strokeWidth={2.2}/>
-                <span>הוסף</span>
-              </button>
-            </div>
-            <p style={{ margin: '10px 0 0', fontSize: 11.5, opacity: .65, textAlign: 'center' }}>
-              הקישו על עיגול להעלאת תמונה
-            </p>
-          </div>
+          <PhotoManager
+            recipeId={recipeId}
+            gallery={gallery}
+            setGallery={setGallery}
+            mainSlot={mainSlot}
+            setMainSlot={setMainSlot}
+            palette={p}
+          />
         </Field>
 
         <Field label="מצרכים">
@@ -871,13 +850,156 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   );
 }
 
-// Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onExport, onImport, categories }) {
-  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories}/>;
+// ───────────────────────────────────────────────────────────
+// PhotoManager — simple grid of upload slots for the form
+// ───────────────────────────────────────────────────────────
+function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, palette }) {
+  const [previews, setPreviews] = uS({});
+  const inputRef = uR(null);
+  const [pickingSlot, setPickingSlot] = uS(null);
+  const p = palette;
+
+  // Load existing images from bridge on mount (may already be loaded if card was rendered)
+  uE(() => {
+    const tryLoad = () => {
+      if (!window.__getImageSlot) return;
+      const next = {};
+      let any = false;
+      gallery.forEach(slot => {
+        const data = window.__getImageSlot(`food-${recipeId}-${slot}`);
+        if (data && data.u) { next[slot] = data.u; any = true; }
+      });
+      if (any) setPreviews(prev => ({ ...prev, ...next }));
+    };
+    tryLoad();
+    const t = setTimeout(tryLoad, 700);
+    return () => clearTimeout(t);
+  }, [recipeId]);
+
+  const openPicker = (slot) => {
+    setPickingSlot(slot);
+    setTimeout(() => inputRef.current?.click(), 0);
+  };
+
+  const onFile = (e) => {
+    const file = e.target.files?.[0];
+    const slot = pickingSlot;
+    e.target.value = '';
+    setPickingSlot(null);
+    if (!file || !slot) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 900;
+        let { width: w, height: h } = img;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/webp', 0.85);
+        if (window.__setImageSlot) window.__setImageSlot(`food-${recipeId}-${slot}`, { u: dataUrl, s: 1, x: 0, y: 0 });
+        setPreviews(prev => {
+          if (!Object.values(prev).some(Boolean)) setMainSlot(slot);
+          return { ...prev, [slot]: dataUrl };
+        });
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const addSlot = () => setGallery(g => [...g, `g${Date.now().toString(36)}`]);
+
+  const removeSlot = (slot) => {
+    if (gallery.length <= 1) return;
+    const next = gallery.filter(s => s !== slot);
+    setGallery(next);
+    if (mainSlot === slot) setMainSlot(next[0]);
+    setPreviews(prev => { const n = { ...prev }; delete n[slot]; return n; });
+  };
+
+  return (
+    <div>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, flexDirection: 'row-reverse' }}>
+        {gallery.map(slot => {
+          const isMain = slot === mainSlot;
+          const preview = previews[slot];
+          return (
+            <div key={slot} style={{ position: 'relative' }}>
+              <button type="button" onClick={() => openPicker(slot)} style={{
+                width: 84, height: 84, borderRadius: 18, border: 'none', cursor: 'pointer',
+                background: preview ? 'transparent' : 'rgba(0,0,0,.07)',
+                overflow: 'hidden', padding: 0,
+                boxShadow: isMain ? `0 0 0 3px ${p.accent}` : '0 2px 10px rgba(0,0,0,.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'box-shadow .2s',
+              }}>
+                {preview
+                  ? <img src={preview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                  : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--ink-soft)' }}>
+                      <IconPlus size={22} strokeWidth={2} />
+                      <span style={{ fontSize: 10, fontWeight: 700 }}>תמונה</span>
+                    </div>
+                }
+              </button>
+              {isMain && (
+                <div style={{
+                  position: 'absolute', top: -7, insetInlineStart: -7,
+                  width: 22, height: 22, borderRadius: 999,
+                  background: p.accent, color: '#fff',
+                  display: 'grid', placeItems: 'center', fontSize: 12,
+                  pointerEvents: 'none', boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+                }}>★</div>
+              )}
+              {!isMain && preview && (
+                <button type="button" onClick={() => setMainSlot(slot)} title="הגדר כתמונה ראשית" style={{
+                  position: 'absolute', top: -7, insetInlineStart: -7,
+                  width: 22, height: 22, borderRadius: 999,
+                  background: 'rgba(255,255,255,.95)', color: 'var(--ink-soft)',
+                  border: 'none', cursor: 'pointer', fontSize: 12,
+                  display: 'grid', placeItems: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,.15)',
+                }}>☆</button>
+              )}
+              {gallery.length > 1 && (
+                <button type="button" onClick={() => removeSlot(slot)} style={{
+                  position: 'absolute', top: -7, insetInlineEnd: -7,
+                  width: 22, height: 22, borderRadius: 999,
+                  background: 'rgba(255,255,255,.95)', color: '#e34466',
+                  border: 'none', cursor: 'pointer', fontSize: 17, lineHeight: 1,
+                  display: 'grid', placeItems: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,.15)',
+                }}>×</button>
+              )}
+            </div>
+          );
+        })}
+        <button type="button" onClick={addSlot} style={{
+          width: 84, height: 84, borderRadius: 18,
+          border: '1.5px dashed rgba(0,0,0,.2)', background: 'transparent',
+          cursor: 'pointer', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 4, color: 'var(--ink-soft)',
+        }}>
+          <IconPlus size={18} strokeWidth={2} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>הוסיפי</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel, categories }) {
-  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel} categories={categories}/>;
+// Backwards-compat aliases so old call sites work:
+function AddRecipeScreen({ onAdd, onExport, onImport, categories, onAddCategory }) {
+  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories} onAddCategory={onAddCategory}/>;
+}
+
+function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory }) {
+  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel} categories={categories} onAddCategory={onAddCategory}/>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -1104,5 +1226,5 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
 Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
-  DeleteConfirm,
+  PhotoManager, DeleteConfirm,
 });
