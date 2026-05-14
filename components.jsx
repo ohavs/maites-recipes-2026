@@ -189,25 +189,29 @@ function FoodArt({ id, size = 200 }) {
 function FoodImage({ recipeId, size = 200, slotIdSuffix = '' }) {
   const slotRef = useRef(null);
   useEffect(() => {
-    // After image-slot mounts, hide its built-in text label so our SVG art
-    // shows through cleanly when the slot is empty.
+    // Make the image-slot transparent when empty so the FoodArt SVG shows through.
     const el = slotRef.current;
-    if (!el || !el.shadowRoot) return;
-    const restyle = () => {
+    if (!el) return;
+    const inject = () => {
       const sr = el.shadowRoot;
       if (!sr) return;
-      // inject a style override
       if (!sr.querySelector('#__art_override')) {
         const s = document.createElement('style');
         s.id = '__art_override';
         s.textContent = `
-          .empty .ph-label, .empty .ph-icon { display: none !important; }
-          .empty .ph { background: transparent !important; border: none !important; }
+          .frame { background: transparent !important; }
+          .ring { display: none !important; }
+          .empty svg { display: none !important; }
+          .cap { display: none !important; }
+          .sub { display: none !important; }
         `;
         sr.appendChild(s);
       }
     };
-    setTimeout(restyle, 50);
+    // Try immediately, then retry once shadow root is ready
+    inject();
+    const t = setTimeout(inject, 80);
+    return () => clearTimeout(t);
   }, []);
 
   return (
@@ -835,9 +839,51 @@ function Phone({ children, statusInk = '#2c1d27', bg = 'transparent', width = 39
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// RecipeCardSkeleton — placeholder while recipes load
+// ───────────────────────────────────────────────────────────
+function RecipeCardSkeleton({ density = 'comfy' }) {
+  const isCompact = density === 'compact';
+  const cardH   = isCompact ? 116 : 168;
+  const imgSize = isCompact ? 132 : 198;
+  const imgPoke = Math.round(imgSize * 0.22);
+  return (
+    <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
+      <div style={{
+        borderRadius: 'var(--radius-card)', minHeight: cardH,
+        background: 'rgba(255,255,255,.55)',
+        boxShadow: 'var(--shadow-card)', overflow: 'visible',
+      }}>
+        <div style={{
+          position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
+          padding: `${isCompact ? 14 : 18}px 24px`, gap: 8, alignItems: 'center',
+        }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ height: isCompact ? 18 : 24, width: '55%', borderRadius: 8, background: 'rgba(0,0,0,.09)' }}/>
+            {!isCompact && <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'rgba(0,0,0,.06)' }}/>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ height: 26, width: 64, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
+              <div style={{ height: 26, width: 44, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
+            </div>
+          </div>
+          <div style={{ width: imgSize - imgPoke, height: imgSize, flexShrink: 0, position: 'relative' }}>
+            <div style={{
+              position: 'absolute', top: '50%', insetInlineStart: -imgPoke,
+              transform: 'translateY(-50%)',
+              width: imgSize, height: imgSize, borderRadius: '50%',
+              background: 'rgba(0,0,0,.07)',
+            }}/>
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
+    </div>
+  );
+}
+
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  Tilt, FoodArt, FoodImage, ImageGallery,
+  Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
   RecipeCard, Pill, FavHeart,
   BottomNav, CategoryStrip, AddCategorySheet, StatusBar, Phone,
 });

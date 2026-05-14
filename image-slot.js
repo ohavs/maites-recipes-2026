@@ -593,8 +593,8 @@
       this._ring.style.borderRadius = mask ? '' : radius;
       this._ring.style.display = mask ? 'none' : '';
 
-      // Controls and reframe entry gate on this so share links stay read-only.
-      const editable = !!(window.omelette && window.omelette.writeFile);
+      // Editable when running in the design environment OR when the Firestore bridge is available.
+      const editable = !!(window.omelette && window.omelette.writeFile) || !!window.__imageSlotBridge;
       this.toggleAttribute('data-editable', editable);
       this._sub.style.display = editable ? '' : 'none';
 
@@ -641,4 +641,7 @@
   if (!customElements.get('image-slot')) {
     customElements.define('image-slot', ImageSlot);
   }
+
+  // Expose setSlot so React components can inject images directly
+  window.__setImageSlot = setSlot;
 })();

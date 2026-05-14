@@ -12,7 +12,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  const [recipes, setRecipes] = $S(RECIPES);
+  const [recipes, setRecipes] = $S([]);
+  const [recipesLoaded, setRecipesLoaded] = $S(false);
   const [categories, setCategories] = $S(() => {
     try { const s = localStorage.getItem('maites.cats'); return s ? JSON.parse(s) : CATEGORIES; }
     catch { return CATEGORIES; }
@@ -72,11 +73,11 @@ function App() {
 
   // Load from Firestore on mount
   $E(() => {
-    if (typeof db_loadRecipes === 'undefined') return;
+    if (typeof db_loadRecipes === 'undefined') { setRecipesLoaded(true); return; }
     db_loadRecipes().then(recs => {
       if (recs && recs.length > 0) setRecipes(recs);
-      else if (recs !== null) db_seedRecipes(RECIPES).catch(() => {});
-    }).catch(() => {});
+      setRecipesLoaded(true);
+    }).catch(() => { setRecipesLoaded(true); });
     db_loadCategories().then(cats => {
       if (cats && cats.length > 0) {
         setCategories(cats);
@@ -192,6 +193,7 @@ function App() {
           {tab === 'home' && (
             <HomeScreen
               recipes={recipes}
+              recipesLoaded={recipesLoaded}
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}

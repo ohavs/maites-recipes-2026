@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory }) {
+function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
 
@@ -96,10 +96,13 @@ function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant,
       </div>
 
       <div style={{ padding: '0 18px 130px', display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 }}>
-        {filtered.length === 0 && (
+        {!recipesLoaded && (
+          [1, 2, 3].map(i => <RecipeCardSkeleton key={i} density={density} />)
+        )}
+        {recipesLoaded && filtered.length === 0 && (
           <EmptyState text={q ? `אין תוצאות עבור "${q}"` : 'אין מתכונים בקטגוריה הזו עדיין'} emoji={q ? "🔍" : "🍽️"} />
         )}
-        {filtered.map((r, i) => (
+        {recipesLoaded && filtered.map((r, i) => (
           <RecipeCard key={`${sharedKey}-${r.id}`}
             recipe={r} index={i}
             onOpen={onOpen}
@@ -396,10 +399,33 @@ function IngredientRow({ ing, palette, index }) {
 // ───────────────────────────────────────────────────────────
 function StepsScreen({ recipe, onClose }) {
   const p = PALETTES[recipe.palette];
+  const steps = recipe.steps || [];
   const [step, setStep] = uS(0);
   const [checked, setChecked] = uS({});
 
-  const total = recipe.steps.length;
+  // No steps: show description/notes as scrollable text
+  if (steps.length === 0) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: p.bg, padding: '18px 22px 26px', borderRadius: '0 0 32px 32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>הוראות הכנה</div>
+            <RoundBtn onClick={onClose} title="חזרה" color="rgba(255,255,255,.85)" ink={p.ink} size={36}>
+              <IconClose size={18} strokeWidth={2.4}/>
+            </RoundBtn>
+          </div>
+          <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
+        </div>
+        <div className="scroll-y" style={{ flex: 1, padding: '24px 22px 40px' }}>
+          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.8, color: 'var(--ink-soft)', whiteSpace: 'pre-line' }}>
+            {recipe.description || 'אין הוראות הכנה למתכון זה.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const total = steps.length;
   const progress = ((step + 1) / total) * 100;
 
   return (
@@ -435,12 +461,12 @@ function StepsScreen({ recipe, onClose }) {
       </div>
 
       <div style={{ flex: 1, padding: '22px 22px 110px', position: 'relative' }}>
-        <StepCard step={recipe.steps[step]} index={step} palette={p}
+        <StepCard step={steps[step]} index={step} palette={p}
           done={!!checked[step]}
           onToggle={() => setChecked(c => ({ ...c, [step]: !c[step] }))}/>
 
         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 18 }}>
-          {recipe.steps.map((_, i) => (
+          {steps.map((_, i) => (
             <span key={i} style={{
               width: i === step ? 22 : 8, height: 8, borderRadius: 999,
               background: i === step ? p.bg : (i < step ? p.accent : 'rgba(0,0,0,.15)'),
@@ -570,6 +596,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [ings, setIngs] = uS(existing?.ingredients?.length ? existing.ingredients : [{ qty: '', name: '', icon: 'chef' }]);
   const [stepsArr, setStepsArr] = uS(existing?.steps?.length ? existing.steps : [{ title: '', body: '' }]);
   const [gallery, setGallery] = uS(existing?.gallery?.length ? existing.gallery : (defaultGallery ? defaultGallery() : ['main']));
+  // Stable ID for image slots — persists across re-renders so photos survive form edits
+  const [recipeId] = uS(existing?.id || `new-${Date.now().toString(36)}`);
 
   const updateIng = (i, k, v) => setIngs(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
   const addIng = () => setIngs(arr => [...arr, { qty: '', name: '', icon: 'chef' }]);
@@ -585,8 +613,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
 
   const save = () => {
     if (!canSave) return;
-    const id = existing?.id
-      || (title.trim().replace(/\s+/g, '-').slice(0, 24) + '-' + Date.now().toString(36));
+    const id = existing?.id || recipeId;
     const total = (+prepTime || 0) + (+cookTime || 0);
     onSave({
       ...(existing || {}),
@@ -701,26 +728,52 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           </div>
         </Field>
 
-        <Field label="גלריית תמונות">
+        <Field label="תמונות המתכון">
           <div style={{
-            background: p.bg, borderRadius: 18, padding: 14, color: p.ink,
+            background: p.bg, borderRadius: 18, padding: '16px 14px 12px', color: p.ink,
             boxShadow: '0 4px 12px rgba(0,0,0,.06)',
           }}>
-            <ImageGallery recipeId={existing?.id || 'new'} slots={gallery} size={180}
-              onAddSlot={addGallerySlot}/>
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-              {gallery.map(s => (
-                <button key={s} onClick={() => removeGallerySlot(s)}
-                  disabled={gallery.length === 1}
-                  style={{
-                    border: 'none', cursor: gallery.length === 1 ? 'default' : 'pointer',
-                    background: 'rgba(255,255,255,.75)', color: p.ink,
-                    padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                    fontFamily: 'inherit',
-                    opacity: gallery.length === 1 ? .5 : 1,
-                  }}>{s === 'main' ? 'ראשית' : s} ×</button>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              {gallery.map((slot, i) => (
+                <div key={slot} style={{ position: 'relative', flexShrink: 0 }}>
+                  <div style={{
+                    width: 88, height: 88, borderRadius: '50%', overflow: 'hidden',
+                    boxShadow: '0 6px 18px rgba(0,0,0,.18)',
+                    background: 'rgba(255,255,255,.25)',
+                  }}>
+                    <image-slot
+                      id={`food-${recipeId}-${slot}`}
+                      shape="circle"
+                      placeholder="הקישו"
+                      style={{ width: '100%', height: '100%', display: 'block' }}
+                    />
+                  </div>
+                  {gallery.length > 1 && (
+                    <button onClick={() => removeGallerySlot(slot)} style={{
+                      position: 'absolute', top: 0, insetInlineStart: 0,
+                      width: 22, height: 22, borderRadius: 999, border: 'none',
+                      background: 'rgba(28,22,32,.8)', color: '#fff',
+                      cursor: 'pointer', fontSize: 15, lineHeight: 1, display: 'grid', placeItems: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,.3)',
+                    }}>×</button>
+                  )}
+                </div>
               ))}
+              <button onClick={addGallerySlot} style={{
+                width: 88, height: 88, borderRadius: '50%',
+                border: `2px dashed ${p.ink}55`,
+                background: 'rgba(255,255,255,.25)', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 4,
+                color: p.ink, fontFamily: 'inherit', fontSize: 11, fontWeight: 700,
+              }}>
+                <IconPlus size={20} strokeWidth={2.2}/>
+                <span>הוסף</span>
+              </button>
             </div>
+            <p style={{ margin: '10px 0 0', fontSize: 11.5, opacity: .65, textAlign: 'center' }}>
+              הקישו על עיגול להעלאת תמונה
+            </p>
           </div>
         </Field>
 
