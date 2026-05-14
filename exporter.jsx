@@ -153,7 +153,7 @@ const COL_ALIASES = {
   cook:       ['זמן בישול','זמן בישול (דקות)','בישול','cook','cook_time','cooktime','זמן'],
   desc:       ['תיאור','description','desc','about'],
   ingredients:['מרכיבים','מצרכים','חומרים','ingredients','ingredient'],
-  steps:      ['הוראות הכנה','שלבים','הוראות','אופן ההכנה','הכנה','instructions','steps','directions'],
+  steps:      ['הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה','ביצוע','דרך הכנה','הכנת המנה','instructions','steps','directions','method','preparation'],
   notes:      ['הערות','הערה','notes','remarks','tips'],
   mainImage:  ['תמונות ראשיות','תמונה ראשית','תמונה','main image','image','photo'],
   gallery:    ['גלריית תמונות','גלריה','gallery','images'],
@@ -211,14 +211,8 @@ function rowToRecipe(row, map) {
   const notes = stripHTML(String(get('notes') || ''));
 
   const ingredients = splitMulti(get('ingredients')).map(parseIngredient);
-  const steps = splitSteps(get('steps'))
-    .map(s => s.replace(/^\d+[.)]\s*/, '').trim()).filter(Boolean)
-    .map((s, i) => ({ title: `שלב ${i + 1}`, body: s }));
+  const instructions = stripHTML(String(get('steps') || ''));
 
-  // Image cells: not used to render (we don't fetch external URLs into the
-  // image-slot component automatically), but we keep them in a meta field
-  // so the user can copy them in. Gallery still seeds slot ids so the user
-  // can drop additional photos.
   const mainImages = splitMulti(get('mainImage'));
   const galleryUrls = splitMulti(get('gallery'));
   const totalSlots = Math.max(1, mainImages.length + galleryUrls.length);
@@ -228,6 +222,7 @@ function rowToRecipe(row, map) {
   return {
     id, title,
     description: desc,
+    instructions,
     cuisine,
     palette: pickPalette(title),
     category,
@@ -239,53 +234,80 @@ function rowToRecipe(row, map) {
     notes,
     gallery,
     ingredients,
-    steps,
-    // metadata only — image-slot images are managed by the user dropping files
+    steps: [],
     _importedImageUrls: { main: mainImages, gallery: galleryUrls },
   };
 }
 
 // ─── Vertical format: each Sheet = one recipe ─────────────────
 // Row 0: title (column A only, no label)
-// Rows 1–N: [fieldLabel, value]  — e.g. ["מרכיבים", "..."]
+// Rows 1–N: [fieldLabel, value] in cols A+B, OR single-column continuation lines
 function sheetToRecipe(sheetName, rows) {
   if (!rows || rows.length === 0) return null;
   const title = stripHTML(String(rows[0] && rows[0][0] != null ? rows[0][0] : sheetName || '')).trim();
   if (!title) return null;
 
-  // Build key→value map from label rows
+  // All known label patterns for detecting field labels in single-column rows
+  const allAliasNorms = Object.values(COL_ALIASES).flat().map(normalizeHeader);
+  const looksLikeLabel = (s) => {
+    const n = normalizeHeader(s);
+    return allAliasNorms.some(a => n === a || n.startsWith(a + ' ') || a.startsWith(n + ' '));
+  };
+
+  // Build key→value map — handles [label, value] rows AND single-column continuation lines
   const kv = {};
+  let lastKey = null;
   for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 2) continue;
-    const key = normalizeHeader(row[0]);
-    const val = String(row[1] ?? '').trim();
-    if (key && val) kv[key] = val;
+    const row = rows[i] || [];
+    const a = row[0] != null ? String(row[0]).trim() : '';
+    const b = row[1] != null ? String(row[1]).trim() : '';
+    if (!a && !b) continue;
+    if (a && b) {
+      // Standard [label, value] row
+      const key = normalizeHeader(a);
+      if (key) { lastKey = key; kv[key] = kv[key] ? kv[key] + '\n' + b : b; }
+    } else if (a) {
+      if (looksLikeLabel(a)) {
+        lastKey = normalizeHeader(a);
+      } else if (lastKey) {
+        // Continuation value for previous field
+        kv[lastKey] = kv[lastKey] ? kv[lastKey] + '\n' + a : a;
+      }
+    } else if (b && lastKey) {
+      // Empty col A, value in col B — continuation
+      kv[lastKey] = kv[lastKey] ? kv[lastKey] + '\n' + b : b;
+    }
   }
+
+  // Lookup with exact match then prefix/suffix partial match, always strip HTML
   const get = (...labels) => {
     for (const lbl of labels) {
-      const v = kv[normalizeHeader(lbl)];
-      if (v) return v;
+      const n = normalizeHeader(lbl);
+      if (kv[n]) return stripHTML(kv[n]);
+    }
+    // Partial match pass (key contains label or label contains key)
+    for (const lbl of labels) {
+      const n = normalizeHeader(lbl);
+      for (const k of Object.keys(kv)) {
+        if (k.includes(n) || n.includes(k)) return stripHTML(kv[k]);
+      }
     }
     return '';
   };
 
-  const cuisine    = get('סוג מטבח','מטבח','קטגוריה');
+  const cuisine    = get('סוג מטבח','מטבח','קטגוריה','cuisine');
   const level      = get('רמת קושי','רמת קשיים') || 'קל';
-  const prepTime   = parseTime(get('זמן הכנה'));
-  const cookTime   = parseTime(get('זמן בישול'));
-  const desc       = get('תיאור','description');
-  const ingRaw     = get('מרכיבים','מצרכים','חומרים');
-  const stepsRaw   = get('הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה');
-  const notes      = get('הערות','הערה','notes');
-  const mainImgRaw = get('תמונות ראשיות','תמונה ראשית','תמונה');
+  const prepTime   = parseTime(get('זמן הכנה','prep'));
+  const cookTime   = parseTime(get('זמן בישול','cook'));
+  const desc       = get('תיאור','description','desc','about');
+  const ingRaw     = get('מרכיבים','מצרכים','חומרים','ingredients');
+  const instrRaw   = get('הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה','ביצוע','דרך הכנה','הכנת המנה','instructions','steps','directions','method');
+  const notes      = get('הערות','הערה','notes','remarks','tips');
+  const mainImgRaw = get('תמונות ראשיות','תמונה ראשית','תמונה','image');
   const galRaw     = get('גלריית תמונות','גלריה','gallery');
 
   const ingredients = splitMulti(ingRaw).map(parseIngredient).filter(i => i.name);
-  const steps = splitSteps(stepsRaw)
-    .map(s => s.replace(/^\d+[.)]\s*/, '').trim())
-    .filter(Boolean)
-    .map((s, i) => ({ title: `שלב ${i + 1}`, body: s }));
+  const instructions = instrRaw; // plain text — no structured steps for Excel imports
 
   const mainImages = mainImgRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
   const galImages  = galRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
@@ -294,15 +316,16 @@ function sheetToRecipe(sheetName, rows) {
 
   const id = makeId(title);
   return {
-    id, title, subtitle: '',
-    description: desc, cuisine,
+    id, title,
+    description: desc, instructions, cuisine,
     palette: pickPalette(title),
     category: guessCategory(cuisine),
     prepTime, cookTime,
     time: prepTime + cookTime,
     servings: 4, level,
     favorite: false, notes,
-    gallery, ingredients, steps,
+    gallery, ingredients,
+    steps: [],
     _importedImageUrls: { main: mainImages, gallery: galImages },
   };
 }

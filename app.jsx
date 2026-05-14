@@ -162,6 +162,9 @@ function App() {
       if (err) { showToast(err.message || 'שגיאה בקריאת הקובץ'); return; }
       if (!recs?.length) { showToast('לא נמצאו מתכונים בקובץ'); return; }
 
+      // Auto-create categories for incoming recipes (uses current categories state)
+      recs.forEach(r => ensureCategoryExists(r.category, categories));
+
       // Deduplicate by title (case-insensitive)
       setRecipes(existing => {
         const existingTitles = new Set(existing.map(r => r.title.trim().toLowerCase()));
@@ -171,8 +174,6 @@ function App() {
         if (newRecs.length > 0 && typeof db_saveRecipe !== 'undefined') {
           newRecs.forEach(r => db_saveRecipe(r).catch(() => {}));
         }
-        // Auto-create categories for any new recipe category ids
-        newRecs.forEach(r => ensureCategoryExists(r.category, existing));
 
         const msg = newRecs.length === 0
           ? `כל המתכונים כבר קיימים (${dupCount} כפולים דולגו)`

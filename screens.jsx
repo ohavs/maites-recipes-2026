@@ -253,7 +253,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               boxShadow: 'var(--shadow-card)',
             }}>
-            <span>{recipe.steps?.length > 0 ? `בואו נכין יחד · ${recipe.steps.length} שלבים` : 'הוראות הכנה'}</span>
+            <span>{recipe.steps?.length > 0 ? `בואו נכין יחד · ${recipe.steps.length} שלבים` : (recipe.instructions || recipe.description ? 'הוראות הכנה' : 'הוראות הכנה')}</span>
             <span style={{
               width: 36, height: 36, borderRadius: 999, background: p.ink, color: p.bg,
               display: 'grid', placeItems: 'center',
@@ -425,7 +425,7 @@ function StepsScreen({ recipe, onClose }) {
         </div>
         <div className="scroll-y" style={{ flex: 1, padding: '24px 22px 40px' }}>
           <p style={{ margin: 0, fontSize: 16, lineHeight: 1.9, color: 'var(--ink)', whiteSpace: 'pre-line' }}>
-            {recipe.description || 'אין הוראות הכנה למתכון זה.'}
+            {recipe.instructions || recipe.description || 'אין הוראות הכנה למתכון זה.'}
           </p>
         </div>
       </div>
