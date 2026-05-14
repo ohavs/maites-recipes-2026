@@ -56,14 +56,25 @@ function splitMulti(s) {
     .filter(Boolean);
 }
 
-// Parse "1 כוס - קמח" or "1 כוס, קמח" or just "קמח" into {qty, name}.
+// Parse time strings like "15 דקות", "10", "" → number of minutes.
+function parseTime(s) {
+  const m = String(s || '').match(/(\d+(?:\.\d+)?)/);
+  return m ? Math.round(+m[1]) : 0;
+}
+
+// Parse "qty units name" — handles multiple formats:
+//   "500 גרם בשר", "2 כפות שמן", "4-5 שיני שום", "1 כוס - קמח", "קמח"
 function parseIngredient(raw) {
   const t = String(raw).trim();
-  // try " - " separator first
-  let m = t.match(/^(.+?)\s*[\-–—]\s*(.+)$/);
+  if (!t) return { qty: '', name: '', icon: 'chef' };
+  // em/en dash explicit separator
+  let m = t.match(/^(.+?)\s*[–—]\s*(.+)$/);
   if (m) return { qty: m[1].trim(), name: m[2].trim(), icon: guessIcon(m[2]) };
-  // fallback to comma
-  m = t.match(/^(.+?),\s*(.+)$/);
+  // hyphen surrounded by spaces (not numeric range like "4-5")
+  m = t.match(/^(.+?)\s+-\s+(.+)$/);
+  if (m) return { qty: m[1].trim(), name: m[2].trim(), icon: guessIcon(m[2]) };
+  // number + optional unit + ingredient name
+  m = t.match(/^([\d\/\-\.¼-¾⅐-↉]+(?:\s+(?:גרם|ק"ג|מ"ל|ליטר|כוס|כוסות|כפות|כף|כפיות|כפית|יח'|יח׳|יחידות|שיני|שן|ענפי|ענף|חבילה|פרוסות|פרוסה|קמצוץ|טיפות|טיפה|מנות|מנה|גביע|גביעים|חתיכות|עלים|עלי|ראשי|ראש|צרור|פחית|קופסא))?)\s+(.{2,})$/u);
   if (m) return { qty: m[1].trim(), name: m[2].trim(), icon: guessIcon(m[2]) };
   return { qty: '', name: t, icon: guessIcon(t) };
 }
@@ -226,46 +237,109 @@ function rowToRecipe(row, map) {
   };
 }
 
-function importFromFile(file, onDone) {
-  const isXLSX = /\.(xlsx|xls)$/i.test(file.name) || file.type.includes('sheet') || file.type.includes('excel');
-  const isCSV  = /\.csv$/i.test(file.name) || file.type === 'text/csv';
+// ─── Vertical format: each Sheet = one recipe ─────────────────
+// Row 0: title (column A only, no label)
+// Rows 1–N: [fieldLabel, value]  — e.g. ["מרכיבים", "..."]
+function sheetToRecipe(sheetName, rows) {
+  if (!rows || rows.length === 0) return null;
+  const title = stripHTML(String(rows[0] && rows[0][0] != null ? rows[0][0] : sheetName || '')).trim();
+  if (!title) return null;
 
-  if (!window.XLSX && !isCSV) {
-    onDone(new Error('SheetJS not loaded'), null);
-    return;
+  // Build key→value map from label rows
+  const kv = {};
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 2) continue;
+    const key = normalizeHeader(row[0]);
+    const val = String(row[1] ?? '').trim();
+    if (key && val) kv[key] = val;
   }
+  const get = (...labels) => {
+    for (const lbl of labels) {
+      const v = kv[normalizeHeader(lbl)];
+      if (v) return v;
+    }
+    return '';
+  };
+
+  const cuisine    = get('סוג מטבח','מטבח','קטגוריה');
+  const level      = get('רמת קושי','רמת קשיים') || 'קל';
+  const prepTime   = parseTime(get('זמן הכנה'));
+  const cookTime   = parseTime(get('זמן בישול'));
+  const desc       = get('תיאור','description');
+  const ingRaw     = get('מרכיבים','מצרכים','חומרים');
+  const stepsRaw   = get('הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה');
+  const notes      = get('הערות','הערה','notes');
+  const mainImgRaw = get('תמונות ראשיות','תמונה ראשית','תמונה');
+  const galRaw     = get('גלריית תמונות','גלריה','gallery');
+
+  const ingredients = splitMulti(ingRaw).map(parseIngredient).filter(i => i.name);
+  const steps = splitMulti(stepsRaw)
+    .map(s => s.replace(/^\d+[.)]\s*/, '').trim())
+    .filter(Boolean)
+    .map((s, i) => ({ title: `שלב ${i + 1}`, body: s }));
+
+  const mainImages = mainImgRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
+  const galImages  = galRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
+  const totalSlots = Math.max(1, mainImages.length + galImages.length);
+  const gallery    = ['main', ...Array.from({ length: totalSlots - 1 }, (_, i) => `g${i + 1}`)];
+
+  const id = makeId(title);
+  return {
+    id, title, subtitle: '',
+    description: desc, cuisine,
+    palette: pickPalette(title),
+    category: guessCategory(cuisine),
+    prepTime, cookTime,
+    time: prepTime + cookTime,
+    servings: 4, level,
+    favorite: false, notes,
+    gallery, ingredients, steps,
+    _importedImageUrls: { main: mainImages, gallery: galImages },
+  };
+}
+
+function importFromFile(file, onDone) {
+  if (!window.XLSX) { onDone(new Error('SheetJS not loaded'), null); return; }
+  const isCSV = /\.csv$/i.test(file.name) || file.type === 'text/csv';
 
   const fr = new FileReader();
   fr.onload = () => {
     try {
-      let rows;
-      if (isCSV) {
-        // Fallback: simple CSV parse with SheetJS (it handles CSV too).
-        const text = String(fr.result || '');
-        const wb = window.XLSX.read(text, { type: 'string' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+      const wb = isCSV
+        ? window.XLSX.read(String(fr.result || ''), { type: 'string' })
+        : window.XLSX.read(new Uint8Array(fr.result), { type: 'array' });
+
+      if (!wb || !wb.SheetNames.length) { onDone(null, []); return; }
+
+      // Detect format:
+      // "Vertical" = multi-sheet OR single sheet whose first row has only 1 cell
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const firstRows  = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1, blankrows: false });
+      const isVertical = wb.SheetNames.length > 1 ||
+        (firstRows.length > 1 && (firstRows[0] || []).length <= 1 && (firstRows[1] || []).length === 2);
+
+      let recs;
+      if (isVertical) {
+        // One recipe per sheet — parse vertically
+        recs = wb.SheetNames.map(name => {
+          const rows = window.XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: false });
+          return sheetToRecipe(name, rows);
+        }).filter(Boolean);
       } else {
-        const data = new Uint8Array(fr.result);
-        const wb = window.XLSX.read(data, { type: 'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+        // One recipe per row (horizontal format)
+        if (!firstRows || firstRows.length < 2) { onDone(null, []); return; }
+        let map = buildHeaderMap(firstRows[0]);
+        map = inferTitleColumn(map, firstRows[0]);
+        if (map.title == null) {
+          onDone(new Error(
+            `לא נמצאה עמודת שם המתכון. עמודות שנמצאו: ${(firstRows[0] || []).map(normalizeHeader).filter(Boolean).join(', ') || '(ריק)'}`
+          ), null);
+          return;
+        }
+        recs = firstRows.slice(1).map(r => rowToRecipe(r, map)).filter(Boolean);
       }
-      if (!rows || rows.length < 2) {
-        onDone(null, []);
-        return;
-      }
-      let map = buildHeaderMap(rows[0]);
-      map = inferTitleColumn(map, rows[0]);
-      if (map.title == null) {
-        onDone(new Error(
-          `לא נמצאה עמודת שם המתכון בקובץ. עמודות שנמצאו: ${rows[0].map(normalizeHeader).filter(Boolean).join(', ') || '(ריק)'}`
-        ), null);
-        return;
-      }
-      const recs = rows.slice(1)
-        .map(r => rowToRecipe(r, map))
-        .filter(Boolean);
+
       onDone(null, recs);
     } catch (e) {
       console.error(e);
@@ -273,7 +347,6 @@ function importFromFile(file, onDone) {
     }
   };
   fr.onerror = () => onDone(fr.error, null);
-
   if (isCSV) fr.readAsText(file, 'utf-8');
   else       fr.readAsArrayBuffer(file);
 }
