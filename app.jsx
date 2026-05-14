@@ -13,8 +13,13 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   const [recipes, setRecipes] = $S(RECIPES);
+  const [categories, setCategories] = $S(() => {
+    try { const s = localStorage.getItem('maites.cats'); return s ? JSON.parse(s) : CATEGORIES; }
+    catch { return CATEGORIES; }
+  });
   const [tab, setTab] = $S('home');
   const [category, setCategory] = $S('all');
+  const [showAddCategory, setShowAddCategory] = $S(false);
   const [openRecipeId, setOpenRecipeId] = $S(null);
   const [cookRecipeId, setCookRecipeId] = $S(null);
   const [editingRecipeId, setEditingRecipeId] = $S(null);
@@ -52,26 +57,61 @@ function App() {
   const editingRecipe  = recipes.find(r => r.id === editingRecipeId)  || null;
   const deletingRecipe = recipes.find(r => r.id === deletingRecipeId) || null;
 
+  // Load from Firestore on mount
+  $E(() => {
+    if (typeof db_loadRecipes === 'undefined') return;
+    db_loadRecipes().then(recs => {
+      if (recs && recs.length > 0) setRecipes(recs);
+      else if (recs !== null) db_seedRecipes(RECIPES).catch(() => {});
+    }).catch(() => {});
+    db_loadCategories().then(cats => {
+      if (cats && cats.length > 0) {
+        setCategories(cats);
+        try { localStorage.setItem('maites.cats', JSON.stringify(cats)); } catch {}
+      }
+    }).catch(() => {});
+  }, []);
+
+  const addCategory = (cat) => {
+    const next = [...categories, cat];
+    setCategories(next);
+    try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+  };
+
   const toggleFav = (id) =>
-    setRecipes(rs => rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    setRecipes(rs => {
+      const updated = rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r);
+      const changed = updated.find(r => r.id === id);
+      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      return updated;
+    });
 
   const addRecipe = (rec) => {
     setRecipes(rs => [rec, ...rs]);
+    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
     setTab('home');
     showToast(`"${rec.title}" נוסף לאוסף 🎉`);
   };
 
   const updateRecipe = (rec) => {
     setRecipes(rs => rs.map(r => r.id === rec.id ? { ...r, ...rec } : r));
+    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
     setEditingRecipeId(null);
     showToast(`עודכן: "${rec.title}"`);
   };
 
   const updateNotes = (id, notes) =>
-    setRecipes(rs => rs.map(r => r.id === id ? { ...r, notes } : r));
+    setRecipes(rs => {
+      const updated = rs.map(r => r.id === id ? { ...r, notes } : r);
+      const changed = updated.find(r => r.id === id);
+      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      return updated;
+    });
 
   const deleteRecipe = (id) => {
     setRecipes(rs => rs.filter(r => r.id !== id));
+    if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(() => {});
     setOpenRecipeId(null);
     setDeletingRecipeId(null);
     showToast('המתכון נמחק');
@@ -131,6 +171,8 @@ function App() {
               category={category}
               onCategory={setCategory}
               sharedKey={`${t.cardVariant}-${density}`}
+              categories={categories}
+              onAddCategory={() => setShowAddCategory(true)}
             />
           )}
           {tab === 'favorites' && (
@@ -148,6 +190,7 @@ function App() {
               onAdd={addRecipe}
               onExport={handleExport}
               onImport={handleImport}
+              categories={categories}
             />
           )}
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
@@ -174,6 +217,7 @@ function App() {
               recipe={editingRecipe}
               onSave={updateRecipe}
               onCancel={() => setEditingRecipeId(null)}
+              categories={categories}
             />
           </div>
         )}
@@ -203,6 +247,13 @@ function App() {
             animation: 'toastIn .3s cubic-bezier(.2,1.3,.4,1)',
             whiteSpace: 'nowrap', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>{toast}</div>
+        )}
+
+        {showAddCategory && (
+          <AddCategorySheet
+            onAdd={(cat) => { addCategory(cat); setShowAddCategory(false); }}
+            onCancel={() => setShowAddCategory(false)}
+          />
         )}
 
         {showInstall && (

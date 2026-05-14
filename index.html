@@ -41,7 +41,8 @@
     --font-display: 'Rubik', 'Quicksand', 'Heebo', system-ui, sans-serif;
     --font-body: 'Heebo', 'Rubik', system-ui, sans-serif;
   }
-  *{ box-sizing: border-box; }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   html, body{
     margin: 0; padding: 0; min-height: 100vh;
     font-family: var(--font-body);
@@ -69,6 +70,8 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="image-slot.js"></script>
 <!-- SheetJS (xlsx) for Excel import/export -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -81,6 +84,7 @@
   <script type="text/babel" src="icons.jsx"></script>
   <script type="text/babel" src="components.jsx"></script>
   <script type="text/babel" src="exporter.jsx"></script>
+  <script type="text/babel" src="db.jsx"></script>
   <script type="text/babel" src="screens.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
   <script>

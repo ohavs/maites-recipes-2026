@@ -73,8 +73,8 @@
 
   function load() {
     if (loadP) return loadP;
-    loadP = fetch(STATE_FILE)
-      .then((r) => (r.ok ? r.json() : null))
+    const bridge = window.__imageSlotBridge;
+    loadP = (bridge ? bridge.load() : fetch(STATE_FILE).then(r => r.ok ? r.json() : null))
       .then((j) => {
         // Merge: sidecar loses to any in-memory change that raced ahead of
         // the fetch (drop or clear) so neither is clobbered by hydration.
@@ -106,7 +106,10 @@
   let saveDirty = false;
   function save() {
     if (saving) { saveDirty = true; return; }
-    const w = window.omelette && window.omelette.writeFile;
+    const bridge = window.__imageSlotBridge;
+    const w = bridge
+      ? (_, json) => bridge.save(JSON.parse(json))
+      : (window.omelette && window.omelette.writeFile);
     if (!w) return;
     saving = true;
     Promise.resolve(w(STATE_FILE, JSON.stringify(slots)))

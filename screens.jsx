@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey }) {
+function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
 
@@ -92,7 +92,7 @@ function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant,
       </div>
 
       <div style={{ padding: '12px 0 4px' }}>
-        <CategoryStrip active={category} onChange={onCategory}/>
+        <CategoryStrip active={category} onChange={onCategory} categories={categories} onAdd={onAddCategory}/>
       </div>
 
       <div style={{ padding: '0 18px 130px', display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 }}>
@@ -557,7 +557,7 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 // RecipeFormScreen — used for both "add new" and "edit existing".
 // Includes per-ingredient icon picker.
 // ───────────────────────────────────────────────────────────
-function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add' }) {
+function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -670,7 +670,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
 
         <Field label="קטגוריה">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-            {CATEGORIES.filter(c => c.id !== 'all').map(c => (
+            {(catsProp || CATEGORIES).filter(c => c.id !== 'all').map(c => (
               <button key={c.id} onClick={() => setCategory(c.id)}
                 style={{
                   border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 999,
@@ -819,12 +819,12 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onExport, onImport }) {
-  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport}/>;
+function AddRecipeScreen({ onAdd, onExport, onImport, categories }) {
+  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories}/>;
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel }) {
-  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel}/>;
+function EditRecipeScreen({ recipe, onSave, onCancel, categories }) {
+  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel} categories={categories}/>;
 }
 
 // ───────────────────────────────────────────────────────────

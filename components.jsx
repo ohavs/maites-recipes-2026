@@ -657,14 +657,15 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
 // ───────────────────────────────────────────────────────────
 // CategoryStrip — horizontally scrolling pills
 // ───────────────────────────────────────────────────────────
-function CategoryStrip({ active, onChange }) {
+function CategoryStrip({ active, onChange, categories: catsProp, onAdd }) {
+  const cats = catsProp || CATEGORIES;
   return (
     <div className="scroll-y" style={{
       display: 'flex', flexDirection: 'row-reverse', gap: 10,
       padding: '4px 22px 18px', overflowX: 'auto', overflowY: 'hidden',
       scrollbarWidth: 'none',
     }}>
-      {CATEGORIES.map(c => {
+      {cats.map(c => {
         const isActive = active === c.id;
         return (
           <button key={c.id} onClick={() => onChange(c.id)}
@@ -684,6 +685,100 @@ function CategoryStrip({ active, onChange }) {
           </button>
         );
       })}
+      {onAdd && (
+        <button onClick={onAdd}
+          style={{
+            flex: '0 0 auto', border: 'none', cursor: 'pointer',
+            width: 40, height: 40, borderRadius: 999,
+            fontSize: 20, fontFamily: 'inherit',
+            background: 'rgba(255,255,255,.7)',
+            color: 'var(--ink-soft)',
+            boxShadow: '0 2px 6px rgba(0,0,0,.07)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all .2s',
+          }}>+</button>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// AddCategorySheet — bottom sheet for creating a new category
+// ───────────────────────────────────────────────────────────
+const CAT_EMOJIS = ['🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳','🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦'];
+
+function AddCategorySheet({ onAdd, onCancel }) {
+  const { useState: uS } = React;
+  const [name, setName] = uS('');
+  const [emoji, setEmoji] = uS('🍽️');
+
+  const confirm = () => {
+    const n = name.trim();
+    if (!n) return;
+    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji });
+  };
+
+  return (
+    <div onClick={onCancel} style={{
+      position: 'absolute', inset: 0, zIndex: 55,
+      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'flex-end',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', background: 'var(--cream)',
+        borderRadius: '28px 28px 0 0',
+        padding: '24px 22px 40px',
+        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>קטגוריה חדשה</h2>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flexDirection: 'row-reverse' }}>
+            {CAT_EMOJIS.map(e => (
+              <button key={e} onClick={() => setEmoji(e)} style={{
+                width: 42, height: 42, border: 'none', borderRadius: 12, fontSize: 22,
+                cursor: 'pointer',
+                background: emoji === e ? 'var(--ink)' : 'rgba(0,0,0,.06)',
+                boxShadow: emoji === e ? '0 4px 12px rgba(0,0,0,.25)' : 'none',
+                transition: 'all .15s',
+              }}>{e}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 8, letterSpacing: '.08em' }}>שם הקטגוריה</div>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && confirm()}
+            placeholder="לדוגמה: נשנושים, ממרחים…"
+            autoFocus
+            style={{
+              width: '100%', border: 'none', borderRadius: 16,
+              padding: '12px 16px', fontSize: 15,
+              background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
+              fontFamily: 'inherit', outline: 'none', textAlign: 'right',
+            }}
+          />
+        </div>
+
+        <button onClick={confirm} disabled={!name.trim()} style={{
+          width: '100%', border: 'none', borderRadius: 18,
+          padding: '14px 0',
+          background: name.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
+          color: name.trim() ? '#fff' : 'var(--ink-soft)',
+          fontSize: 15, fontWeight: 700,
+          fontFamily: 'var(--font-display)', cursor: name.trim() ? 'pointer' : 'default',
+          transition: 'all .2s',
+        }}>הוסיפי קטגוריה</button>
+      </div>
+      <style>{`@keyframes catSlide{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }
@@ -744,5 +839,5 @@ Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   Tilt, FoodArt, FoodImage, ImageGallery,
   RecipeCard, Pill, FavHeart,
-  BottomNav, CategoryStrip, StatusBar, Phone,
+  BottomNav, CategoryStrip, AddCategorySheet, StatusBar, Phone,
 });
