@@ -22,7 +22,6 @@ const PALETTES = {
 
 const defaultGallery = () => ['main'];
 
-const RECIPES = [
 const RECIPES = [];
 
 Object.assign(window, { CATEGORIES, PALETTES, RECIPES, defaultGallery });
