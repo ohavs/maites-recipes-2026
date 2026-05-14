@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>Receips — אפליקציית מתכונים</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- Fonts: Quicksand display + Heebo for Hebrew -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Heebo:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #fbeef2;          /* soft pink page bg behind cards */
+    --ink: #2c1d27;
+    --ink-soft: #5b4452;
+    --cream: #fff7e8;
+    --c-yellow: #ffd255;
+    --c-yellow-2: #ffe28a;
+    --c-sky: #8fd6e7;
+    --c-sky-2: #b6e4ed;
+    --c-pink: #f7a8b8;
+    --c-pink-2: #ffc7d1;
+    --c-mint: #b3e4c3;
+    --c-mint-2: #d2efd9;
+    --c-lavender: #c9b8e8;
+    --c-lavender-2: #ddd0f0;
+    --c-peach: #ffb494;
+    --c-peach-2: #ffd0b9;
+    --shadow-card: 0 10px 28px -8px rgba(64, 33, 50, .25), 0 22px 60px -20px rgba(64, 33, 50, .22), 0 1px 0 rgba(255,255,255,.7) inset;
+    --shadow-card-lift: 0 22px 50px -10px rgba(64, 33, 50, .32), 0 40px 80px -28px rgba(64, 33, 50, .25);
+    --radius-card: 28px;
+    --font-display: 'Rubik', 'Quicksand', 'Heebo', system-ui, sans-serif;
+    --font-body: 'Heebo', 'Rubik', system-ui, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 700px at 20% 0%, #ffe5d3 0%, transparent 60%),
+      radial-gradient(1100px 700px at 80% 100%, #e0d3f5 0%, transparent 55%),
+      linear-gradient(180deg, #f5e7ef 0%, #efe1ec 100%);
+    overflow: hidden;
+  }
+  body{ display: grid; place-items: center; }
+
+  /* hide scrollbars inside the phone */
+  .scroll-y{ overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; }
+  .scroll-y::-webkit-scrollbar{ display: none; }
+
+  /* utility */
+  .display{ font-family: var(--font-display); letter-spacing: -.01em; }
+  .stack{ display: flex; flex-direction: column; }
+  button{ font-family: inherit; }
+</style>
+
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="image-slot.js"></script>
+<!-- SheetJS (xlsx) for Excel import/export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="exporter.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
