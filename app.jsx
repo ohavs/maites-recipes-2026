@@ -21,6 +21,17 @@ function App() {
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
   const [density, setDensity] = $S(t.density || 'comfy');
+
+  // PWA install prompt
+  const [installPrompt, setInstallPrompt] = $S(null);
+  const [showInstall, setShowInstall] = $S(false);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
+  $E(() => {
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
+    window.addEventListener('beforeinstallprompt', handler);
+    if (isIOS) setShowInstall(true);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
   $E(() => { setDensity(t.density || 'comfy'); }, [t.density]);
 
   const [hintSeen, setHintSeen] = $S(() => {
@@ -194,6 +205,16 @@ function App() {
           }}>{toast}</div>
         )}
 
+        {showInstall && (
+          <InstallPrompt
+            isIOS={isIOS}
+            onInstall={async () => {
+              if (installPrompt) { installPrompt.prompt(); const r = await installPrompt.userChoice; if (r.outcome === 'accepted') setShowInstall(false); }
+            }}
+            onDismiss={() => setShowInstall(false)}
+          />
+        )}
+
         {!hintSeen && !anyOverlay && tab === 'home' && (
           <FirstHint onDismiss={() => { setHintSeen(true); try { localStorage.setItem('receips.hint','1'); } catch {} }}/>
         )}
@@ -252,6 +273,65 @@ function FirstHint({ onDismiss }) {
         ✨ הקישו על כרטיס לצפייה במתכון
       </div>
       <style>{`@keyframes hintFade{0%{opacity:0}100%{opacity:1}}`}</style>
+    </div>
+  );
+}
+
+function InstallPrompt({ isIOS, onInstall, onDismiss }) {
+  return (
+    <div style={{
+      position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 60,
+      padding: '0 16px 28px',
+      animation: 'installSlide .4s cubic-bezier(.2,1.2,.4,1)',
+    }}>
+      <div style={{
+        background: 'var(--cream)',
+        borderRadius: 28,
+        boxShadow: '0 -4px 40px rgba(64,33,50,.18), 0 20px 60px rgba(64,33,50,.18)',
+        padding: '24px 22px 22px',
+        display: 'flex', flexDirection: 'column', gap: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16, flexShrink: 0,
+            background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
+            display: 'grid', placeItems: 'center',
+            fontSize: 28,
+          }}>🍳</div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>
+              התקיני את Maites
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 2 }}>
+              גישה מהירה לכל המתכונים שלך
+            </div>
+          </div>
+          <button onClick={onDismiss} style={{
+            marginRight: 'auto', background: 'none', border: 'none',
+            fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer', lineHeight: 1, padding: 4,
+          }}>×</button>
+        </div>
+
+        {isIOS ? (
+          <div style={{
+            background: 'rgba(247,168,184,.15)', borderRadius: 16, padding: '12px 14px',
+            fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6,
+          }}>
+            לחצי על <strong>שתף</strong> (□↑) בספארי ואז <strong>"הוסף למסך הבית"</strong>
+          </div>
+        ) : (
+          <button onClick={onInstall} style={{
+            background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
+            border: 'none', borderRadius: 18,
+            padding: '14px 0', fontFamily: 'var(--font-display)',
+            fontWeight: 700, fontSize: 15, color: 'var(--ink)',
+            cursor: 'pointer', width: '100%',
+          }}>
+            התקני עכשיו
+          </button>
+        )}
+      </div>
+      <style>{`@keyframes installSlide{0%{opacity:0;transform:translateY(80px)}100%{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }

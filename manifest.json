@@ -1,0 +1,22 @@
+{
+  "name": "Maites — מתכונים",
+  "short_name": "Maites",
+  "description": "אוסף המתכונים שלי",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbeef2",
+  "theme_color": "#f7a8b8",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "lifestyle"],
+  "screenshots": []
+}
