@@ -28,12 +28,30 @@ function escapeHTML(s) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// Split a multi-value cell ("a\nb\nc" or "a; b; c" or "a | b | c") into
-// trimmed non-empty items.
+// Strip HTML tags and decode entities — handles cells from web apps
+// that embed <div>, <br>, &nbsp; etc.
+function stripHTML(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(div|p|li|tr|td|th)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/^[~\s]+/gm, '')    // strip leading ~ artifacts per line
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Split a multi-value cell into trimmed non-empty items. Strips HTML first.
 function splitMulti(s) {
   if (s == null) return [];
-  return String(s)
-    .split(/[\r\n;|]/g)
+  return stripHTML(String(s))
+    .split(/[\r\n;|]+/g)
     .map(x => x.trim())
     .filter(Boolean);
 }
@@ -150,12 +168,12 @@ function rowToRecipe(row, map) {
   const title = String(get('title') || '').trim();
   if (!title) return null;
 
-  const cuisine = String(get('cuisine') || '').trim();
+  const cuisine = stripHTML(String(get('cuisine') || ''));
   const category = guessCategory(cuisine);
   const prepTime = +String(get('prep') || '').replace(/[^\d.]/g,'') || 0;
   const cookTime = +String(get('cook') || '').replace(/[^\d.]/g,'') || 0;
-  const desc = String(get('desc') || '').trim();
-  const notes = String(get('notes') || '').trim();
+  const desc  = stripHTML(String(get('desc')  || ''));
+  const notes = stripHTML(String(get('notes') || ''));
 
   const ingredients = splitMulti(get('ingredients')).map(parseIngredient);
   const steps = splitMulti(get('steps')).map((s, i) => parseStep(s, i));

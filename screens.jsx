@@ -119,7 +119,7 @@ function HomeScreen({ recipes, onOpen, onToggleFav, density, onDensity, variant,
 // "disappears" behind the recipe body as it scrolls up),
 // swipeable image gallery, ingredients, notes, edit button.
 // ───────────────────────────────────────────────────────────
-function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onUpdateNotes, openMs = 380 }) {
+function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onUpdateNotes, openMs = 380 }) {
   const p = PALETTES[recipe.palette];
   const scrollRef = uR(null);
   const [scrollY, setScrollY] = uS(0);
@@ -250,7 +250,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onUpd
         </div>
       </div>
 
-      {/* Top bar — back / fav / EDIT (replaces share) */}
+      {/* Top bar — back / fav / edit / delete */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: '14px 18px', display: 'flex', justifyContent: 'space-between',
@@ -262,6 +262,9 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onUpd
           </RoundBtn>
           <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" color="#fff" ink={p.ink}>
             <IconEdit size={18} strokeWidth={2.2}/>
+          </RoundBtn>
+          <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" color="#fff" ink="#e34466">
+            <IconTrash size={18} strokeWidth={2.2}/>
           </RoundBtn>
         </div>
         <div style={{ pointerEvents: 'auto' }}>
@@ -971,7 +974,82 @@ function EmptyState({ text, emoji, cta }) {
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// DeleteConfirm — styled fullscreen confirmation dialog
+// ───────────────────────────────────────────────────────────
+function DeleteConfirm({ recipe, onConfirm, onCancel }) {
+  const p = PALETTES[recipe.palette];
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 25,
+      background: 'rgba(28,22,32,.65)',
+      backdropFilter: 'blur(14px)',
+      display: 'grid', placeItems: 'center',
+    }} onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--cream)',
+        borderRadius: 36, padding: '36px 28px 28px',
+        margin: '0 24px', maxWidth: 340, width: '100%',
+        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
+        textAlign: 'center',
+        animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
+      }}>
+        {/* Icon badge */}
+        <div style={{
+          width: 76, height: 76, borderRadius: 999,
+          background: p.bg,
+          display: 'grid', placeItems: 'center',
+          boxShadow: `0 14px 30px -8px ${p.bg}cc, 0 1px 0 rgba(255,255,255,.6) inset`,
+        }}>
+          <IconTrash size={32} strokeWidth={1.8} color={p.ink}/>
+        </div>
+
+        {/* Text */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h2 className="display" style={{
+            margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--ink)',
+          }}>מחיקת מתכון</h2>
+          <p style={{ margin: 0, fontSize: 15.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+            בטוח למחוק את<br/>
+            <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>"{recipe.title}"</strong>?
+          </p>
+          <span style={{
+            display: 'inline-block', padding: '5px 14px',
+            borderRadius: 999,
+            background: 'rgba(227,68,102,.1)',
+            color: '#c0304f', fontSize: 12.5, fontWeight: 700,
+          }}>לא ניתן לשחזר אחרי המחיקה</span>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
+            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            transition: 'background .15s',
+          }}>ביטול</button>
+          <button onClick={onConfirm} style={{
+            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
+            background: '#e34466', color: '#fff',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            boxShadow: '0 10px 24px -8px rgba(227,68,102,.55)',
+            transition: 'transform .15s, box-shadow .15s',
+          }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
+          onMouseUp={e => e.currentTarget.style.transform = ''}
+          onMouseLeave={e => e.currentTarget.style.transform = ''}
+          >מחק מתכון</button>
+        </div>
+      </div>
+      <style>{`@keyframes delPop{0%{transform:scale(.82);opacity:0}100%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+  );
+}
+
 Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
+  DeleteConfirm,
 });
