@@ -253,7 +253,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               boxShadow: 'var(--shadow-card)',
             }}>
-            <span>בואו נכין יחד · {recipe.steps?.length || 0} שלבים</span>
+            <span>{recipe.steps?.length > 0 ? `בואו נכין יחד · ${recipe.steps.length} שלבים` : 'הוראות הכנה'}</span>
             <span style={{
               width: 36, height: 36, borderRadius: 999, background: p.ink, color: p.bg,
               display: 'grid', placeItems: 'center',
@@ -404,19 +404,17 @@ function IngredientRow({ ing, palette, index }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// StepsScreen — fullscreen guided cook-along with progress
+// StepsScreen — scrollable vertical list of all steps
 // ───────────────────────────────────────────────────────────
 function StepsScreen({ recipe, onClose }) {
   const p = PALETTES[recipe.palette];
   const steps = recipe.steps || [];
-  const [step, setStep] = uS(0);
-  const [checked, setChecked] = uS({});
 
-  // No steps: show description/notes as scrollable text
+  // No steps: show description as plain instructions
   if (steps.length === 0) {
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: p.bg, padding: '18px 22px 26px', borderRadius: '0 0 32px 32px' }}>
+        <div style={{ background: p.bg, padding: '18px 22px 26px', borderRadius: '0 0 32px 32px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>הוראות הכנה</div>
             <RoundBtn onClick={onClose} title="חזרה" color="rgba(255,255,255,.85)" ink={p.ink} size={36}>
@@ -426,7 +424,7 @@ function StepsScreen({ recipe, onClose }) {
           <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
         </div>
         <div className="scroll-y" style={{ flex: 1, padding: '24px 22px 40px' }}>
-          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.8, color: 'var(--ink-soft)', whiteSpace: 'pre-line' }}>
+          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.9, color: 'var(--ink)', whiteSpace: 'pre-line' }}>
             {recipe.description || 'אין הוראות הכנה למתכון זה.'}
           </p>
         </div>
@@ -434,128 +432,60 @@ function StepsScreen({ recipe, onClose }) {
     );
   }
 
-  const total = steps.length;
-  const progress = ((step + 1) / total) * 100;
-
   return (
-    <div style={{
-      position: 'absolute', inset: 0, background: '#fbeef2',
-      display: 'flex', flexDirection: 'column',
-    }}>
+    <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', display: 'flex', flexDirection: 'column' }}>
       {/* header */}
       <div style={{
-        background: p.bg, padding: '18px 22px 26px',
-        borderRadius: '0 0 32px 32px', position: 'relative',
+        background: p.bg, padding: '18px 22px 22px',
+        borderRadius: '0 0 32px 32px', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>
-            שלב {step + 1} מתוך {total}
-          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>{steps.length} שלבים</div>
           <RoundBtn onClick={onClose} title="חזרה" color="rgba(255,255,255,.85)" ink={p.ink} size={36}>
             <IconClose size={18} strokeWidth={2.4}/>
           </RoundBtn>
         </div>
-        <h2 className="display" style={{
-          margin: '14px 0 18px', fontSize: 28, fontWeight: 700, color: p.ink,
-        }}>{recipe.title}</h2>
-        <div style={{
-          height: 10, borderRadius: 999, background: 'rgba(255,255,255,.55)',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${progress}%`, height: '100%', background: p.ink,
-            borderRadius: 999, transition: 'width .4s cubic-bezier(.2,.9,.25,1)',
-          }}/>
-        </div>
+        <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
       </div>
 
-      <div style={{ flex: 1, padding: '22px 22px 110px', position: 'relative' }}>
-        <StepCard step={steps[step]} index={step} palette={p}
-          done={!!checked[step]}
-          onToggle={() => setChecked(c => ({ ...c, [step]: !c[step] }))}/>
-
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 18 }}>
-          {steps.map((_, i) => (
-            <span key={i} style={{
-              width: i === step ? 22 : 8, height: 8, borderRadius: 999,
-              background: i === step ? p.bg : (i < step ? p.accent : 'rgba(0,0,0,.15)'),
-              transition: 'all .3s',
-            }}/>
-          ))}
-        </div>
-      </div>
-
-      <div style={{
-        position: 'absolute', bottom: 18, left: 18, right: 18,
-        display: 'flex', gap: 10,
-      }}>
-        <button
-          onClick={() => setStep(s => Math.max(0, s-1))}
-          disabled={step === 0}
-          style={{
-            flex: 1, padding: '16px', border: 'none', cursor: step===0 ? 'default' : 'pointer',
-            borderRadius: 18, background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
-            opacity: step === 0 ? .4 : 1,
-            boxShadow: '0 8px 18px -8px rgba(0,0,0,.2)',
-          }}>הקודם</button>
-        <button
-          onClick={() => step < total - 1 ? setStep(s => s+1) : onClose()}
-          style={{
-            flex: 2, padding: '16px', border: 'none', cursor: 'pointer',
-            borderRadius: 18, background: p.bg, color: p.ink,
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-            boxShadow: 'var(--shadow-card)',
-          }}>{step === total - 1 ? 'סיימתי! 🎉' : 'השלב הבא'}</button>
+      {/* Scrollable step cards */}
+      <div className="scroll-y" style={{ flex: 1, padding: '30px 18px 60px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {steps.map((step, i) => (
+          <StepCard key={i} step={step} index={i} palette={p} />
+        ))}
       </div>
     </div>
   );
 }
 
-function StepCard({ step, index, palette, done, onToggle }) {
+function StepCard({ step, index, palette }) {
   const [shown, setShown] = uS(false);
   const enabled = useAnimEnabled();
-  const ms = useAnimMs(450);
+  const ms = useAnimMs(400);
   uE(() => {
-    setShown(false);
-    const t = setTimeout(() => setShown(true), 30);
+    const t = setTimeout(() => setShown(true), enabled ? index * 70 : 0);
     return () => clearTimeout(t);
   }, [index]);
   return (
     <div style={{
       background: '#fff',
-      borderRadius: 28, padding: '28px 22px',
+      borderRadius: 26, padding: '22px 20px 22px',
       boxShadow: 'var(--shadow-card)',
       position: 'relative',
       opacity: enabled ? (shown ? 1 : 0) : 1,
-      transform: enabled ? (shown ? 'translateY(0) scale(1)' : 'translateY(20px) scale(.97)') : 'none',
+      transform: enabled ? (shown ? 'translateY(0)' : 'translateY(18px)') : 'none',
       transition: `opacity ${ms}ms ease, transform ${ms}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
       <div style={{
-        position: 'absolute', top: -22, insetInlineStart: 22,
-        width: 60, height: 60, borderRadius: 999, background: palette.bg,
+        position: 'absolute', top: -18, insetInlineStart: 18,
+        width: 48, height: 48, borderRadius: 999, background: palette.bg,
         color: palette.ink, display: 'grid', placeItems: 'center',
-        fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700,
-        boxShadow: '0 12px 24px -8px rgba(0,0,0,.22)',
+        fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700,
+        boxShadow: '0 8px 18px -6px rgba(0,0,0,.2)',
       }}>{index + 1}</div>
-      <h3 className="display" style={{
-        marginTop: 32, marginBottom: 12, fontSize: 22, fontWeight: 700, color: 'var(--ink)',
-      }}>{step.title}</h3>
       <p style={{
-        margin: 0, fontSize: 15.5, lineHeight: 1.7, color: 'var(--ink-soft)',
-      }}>{step.body}</p>
-      <button onClick={onToggle} style={{
-        marginTop: 18, border: 'none', cursor: 'pointer',
-        padding: '10px 14px', borderRadius: 999,
-        background: done ? palette.accent : palette.tag,
-        color: done ? '#fff' : palette.ink,
-        fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        transition: 'all .2s', whiteSpace: 'nowrap',
-      }}>
-        <IconCheck size={14} strokeWidth={3}/>
-        {done ? 'סומן כבוצע' : 'סמן כבוצע'}
-      </button>
+        margin: '22px 0 0', fontSize: 15.5, lineHeight: 1.8, color: 'var(--ink)',
+      }}>{step.body || step.title}</p>
     </div>
   );
 }
@@ -707,7 +637,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
 
         <Field label="קטגוריה">
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-            {(catsProp || CATEGORIES).filter(c => c.id !== 'all').map(c => (
+            {(catsProp || []).filter(c => c.id !== 'all').map(c => (
               <button key={c.id} onClick={() => setCategory(c.id)}
                 style={{
                   border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 999,

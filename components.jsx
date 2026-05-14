@@ -186,33 +186,32 @@ function FoodArt({ id, size = 200 }) {
 // FoodImage — circular slot the user can drag a real photo into.
 // Falls back to FoodArt SVG when empty.
 // ───────────────────────────────────────────────────────────
-function FoodImage({ recipeId, size = 200, slotIdSuffix = '' }) {
+function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }) {
   const slotRef = useRef(null);
   useEffect(() => {
-    // Make the image-slot transparent when empty so the FoodArt SVG shows through.
     const el = slotRef.current;
     if (!el) return;
     const inject = () => {
       const sr = el.shadowRoot;
       if (!sr) return;
-      if (!sr.querySelector('#__art_override')) {
-        const s = document.createElement('style');
-        s.id = '__art_override';
-        s.textContent = `
-          .frame { background: transparent !important; }
-          .ring { display: none !important; }
-          .empty svg { display: none !important; }
-          .cap { display: none !important; }
-          .sub { display: none !important; }
-        `;
-        sr.appendChild(s);
-      }
+      const existing = sr.querySelector('#__art_override');
+      if (existing) existing.remove();
+      const s = document.createElement('style');
+      s.id = '__art_override';
+      s.textContent = `
+        .frame { background: transparent !important; }
+        .ring { display: none !important; }
+        .empty svg { display: none !important; }
+        .cap { display: none !important; }
+        .sub { display: none !important; }
+        ${readonly ? '.empty { pointer-events: none !important; cursor: default !important; }' : ''}
+      `;
+      sr.appendChild(s);
     };
-    // Try immediately, then retry once shadow root is ready
     inject();
     const t = setTimeout(inject, 80);
     return () => clearTimeout(t);
-  }, []);
+  }, [readonly]);
 
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
@@ -425,7 +424,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               top: '50%', insetInlineStart: -imgPokeOut,
               transform: 'translateY(-50%)',
             }}>
-              <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} />
+              <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
             </div>
           </div>
         </div>
@@ -484,7 +483,7 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
             flex: '0 0 100%', display: 'grid', placeItems: 'center',
             scrollSnapAlign: 'center', padding: '8px 0',
           }}>
-            <FoodImage recipeId={recipeId} size={size} slotIdSuffix={`-${slot}`} />
+            <FoodImage recipeId={recipeId} size={size} slotIdSuffix={`-${slot}`} readonly />
           </div>
         ))}
         {onAddSlot && (

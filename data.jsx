@@ -1,13 +1,17 @@
 // data.jsx — recipes seed data
 
 const CATEGORIES = [
-  { id: 'all',       label: 'הכל',        emoji: '🍽️' },
-  { id: 'mains',     label: 'עיקריות',     emoji: '🥘' },
-  { id: 'salads',    label: 'סלטים',       emoji: '🥗' },
-  { id: 'desserts',  label: 'קינוחים',      emoji: '🍰' },
-  { id: 'breakfast', label: 'ארוחת בוקר',  emoji: '🥐' },
-  { id: 'bakery',    label: 'מאפים',       emoji: '🍞' },
+  { id: 'all', label: 'הכל', emoji: '🍽️' },
 ];
+
+// Seed definitions used when auto-creating categories from imports
+const CATEGORY_SEED = {
+  mains:     { id: 'mains',     label: 'עיקריות',    emoji: '🥘' },
+  salads:    { id: 'salads',    label: 'סלטים',      emoji: '🥗' },
+  desserts:  { id: 'desserts',  label: 'קינוחים',    emoji: '🍰' },
+  breakfast: { id: 'breakfast', label: 'ארוחת בוקר', emoji: '🥐' },
+  bakery:    { id: 'bakery',    label: 'מאפים',      emoji: '🍞' },
+};
 
 // Palette per recipe. Each has a primary block color + a softer secondary
 // for the detail view body section.
@@ -24,4 +28,4 @@ const defaultGallery = () => ['main'];
 
 const RECIPES = [];
 
-Object.assign(window, { CATEGORIES, PALETTES, RECIPES, defaultGallery });
+Object.assign(window, { CATEGORIES, CATEGORY_SEED, PALETTES, RECIPES, defaultGallery });

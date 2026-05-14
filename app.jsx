@@ -93,6 +93,14 @@ function App() {
     if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
   };
 
+  // Auto-create a category from CATEGORY_SEED if recipe has an unknown category id
+  const ensureCategoryExists = (catId, currentCats) => {
+    if (!catId || catId === 'all') return;
+    if (currentCats.some(c => c.id === catId)) return;
+    const seed = typeof CATEGORY_SEED !== 'undefined' && CATEGORY_SEED[catId];
+    if (seed) addCategory(seed);
+  };
+
   const toggleFav = (id) =>
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r);
@@ -102,6 +110,7 @@ function App() {
     });
 
   const addRecipe = (rec) => {
+    ensureCategoryExists(rec.category, categories);
     setRecipes(rs => [rec, ...rs]);
     if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
     setTab('home');
@@ -162,6 +171,8 @@ function App() {
         if (newRecs.length > 0 && typeof db_saveRecipe !== 'undefined') {
           newRecs.forEach(r => db_saveRecipe(r).catch(() => {}));
         }
+        // Auto-create categories for any new recipe category ids
+        newRecs.forEach(r => ensureCategoryExists(r.category, existing));
 
         const msg = newRecs.length === 0
           ? `כל המתכונים כבר קיימים (${dupCount} כפולים דולגו)`

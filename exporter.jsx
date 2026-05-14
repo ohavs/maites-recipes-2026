@@ -28,13 +28,12 @@ function escapeHTML(s) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// Strip HTML tags and decode entities — handles cells from web apps
-// that embed <div>, <br>, &nbsp; etc.
+// Strip HTML tags, decode entities, and clean Excel/spreadsheet artifacts.
 function stripHTML(s) {
   if (s == null) return '';
   return String(s)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/?(div|p|li|tr|td|th)[^>]*>/gi, '\n')
+    .replace(/<\/?(div|p|li|tr|td|th|span|strong|em|b|i|u)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
@@ -42,8 +41,13 @@ function stripHTML(s) {
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/^[~\s]+/gm, '')    // strip leading ~ artifacts per line
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/&#\d+;/g, ' ')        // other numeric entities → space
+    // Excel / Google Sheets formatting artifacts
+    .replace(/~/g, '')               // tilde separators used in some spreadsheets
+    .replace(/\s*\|\s*/g, '\n')      // pipe separators → newline
+    .replace(/[ \t]{2,}/g, ' ')      // collapse multiple spaces/tabs
+    .replace(/\n{3,}/g, '\n\n')      // max 2 consecutive newlines
+    .replace(/^[\s\-*•]+/gm, '')     // strip leading bullets/dashes per line
     .trim();
 }
 
