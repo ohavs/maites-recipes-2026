@@ -163,6 +163,7 @@ function normalizeHeader(h) {
   return stripHTML(String(h || ''))
     .normalize('NFC')
     .replace(/\s+/g, ' ')
+    .replace(/[:\-–—]+$/, '')  // strip trailing colon/dash (common in Hebrew labels)
     .trim()
     .toLowerCase();
 }
@@ -295,19 +296,44 @@ function sheetToRecipe(sheetName, rows) {
     return '';
   };
 
-  const cuisine    = get('סוג מטבח','מטבח','קטגוריה','cuisine');
-  const level      = get('רמת קושי','רמת קשיים') || 'קל';
-  const prepTime   = parseTime(get('זמן הכנה','prep'));
-  const cookTime   = parseTime(get('זמן בישול','cook'));
-  const desc       = get('תיאור','description','desc','about');
-  const ingRaw     = get('מרכיבים','מצרכים','חומרים','ingredients');
-  const instrRaw   = get('הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה','ביצוע','דרך הכנה','הכנת המנה','instructions','steps','directions','method');
-  const notes      = get('הערות','הערה','notes','remarks','tips');
+  const cuisine    = get('סוג מטבח','מטבח','קטגוריה','cuisine','category');
+  const level      = get('רמת קושי','רמת קשיים','רמת קשיות') || 'קל';
+  const prepTime   = parseTime(get('זמן הכנה','prep','זמן'));
+  const cookTime   = parseTime(get('זמן בישול','cook','בישול'));
+  const desc       = get('תיאור','description','desc','about','הסבר');
+  const ingRaw     = get('מרכיבים','מצרכים','חומרים','ingredients','ingredient','רכיבים');
+  const notes      = get('הערות','הערה','notes','remarks','tips','טיפים','הערות שף');
   const mainImgRaw = get('תמונות ראשיות','תמונה ראשית','תמונה','image');
   const galRaw     = get('גלריית תמונות','גלריה','gallery');
 
+  let instrRaw = get(
+    'הוראות הכנה','אופן ההכנה','אופן הכנה','שלבי הכנה',
+    'הוראות','שלבים','הכנה','שיטת הכנה','תהליך הכנה','הכנת המנה',
+    'ביצוע','דרך הכנה','עריכה ובישול','עריכה','בישול',
+    'instructions','steps','directions','method','preparation','procedure'
+  );
+
+  // Fallback: if still no instructions, use the longest unrecognized text value (>30 chars)
+  if (!instrRaw) {
+    const knownKeys = new Set([
+      'תיאור','description','desc','about','הסבר',
+      'סוג מטבח','מטבח','קטגוריה','cuisine','category',
+      'רמת קושי','רמת קשיים','רמת קשיות',
+      'זמן הכנה','prep','זמן','זמן בישול','cook','בישול',
+      'הערות','הערה','notes','remarks','tips','טיפים','הערות שף',
+      'תמונות ראשיות','תמונה ראשית','תמונה','image',
+      'גלריית תמונות','גלריה','gallery',
+      'מרכיבים','מצרכים','חומרים','ingredients','ingredient','רכיבים',
+    ].map(normalizeHeader));
+    const candidates = Object.entries(kv)
+      .filter(([k, v]) => !knownKeys.has(k) && String(v).length > 30)
+      .sort(([, a], [, b]) => b.length - a.length);
+    if (candidates.length > 0) instrRaw = stripHTML(candidates[0][1]);
+    console.log('[import]', title, '— fields:', Object.keys(kv), '— instructions key:', candidates[0]?.[0] || 'not found');
+  }
+
   const ingredients = splitMulti(ingRaw).map(parseIngredient).filter(i => i.name);
-  const instructions = instrRaw; // plain text — no structured steps for Excel imports
+  const instructions = instrRaw;
 
   const mainImages = mainImgRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
   const galImages  = galRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
