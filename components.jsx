@@ -214,10 +214,14 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }
   }, [readonly]);
 
   return (
-    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+    <div style={{
+      position: 'relative', width: size, height: size, flexShrink: 0,
+      ...(readonly ? { pointerEvents: 'none', touchAction: 'pan-y' } : {}),
+    }}>
       <image-slot ref={slotRef}
         id={`food-${recipeId}${slotIdSuffix}`}
         shape="circle"
+        fit="contain"
         placeholder=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       ></image-slot>
