@@ -58,8 +58,6 @@ function App() {
     if (isIOS) setTimeout(() => setShowInstall(true), 1500);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
-  $E(() => { setDensity(t.density || 'comfy'); }, [t.density]);
-
   const [hintSeen, setHintSeen] = $S(() => {
     try { return localStorage.getItem('receips.hint') === '1'; }
     catch { return false; }
