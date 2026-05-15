@@ -118,14 +118,37 @@ function guessIcon(name) {
   return 'chef';
 }
 
-// Map free-text cuisine/category cell back to one of our category ids.
-function guessCategory(cuisineOrCat) {
-  const t = String(cuisineOrCat || '').toLowerCase();
+// Map free-text cuisine cell back to a predefined category id.
+function guessCategory(cuisine) {
+  const t = String(cuisine || '').toLowerCase();
   if (/(סלט)/.test(t)) return 'salads';
   if (/(קינוח|עוגה|גבינה|מקרון|מוס|פאי)/.test(t)) return 'desserts';
   if (/(בוקר|שקשוקה|חביתה|ארוחת בוקר)/.test(t)) return 'breakfast';
   if (/(לחם|חלה|מאפה|פיצה|בריוש)/.test(t)) return 'bakery';
   return 'mains';
+}
+
+// Convert a raw category label from Excel into {id, label, emoji}.
+// Known Hebrew categories map to fixed ids; unknown ones get a slug id.
+function parseCategoryLabel(raw) {
+  if (!raw) return null;
+  const t = String(raw).trim();
+  if (!t) return null;
+  const tl = t.toLowerCase();
+  if (/עיקרי/.test(tl))               return { id: 'mains',     label: 'עיקריות',       emoji: '🥘' };
+  if (/סלט/.test(tl))                 return { id: 'salads',    label: 'סלטים',         emoji: '🥗' };
+  if (/קינוח|עוג/.test(tl))           return { id: 'desserts',  label: 'קינוחים',       emoji: '🍰' };
+  if (/בוקר/.test(tl))                return { id: 'breakfast', label: 'ארוחת בוקר',    emoji: '🥐' };
+  if (/מאפ|לחם|פיצ|בריוש/.test(tl))  return { id: 'bakery',    label: 'מאפים',         emoji: '🍞' };
+  if (/מרק/.test(tl))                 return { id: 'soups',     label: 'מרקים',         emoji: '🍲' };
+  if (/תוספ/.test(tl))               return { id: 'sides',     label: 'תוספות',        emoji: '🥦' };
+  if (/רטב|ממרח|דיפ/.test(tl))       return { id: 'sauces',    label: 'רטבים וממרחים', emoji: '🫙' };
+  if (/שתי|משק/.test(tl))            return { id: 'drinks',    label: 'משקאות',        emoji: '🥤' };
+  if (/חטיף|אמוז/.test(tl))          return { id: 'snacks',    label: 'חטיפים',        emoji: '🥨' };
+  if (/פסט|אורז|קינואה|דגן/.test(tl)) return { id: 'grains',    label: 'פסטה ודגנים',   emoji: '🍝' };
+  // Unknown — build a stable slug from the Hebrew label
+  const id = t.replace(/\s+/g, '-').replace(/[^֐-׿a-zA-Z0-9\-]/g, '').slice(0, 30) || 'other';
+  return { id, label: t, emoji: '🍽️' };
 }
 
 // Pick a palette deterministically from a string so colors are spread.
@@ -148,7 +171,8 @@ function makeId(title) {
 // Column header → recipe field. Both Hebrew and a few aliases accepted.
 const COL_ALIASES = {
   title:      ['שם המתכון','שם מתכון','שם','כותרת','מתכון','title','name','recipe'],
-  cuisine:    ['סוג מטבח','מטבח','קטגוריה','cuisine','category','type'],
+  cuisine:    ['סוג מטבח','מטבח','cuisine'],
+  category:   ['קטגוריה','סוג מנה','category','type'],
   prep:       ['זמן הכנה','זמן הכנה (דקות)','הכנה','prep','prep_time','preptime'],
   cook:       ['זמן בישול','זמן בישול (דקות)','בישול','cook','cook_time','cooktime','זמן'],
   desc:       ['תיאור','description','desc','about'],
@@ -205,7 +229,8 @@ function rowToRecipe(row, map) {
   if (!title) return null;
 
   const cuisine = stripHTML(String(get('cuisine') || ''));
-  const category = guessCategory(cuisine);
+  const catText = stripHTML(String(get('category') || ''));
+  const catInfo = catText ? parseCategoryLabel(catText) : parseCategoryLabel(guessCategory(cuisine));
   const prepTime = +String(get('prep') || '').replace(/[^\d.]/g,'') || 0;
   const cookTime = +String(get('cook') || '').replace(/[^\d.]/g,'') || 0;
   const desc  = stripHTML(String(get('desc')  || ''));
@@ -226,7 +251,8 @@ function rowToRecipe(row, map) {
     instructions,
     cuisine,
     palette: pickPalette(title),
-    category,
+    category: catInfo.id,
+    _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
     servings: 4,
@@ -296,7 +322,9 @@ function sheetToRecipe(sheetName, rows) {
     return '';
   };
 
-  const cuisine    = get('סוג מטבח','מטבח','קטגוריה','cuisine','category');
+  const cuisine    = get('סוג מטבח','מטבח','cuisine');
+  const catRaw     = get('קטגוריה','סוג מנה','סוג','category','type');
+  const catInfo    = catRaw ? parseCategoryLabel(catRaw) : parseCategoryLabel(guessCategory(cuisine));
   const level      = get('רמת קושי','רמת קשיים','רמת קשיות') || 'קל';
   const prepTime   = parseTime(get('זמן הכנה','prep','זמן'));
   const cookTime   = parseTime(get('זמן בישול','cook','בישול'));
@@ -345,7 +373,8 @@ function sheetToRecipe(sheetName, rows) {
     id, title,
     description: desc, instructions, cuisine,
     palette: pickPalette(title),
-    category: guessCategory(cuisine),
+    category: catInfo.id,
+    _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
     servings: 4, level,

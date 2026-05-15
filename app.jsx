@@ -93,12 +93,14 @@ function App() {
     if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
   };
 
-  // Auto-create a category from CATEGORY_SEED if recipe has an unknown category id
-  const ensureCategoryExists = (catId, currentCats) => {
+  // Auto-create a category if it doesn't exist yet.
+  // Uses CATEGORY_SEED first, then catInfo from the recipe, then a bare minimum fallback.
+  const ensureCategoryExists = (catId, currentCats, catInfo) => {
     if (!catId || catId === 'all') return;
     if (currentCats.some(c => c.id === catId)) return;
     const seed = typeof CATEGORY_SEED !== 'undefined' && CATEGORY_SEED[catId];
-    if (seed) addCategory(seed);
+    if (seed) { addCategory(seed); return; }
+    if (catInfo) { addCategory({ id: catId, label: catInfo.label, emoji: catInfo.emoji || '🍽️' }); }
   };
 
   const toggleFav = (id) =>
@@ -110,7 +112,7 @@ function App() {
     });
 
   const addRecipe = (rec) => {
-    ensureCategoryExists(rec.category, categories);
+    ensureCategoryExists(rec.category, categories, rec._catInfo);
     setRecipes(rs => [rec, ...rs]);
     if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
     setTab('home');
@@ -163,7 +165,7 @@ function App() {
       if (!recs?.length) { showToast('לא נמצאו מתכונים בקובץ'); return; }
 
       // Auto-create categories for incoming recipes (uses current categories state)
-      recs.forEach(r => ensureCategoryExists(r.category, categories));
+      recs.forEach(r => ensureCategoryExists(r.category, categories, r._catInfo));
 
       // Deduplicate by title (case-insensitive)
       setRecipes(existing => {

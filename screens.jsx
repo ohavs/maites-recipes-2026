@@ -434,7 +434,7 @@ function StepsScreen({ recipe, onClose }) {
           <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
         </div>
         <div className="scroll-y" style={{ flex: 1, padding: '24px 22px 40px' }}>
-          <p style={{ margin: 0, fontSize: 16, lineHeight: 1.9, color: 'var(--ink)', whiteSpace: 'pre-line' }}>
+          <p style={{ margin: 0, fontSize: 18, lineHeight: 2, color: 'var(--ink)', whiteSpace: 'pre-line' }}>
             {plainText || 'אין הוראות הכנה למתכון זה.'}
           </p>
         </div>
