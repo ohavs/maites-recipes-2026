@@ -242,11 +242,21 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
                 הערות אישיות
               </span>
             </SectionLabel>
-            <NotesEditor
-              value={typeof stripHTML === 'function' ? stripHTML(recipe.notes || '') : (recipe.notes || '')}
-              palette={p}
-              onChange={(v) => onUpdateNotes(recipe.id, v)}
-            />
+            {(() => {
+              const notes = typeof stripHTML === 'function' ? stripHTML(recipe.notes || '') : (recipe.notes || '');
+              return notes.trim() ? (
+                <p style={{
+                  margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.65, color: 'var(--ink)',
+                  whiteSpace: 'pre-line', padding: '14px 16px', borderRadius: 16,
+                  background: 'rgba(255,255,255,.7)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,.06), inset 0 0 0 1px rgba(0,0,0,.05)',
+                }}>{notes}</p>
+              ) : (
+                <p style={{ margin: '10px 0 0', padding: '4px 0', fontSize: 14, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
+                  לא נוספו הערות
+                </p>
+              );
+            })()}
           </div>
 
           {/* CTA — instructions button or "no instructions" message */}

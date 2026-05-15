@@ -456,6 +456,24 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
 function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
+  const [slotsWithImages, setSlotsWithImages] = useState(new Set());
+
+  useEffect(() => {
+    const check = () => {
+      if (!window.__getImageSlot) return;
+      const withImgs = new Set(
+        slots.filter(slot => {
+          const d = window.__getImageSlot(`food-${recipeId}-${slot}`);
+          return d && d.u;
+        })
+      );
+      setSlotsWithImages(withImgs);
+    };
+    check();
+    const t1 = setTimeout(check, 500);
+    const t2 = setTimeout(check, 1800);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [recipeId, slots]);
 
   const onScroll = (e) => {
     const el = e.target;
@@ -471,13 +489,15 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
     el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   };
 
+  const slotsWithDots = slots.filter(slot => slotsWithImages.has(slot));
+
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div ref={scrollRef} onScroll={onScroll} style={{
         display: 'flex', overflowX: 'auto', overflowY: 'hidden',
         scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
-        WebkitOverflowScrolling: 'touch',
-      }} className="scroll-y">
+        msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch',
+      }}>
         {slots.map((slot, i) => (
           <div key={slot} style={{
             flex: '0 0 100%', display: 'grid', placeItems: 'center',
@@ -504,30 +524,13 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
           </div>
         )}
       </div>
-      {/* swipe hint arrows (only when >1) */}
-      {slots.length > 1 && (
-        <>
-          <div style={{
-            position: 'absolute', insetInlineStart: 4, top: '50%', transform: 'translateY(-50%)',
-            color: 'rgba(0,0,0,.4)', pointerEvents: 'none',
-          }}>
-            <IconChevronLeft size={22} strokeWidth={2.4}/>
-          </div>
-          <div style={{
-            position: 'absolute', insetInlineEnd: 4, top: '50%', transform: 'translateY(-50%)',
-            color: 'rgba(0,0,0,.4)', pointerEvents: 'none',
-          }}>
-            <IconChevronRight size={22} strokeWidth={2.4}/>
-          </div>
-        </>
-      )}
-      {/* dots */}
-      {slots.length > 1 && (
+      {/* dots — only when more than 1 slot actually has an image */}
+      {slotsWithDots.length > 1 && (
         <div style={{
           display: 'flex', gap: 6, justifyContent: 'center',
           marginTop: 4,
         }}>
-          {slots.map((_, i) => (
+          {slots.map((slot, i) => slotsWithImages.has(slot) ? (
             <button key={i} onClick={() => goTo(i)} aria-label={`תמונה ${i+1}`}
               style={{
                 width: i === index ? 22 : 7, height: 7, borderRadius: 999,
@@ -535,7 +538,7 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
                 border: 'none', cursor: 'pointer', padding: 0,
                 transition: 'width .25s, background .25s',
               }}/>
-          ))}
+          ) : null)}
         </div>
       )}
     </div>
