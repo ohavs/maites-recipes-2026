@@ -249,28 +249,44 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             />
           </div>
 
-          {/* CTA */}
-          <button onClick={() => onOpenSteps(recipe)}
-            style={{
-              marginTop: 28, width: '100%',
-              border: 'none', cursor: 'pointer',
-              padding: '20px 22px', borderRadius: 22,
-              background: p.bg,
-              color: p.ink,
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 17,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              boxShadow: 'var(--shadow-card)',
-            }}>
-            <span>{(() => {
-              const s = recipe.steps || [];
-              const isAuto = s.length > 0 && s.every(x => /^שלב\s*\d+$/.test((x.title || '').trim()));
-              return (s.length > 0 && !isAuto) ? `בואו נכין יחד · ${s.length} שלבים` : 'הוראות הכנה';
-            })()}</span>
-            <span style={{
-              width: 36, height: 36, borderRadius: 999, background: p.ink, color: p.bg,
-              display: 'grid', placeItems: 'center',
-            }}><IconBack size={18} strokeWidth={2.4}/></span>
-          </button>
+          {/* CTA — instructions button or "no instructions" message */}
+          {(() => {
+            const s = recipe.steps || [];
+            const isAuto = s.length > 0 && s.every(x => /^שלב\s*\d+$/.test((x.title || '').trim()));
+            const hasContent = !!(recipe.instructions?.trim())
+              || (s.length > 0 && !isAuto)
+              || (isAuto && s.some(x => (x.body || '').trim()));
+            if (!hasContent) {
+              return (
+                <div style={{
+                  marginTop: 28, padding: '18px 22px', borderRadius: 22,
+                  background: 'rgba(0,0,0,.04)', textAlign: 'center',
+                  color: 'var(--ink-soft)', fontSize: 14.5, fontWeight: 500,
+                }}>
+                  אין הוראות הכנה למתכון זה
+                </div>
+              );
+            }
+            const label = (s.length > 0 && !isAuto) ? `בואו נכין יחד · ${s.length} שלבים` : 'הוראות הכנה';
+            return (
+              <button onClick={() => onOpenSteps(recipe)}
+                style={{
+                  marginTop: 28, width: '100%',
+                  border: 'none', cursor: 'pointer',
+                  padding: '20px 22px', borderRadius: 22,
+                  background: p.bg, color: p.ink,
+                  fontFamily: 'inherit', fontWeight: 700, fontSize: 17,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  boxShadow: 'var(--shadow-card)',
+                }}>
+                <span>{label}</span>
+                <span style={{
+                  width: 36, height: 36, borderRadius: 999, background: p.ink, color: p.bg,
+                  display: 'grid', placeItems: 'center',
+                }}><IconBack size={18} strokeWidth={2.4}/></span>
+              </button>
+            );
+          })()}
         </div>
       </div>
 
