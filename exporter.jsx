@@ -583,5 +583,5 @@ function exportWord(recipes) {
 }
 
 Object.assign(window, {
-  exportExcel, exportWord, importFromFile,
+  exportExcel, exportWord, importFromFile, stripHTML,
 });
