@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory }) {
+function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
 
@@ -104,7 +104,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
       </div>
 
       <div style={{ padding: '12px 0 4px' }}>
-        <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory}/>
+        <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory} onManage={onManageCategories}/>
       </div>
 
       <div style={{ padding: '0 18px 130px', ...(density === 'grid'
@@ -1022,25 +1022,22 @@ function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory 
 // ───────────────────────────────────────────────────────────
 function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   const [pickerOpen, setPickerOpen] = uS(false);
-  const Entry = ING_ICONS[ing.icon || 'chef'] || ING_ICONS.chef;
-  const I = Entry.I;
+  const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
 
   return (
     <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'stretch' }}>
       <div style={{ position: 'relative' }}>
         <button onClick={() => setPickerOpen(o => !o)}
-          aria-label="בחר אייקון"
+          aria-label="בחר אמוג׳י"
           style={{
             width: 44, height: '100%', minHeight: 44, borderRadius: 14, border: 'none',
             background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center',
+            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 22,
             boxShadow: '0 2px 6px rgba(0,0,0,.07), inset 0 0 0 1px rgba(0,0,0,.04)',
-          }}>
-          <I size={20}/>
-        </button>
+          }}>{emoji}</button>
         {pickerOpen && (
-          <IconPickerPopover current={ing.icon || 'chef'}
-            onPick={(k) => { onChange('icon', k); setPickerOpen(false); }}
+          <EmojiPickerPopover current={emoji}
+            onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
             onClose={() => setPickerOpen(false)}
           />
         )}
@@ -1060,40 +1057,54 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   );
 }
 
-function IconPickerPopover({ current, onPick, onClose }) {
+const FOOD_EMOJIS = [
+  '🍽️','🥕','🍎','🥚','🥛','🧀','🍞','🌾','🧂','🌿','🍯','🥩','🐟','🫙','🍾','🍫','☕','🥜',
+  '🍅','🥦','🧅','🧄','🥔','🌽','🥒','🍄','🥬','🫑','🥑','🍋','🍊','🍇','🍓','🫐','🍒','🍌',
+  '🥞','🧇','🥓','🍗','🍖','🦐','🦞','🍣','🍱','🌮','🍕','🫓','🍜','🍝','🥘','🍲','🌯','🥗',
+  '🧆','🍳','🥘','🫕','🍛','🧁','🍰','🎂','🍮','🍭','🍬','🍩','🍪','🌰','🍺','🍷','🍵','🧋',
+];
+
+function EmojiPickerPopover({ current, onPick, onClose }) {
+  const [custom, setCustom] = uS('');
   uE(() => {
     const onDown = (e) => {
-      if (!e.target.closest?.('[data-icon-pop]')) onClose();
+      if (!e.target.closest?.('[data-emoji-pop]')) onClose();
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
-  const keys = Object.keys(ING_ICONS);
   return (
-    <div data-icon-pop="1" style={{
+    <div data-emoji-pop="1" style={{
       position: 'absolute', top: '100%', insetInlineEnd: 0, marginTop: 6,
       background: '#fff', borderRadius: 16, padding: 10,
-      boxShadow: '0 16px 40px -10px rgba(0,0,0,.3), 0 1px 0 rgba(255,255,255,.7) inset',
-      display: 'grid', gridTemplateColumns: 'repeat(6, 36px)', gap: 6,
-      zIndex: 20,
+      boxShadow: '0 16px 40px -10px rgba(0,0,0,.3)',
+      width: 260, zIndex: 20,
     }}>
-      {keys.map(k => {
-        const E = ING_ICONS[k];
-        const Ic = E.I;
-        const sel = k === current;
-        return (
-          <button key={k} onClick={() => onPick(k)} title={E.label}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+        {FOOD_EMOJIS.map(e => (
+          <button key={e} onClick={() => onPick(e)}
             style={{
-              width: 36, height: 36, borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: sel ? 'var(--ink)' : 'rgba(0,0,0,.04)',
-              color: sel ? '#fff' : 'var(--ink)',
-              display: 'grid', placeItems: 'center',
-              transition: 'all .15s',
-            }}>
-            <Ic size={18}/>
-          </button>
-        );
-      })}
+              height: 36, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 20,
+              background: e === current ? 'var(--ink)' : 'rgba(0,0,0,.04)',
+              transition: 'all .12s',
+            }}>{e}</button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input value={custom} onChange={e => setCustom(e.target.value)}
+          placeholder="הקלד/י אמוג׳י…"
+          style={{
+            flex: 1, border: 'none', borderRadius: 10, padding: '8px 10px', fontSize: 16,
+            background: 'rgba(0,0,0,.06)', fontFamily: 'inherit', outline: 'none', textAlign: 'right',
+          }}/>
+        <button onClick={() => { if (custom.trim()) onPick(custom.trim()); }}
+          disabled={!custom.trim()}
+          style={{
+            border: 'none', borderRadius: 10, padding: '8px 12px', cursor: 'pointer',
+            background: custom.trim() ? 'var(--ink)' : 'rgba(0,0,0,.1)',
+            color: custom.trim() ? '#fff' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+          }}>בחר</button>
+      </div>
     </div>
   );
 }

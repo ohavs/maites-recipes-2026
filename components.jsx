@@ -651,8 +651,16 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
 // ───────────────────────────────────────────────────────────
 // CategoryStrip — horizontally scrolling pills
 // ───────────────────────────────────────────────────────────
-function CategoryStrip({ active, onChange, categories: catsProp, onAdd }) {
+function CategoryStrip({ active, onChange, categories: catsProp, onAdd, onManage }) {
   const cats = catsProp || CATEGORIES;
+  const btnBase = {
+    flex: '0 0 auto', border: 'none', cursor: 'pointer',
+    width: 40, height: 40, borderRadius: 999, fontFamily: 'inherit',
+    background: 'rgba(255,255,255,.7)', color: 'var(--ink-soft)',
+    boxShadow: '0 2px 6px rgba(0,0,0,.07)',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all .2s', fontSize: 17,
+  };
   return (
     <div className="scroll-y" style={{
       display: 'flex', flexDirection: 'row-reverse', gap: 10,
@@ -664,11 +672,9 @@ function CategoryStrip({ active, onChange, categories: catsProp, onAdd }) {
         return (
           <button key={c.id} onClick={() => onChange(c.id)}
             style={{
-              flex: '0 0 auto',
-              border: 'none', cursor: 'pointer',
+              flex: '0 0 auto', border: 'none', cursor: 'pointer',
               padding: '10px 16px', borderRadius: 999,
-              fontSize: 14, fontWeight: 700,
-              fontFamily: 'inherit',
+              fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
               background: isActive ? 'var(--ink)' : 'rgba(255,255,255,.7)',
               color: isActive ? '#fff' : 'var(--ink)',
               boxShadow: isActive ? '0 8px 18px -6px rgba(0,0,0,.4)' : '0 2px 6px rgba(0,0,0,.07)',
@@ -679,19 +685,156 @@ function CategoryStrip({ active, onChange, categories: catsProp, onAdd }) {
           </button>
         );
       })}
-      {onAdd && (
-        <button onClick={onAdd}
-          style={{
-            flex: '0 0 auto', border: 'none', cursor: 'pointer',
-            width: 40, height: 40, borderRadius: 999,
-            fontSize: 20, fontFamily: 'inherit',
-            background: 'rgba(255,255,255,.7)',
-            color: 'var(--ink-soft)',
-            boxShadow: '0 2px 6px rgba(0,0,0,.07)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all .2s',
-          }}>+</button>
+      {onAdd && <button onClick={onAdd} style={btnBase}>+</button>}
+      {onManage && (
+        <button onClick={onManage} style={btnBase} title="ניהול קטגוריות">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
       )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// ManageCategoriesSheet — edit emoji/name + add + delete
+// ───────────────────────────────────────────────────────────
+const CAT_EMOJIS_ALL = [
+  '🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳',
+  '🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦','🍅','🧅','🧄','🥔',
+  '🌽','🥒','🍄','🌿','🥬','🫑','🍠','🥚','🍳','🥛','🧈','🥓','🍗','🍖',
+  '🦐','🍣','🍱','🌯','🫔','🥫','🍛','🫕','🌭','🍔','🍟','🫓','🍿','🍦',
+  '🎂','🍮','🍭','🍫','🍩','🍯','🧂','🫙','🍷','☕','🍵','🧋','🥤','🍺',
+  '🥜','🌰','🍋','🍊','🍎','🍇','🍓','🍒','🍌','🍉','🥝','🍈','🍐','🥭',
+];
+
+function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose }) {
+  const { useState: uS } = React;
+  const [editingEmoji, setEditingEmoji] = uS(null); // catId whose emoji picker is open
+  const [addMode, setAddMode] = uS(false);
+  const [newName, setNewName] = uS('');
+  const [newEmoji, setNewEmoji] = uS('🍽️');
+
+  const confirmAdd = () => {
+    const n = newName.trim();
+    if (!n) return;
+    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji: newEmoji });
+    setNewName(''); setNewEmoji('🍽️'); setAddMode(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'absolute', inset: 0, zIndex: 55,
+      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'flex-end',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', background: 'var(--cream)',
+        borderRadius: '28px 28px 0 0',
+        padding: '24px 22px 40px',
+        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        maxHeight: '80vh', overflowY: 'auto',
+        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>ניהול קטגוריות</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
+        </div>
+
+        {/* Existing categories */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {categories.map(cat => (
+            <div key={cat.id} style={{ position: 'relative' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
+                background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: '12px 14px',
+                boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+              }}>
+                {/* Emoji button — opens picker */}
+                <button onClick={() => setEditingEmoji(editingEmoji === cat.id ? null : cat.id)}
+                  style={{
+                    width: 44, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: editingEmoji === cat.id ? 'var(--ink)' : 'rgba(0,0,0,.06)',
+                    fontSize: 24, display: 'grid', placeItems: 'center',
+                    flexShrink: 0, transition: 'all .15s',
+                  }}>{cat.emoji}</button>
+                <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{cat.label}</span>
+                <button onClick={() => onDelete(cat.id)}
+                  style={{
+                    width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer',
+                    background: 'rgba(220,53,69,.1)', color: '#dc3545',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                  </svg>
+                </button>
+              </div>
+              {/* Inline emoji picker */}
+              {editingEmoji === cat.id && (
+                <div style={{
+                  marginTop: 8, background: '#fff', borderRadius: 16, padding: 12,
+                  boxShadow: '0 8px 24px rgba(0,0,0,.14)',
+                  display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse',
+                }}>
+                  {CAT_EMOJIS_ALL.map(e => (
+                    <button key={e} onClick={() => { onEdit(cat.id, { emoji: e }); setEditingEmoji(null); }}
+                      style={{
+                        width: 40, height: 40, border: 'none', borderRadius: 10, fontSize: 22,
+                        cursor: 'pointer', background: e === cat.emoji ? 'var(--ink)' : 'rgba(0,0,0,.05)',
+                        transition: 'all .12s',
+                      }}>{e}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Add new */}
+        {!addMode ? (
+          <button onClick={() => setAddMode(true)} style={{
+            width: '100%', border: '1.5px dashed rgba(0,0,0,.2)', borderRadius: 16,
+            padding: '12px 0', cursor: 'pointer', background: 'transparent',
+            fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: 'var(--ink-soft)',
+          }}>+ קטגוריה חדשה</button>
+        ) : (
+          <div style={{ background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse', marginBottom: 14 }}>
+              {CAT_EMOJIS_ALL.slice(0, 24).map(e => (
+                <button key={e} onClick={() => setNewEmoji(e)} style={{
+                  width: 38, height: 38, border: 'none', borderRadius: 10, fontSize: 20,
+                  cursor: 'pointer', background: newEmoji === e ? 'var(--ink)' : 'rgba(0,0,0,.05)',
+                  transition: 'all .12s',
+                }}>{e}</button>
+              ))}
+            </div>
+            <input value={newName} onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmAdd()}
+              placeholder="שם הקטגוריה" autoFocus
+              style={{
+                width: '100%', border: 'none', borderRadius: 12, padding: '10px 14px',
+                fontSize: 15, background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
+                fontFamily: 'inherit', outline: 'none', textAlign: 'right',
+                marginBottom: 10, boxSizing: 'border-box',
+              }}/>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={confirmAdd} disabled={!newName.trim()} style={{
+                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
+                background: newName.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
+                color: newName.trim() ? '#fff' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
+              }}>הוסיפי</button>
+              <button onClick={() => setAddMode(false)} style={{
+                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
+                background: 'rgba(0,0,0,.06)', color: 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
+              }}>ביטול</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -950,5 +1093,5 @@ Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, Pill, FavHeart,
-  BottomNav, CategoryStrip, AddCategorySheet, StatusBar, Phone,
+  BottomNav, CategoryStrip, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
 });

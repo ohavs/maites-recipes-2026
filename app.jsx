@@ -26,10 +26,14 @@ function App() {
   const [editingRecipeId, setEditingRecipeId] = $S(null);
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
-  const [density, setDensity] = $S(t.density || 'comfy');
+  const [density, setDensity] = $S(() => {
+    try { return localStorage.getItem('maites.density') || t.density || 'comfy'; }
+    catch { return t.density || 'comfy'; }
+  });
   const [showNavGuard, setShowNavGuard] = $S(false);
   const [pendingNav, setPendingNav] = $S(null);
   const formDirtyRef = $R(false);
+  const [showManageCategories, setShowManageCategories] = $S(false);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -91,6 +95,20 @@ function App() {
 
   const addCategory = (cat) => {
     const next = [...categories, cat];
+    setCategories(next);
+    try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+  };
+
+  const editCategory = (id, updates) => {
+    const next = categories.map(c => c.id === id ? { ...c, ...updates } : c);
+    setCategories(next);
+    try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+  };
+
+  const deleteCategory = (id) => {
+    const next = categories.filter(c => c.id !== id);
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
     if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
@@ -227,13 +245,14 @@ function App() {
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}
-              onDensity={(d) => { setDensity(d); setTweak('density', d); }}
+              onDensity={(d) => { setDensity(d); setTweak('density', d); try { localStorage.setItem('maites.density', d); } catch {} }}
               variant={t.cardVariant}
               category={category}
               onCategory={setCategory}
               sharedKey={`${t.cardVariant}-${density}`}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
+              onManageCategories={() => setShowManageCategories(true)}
             />
           )}
           {tab === 'favorites' && (
@@ -317,6 +336,15 @@ function App() {
           <AddCategorySheet
             onAdd={(cat) => { addCategory(cat); setShowAddCategory(false); }}
             onCancel={() => setShowAddCategory(false)}
+          />
+        )}
+        {showManageCategories && (
+          <ManageCategoriesSheet
+            categories={categories.filter(c => c.id !== 'all')}
+            onEdit={editCategory}
+            onDelete={deleteCategory}
+            onAdd={(cat) => addCategory(cat)}
+            onClose={() => setShowManageCategories(false)}
           />
         )}
         {showNavGuard && (

@@ -257,32 +257,39 @@ const IconNuts = (p) => (
   </Icon>
 );
 
-// Map of ingredient category id → icon component + Hebrew label
-const ING_ICONS = {
-  chef:    { I: IconChef,      label: 'כללי' },
-  veg:     { I: IconVeg,       label: 'ירק' },
-  fruit:   { I: IconFruit,     label: 'פרי' },
-  egg:     { I: IconEgg,       label: 'ביצים' },
-  dairy:   { I: IconDairy,     label: 'מוצרי חלב' },
-  cheese:  { I: IconCheese,    label: 'גבינה' },
-  bread:   { I: IconBread,     label: 'לחם' },
-  grain:   { I: IconGrain,     label: 'דגנים / קמח' },
-  spice:   { I: IconSpice,     label: 'תבלין' },
-  herb:    { I: IconHerb,      label: 'עשבי תיבול' },
-  sweet:   { I: IconSweet,     label: 'מתוק / סוכר' },
-  meat:    { I: IconMeat,      label: 'בשר' },
-  fish:    { I: IconFish,      label: 'דגים' },
-  drop:    { I: IconDrop,      label: 'נוזלים / שמן' },
-  bottle:  { I: IconBottle,    label: 'בקבוק' },
-  chocolate:{ I: IconChocolate, label: 'שוקולד' },
-  coffee:  { I: IconCoffee,    label: 'קפה' },
-  nuts:    { I: IconNuts,      label: 'אגוזים' },
+// Legacy key → emoji mapping for backward-compat with old saved recipes
+const ING_KEY_EMOJI = {
+  chef:'🍽️', veg:'🥕', fruit:'🍎', egg:'🥚', dairy:'🥛',
+  cheese:'🧀', bread:'🍞', grain:'🌾', spice:'🧂', herb:'🌿',
+  sweet:'🍯', meat:'🥩', fish:'🐟', drop:'🫙', bottle:'🍾',
+  chocolate:'🍫', coffee:'☕', nuts:'🥜',
 };
 
-function IngredientIcon({ kind = 'chef', size = 20, ...rest }) {
-  const entry = ING_ICONS[kind] || ING_ICONS.chef;
-  const I = entry.I;
-  return <I size={size} {...rest} />;
+// ING_ICONS kept for any legacy references — now emoji-based
+const ING_ICONS = {
+  chef:       { emoji:'🍽️', label:'כללי' },
+  veg:        { emoji:'🥕',  label:'ירק' },
+  fruit:      { emoji:'🍎',  label:'פרי' },
+  egg:        { emoji:'🥚',  label:'ביצים' },
+  dairy:      { emoji:'🥛',  label:'חלב' },
+  cheese:     { emoji:'🧀',  label:'גבינה' },
+  bread:      { emoji:'🍞',  label:'לחם' },
+  grain:      { emoji:'🌾',  label:'קמח / דגנים' },
+  spice:      { emoji:'🧂',  label:'תבלין' },
+  herb:       { emoji:'🌿',  label:'עשבי תיבול' },
+  sweet:      { emoji:'🍯',  label:'מתוק' },
+  meat:       { emoji:'🥩',  label:'בשר' },
+  fish:       { emoji:'🐟',  label:'דגים' },
+  drop:       { emoji:'🫙',  label:'נוזלים' },
+  bottle:     { emoji:'🍾',  label:'בקבוק' },
+  chocolate:  { emoji:'🍫',  label:'שוקולד' },
+  coffee:     { emoji:'☕',  label:'קפה' },
+  nuts:       { emoji:'🥜',  label:'אגוזים' },
+};
+
+function IngredientIcon({ kind = '🍽️', size = 20 }) {
+  const emoji = ING_KEY_EMOJI[kind] || kind || '🍽️';
+  return <span style={{ fontSize: Math.round(size * 0.95), lineHeight: 1, display: 'inline-block' }}>{emoji}</span>;
 }
 
 Object.assign(window, {
@@ -294,5 +301,5 @@ Object.assign(window, {
   IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,
-  ING_ICONS, IngredientIcon,
+  ING_ICONS, ING_KEY_EMOJI, IngredientIcon,
 });
