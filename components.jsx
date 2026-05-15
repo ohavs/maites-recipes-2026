@@ -872,9 +872,95 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// RecipeCardGrid — 2-column square card with image poking out
+// from the top center. Used in 'grid' density mode.
+// ───────────────────────────────────────────────────────────
+function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
+  const p = PALETTES[recipe.palette];
+  const enabled = useAnimEnabled();
+  const enterMs = useAnimMs(500);
+  const [mounted, setMounted] = useState(false);
+  const cardRef = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), enabled ? index * 55 : 0);
+    return () => clearTimeout(t);
+  }, []);
+  useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
+
+  const imgSize = 88;
+  const cardBg = p.bg;
+
+  return (
+    <div style={{
+      position: 'relative',
+      paddingTop: imgSize / 2,
+      opacity: mounted ? 1 : 0,
+      transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
+      transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
+    }}>
+      {/* image circle — centered at the top edge of the card */}
+      <div style={{
+        position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 2, pointerEvents: 'none',
+      }}>
+        <FoodImage
+          recipeId={recipe.id} size={imgSize}
+          slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`}
+          readonly
+        />
+      </div>
+
+      {/* card body */}
+      <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
+        background: cardBg,
+        borderRadius: 22,
+        paddingTop: imgSize / 2 + 10,
+        paddingBottom: 14,
+        paddingInline: 10,
+        boxShadow: 'var(--shadow-card)',
+        cursor: 'pointer',
+        position: 'relative',
+        textAlign: 'center',
+        minHeight: 110,
+        background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
+        transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
+      }}>
+        <div style={{
+          fontWeight: 700, fontSize: 14, lineHeight: 1.25,
+          color: p.ink, marginBottom: 8,
+          display: '-webkit-box', WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>{recipe.title}</div>
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Pill color={p.tag} ink={p.ink}>
+            <IconClock size={11} strokeWidth={2.4}/> {recipe.time}ד׳
+          </Pill>
+          <Pill color={p.tag} ink={p.ink}>
+            <IconUsers size={11} strokeWidth={2.4}/> {recipe.servings}
+          </Pill>
+        </div>
+        {/* fav button */}
+        <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
+          aria-label="מועדפים"
+          style={{
+            position: 'absolute', top: 7, insetInlineEnd: 7,
+            width: 28, height: 28, borderRadius: 999,
+            background: 'rgba(255,255,255,.78)', border: 'none',
+            cursor: 'pointer', display: 'grid', placeItems: 'center',
+            color: recipe.favorite ? '#e34466' : p.ink,
+            boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+          }}>
+          <FavHeart filled={recipe.favorite}/>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
-  RecipeCard, Pill, FavHeart,
+  RecipeCard, RecipeCardGrid, Pill, FavHeart,
   BottomNav, CategoryStrip, AddCategorySheet, StatusBar, Phone,
 });

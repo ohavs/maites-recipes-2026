@@ -27,6 +27,9 @@ function App() {
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
   const [density, setDensity] = $S(t.density || 'comfy');
+  const [showNavGuard, setShowNavGuard] = $S(false);
+  const [pendingNav, setPendingNav] = $S(null);
+  const formDirtyRef = $R(false);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -190,9 +193,22 @@ function App() {
   };
 
   const navTo = (id) => {
+    if (tab === 'add' && id !== 'add' && formDirtyRef.current) {
+      setPendingNav(id);
+      setShowNavGuard(true);
+      return;
+    }
+    formDirtyRef.current = false;
     if (id === 'add')            setTab('add');
     else if (id === 'favorites') setTab('favorites');
     else                         setTab('home');
+  };
+  const confirmNavLeave = () => {
+    const id = pendingNav;
+    setShowNavGuard(false); setPendingNav(null); formDirtyRef.current = false;
+    if (id === 'add') setTab('add');
+    else if (id === 'favorites') setTab('favorites');
+    else setTab('home');
   };
 
   const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
@@ -237,6 +253,7 @@ function App() {
               onImport={handleImport}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
+              onDirtyChange={(d) => { formDirtyRef.current = d; }}
             />
           )}
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
@@ -302,6 +319,12 @@ function App() {
             onCancel={() => setShowAddCategory(false)}
           />
         )}
+        {showNavGuard && (
+          <UnsavedChangesDialog
+            onStay={() => { setShowNavGuard(false); setPendingNav(null); }}
+            onLeave={confirmNavLeave}
+          />
+        )}
 
         {showInstall && (
           <InstallPrompt
@@ -335,6 +358,7 @@ function App() {
           options={[
             { value: 'compact', label: 'קומפקטי' },
             { value: 'comfy',   label: 'נוח' },
+            { value: 'grid',    label: 'גריד' },
           ]}
           onChange={v => { setDensity(v); setTweak('density', v); }}/>
         <TweakSelect label="סגנון"

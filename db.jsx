@@ -122,6 +122,11 @@ async function db_deleteRecipe(id) {
   }
 }
 
+async function db_deleteImageSlot(slotId) {
+  await _db.collection('image_slots').doc(slotId).delete()
+    .catch(e => console.warn('deleteImageSlot:', e));
+}
+
 async function db_seedRecipes(recipes) {
   const now = Date.now();
   const batch = _db.batch();
@@ -158,6 +163,7 @@ Object.assign(window, {
   db_loadRecipes,
   db_saveRecipe,
   db_deleteRecipe,
+  db_deleteImageSlot,
   db_seedRecipes,
   db_loadCategories,
   db_saveCategories,

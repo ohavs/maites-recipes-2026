@@ -159,6 +159,12 @@ const IconRows = (p) => (
     <rect x="3" y="16" width="18" height="4" rx="1.5"/>
   </Icon>
 );
+const IconColumns2 = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="7.5" height="18" rx="1.5"/>
+    <rect x="13.5" y="3" width="7.5" height="18" rx="1.5"/>
+  </Icon>
+);
 
 // ────────────────────────────────────────────────
 // Ingredient category icons (filled, simple)
@@ -284,7 +290,7 @@ Object.assign(window, {
   IconClock, IconUsers, IconFire, IconChef, IconFilter, IconDownload, IconUpload,
   IconCheck, IconShare, IconBookmark, IconDots, IconExcel, IconWord,
   IconEdit, IconNote, IconChevronLeft, IconChevronRight, IconImage, IconTrash,
-  IconGrid, IconRows,
+  IconGrid, IconRows, IconColumns2,
   IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,

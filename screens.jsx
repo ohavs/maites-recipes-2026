@@ -45,17 +45,19 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
           color: 'var(--ink)', fontFamily: 'var(--font-display)',
         }}>Maites</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => onDensity(density === 'compact' ? 'comfy' : 'compact')}
-            aria-label="פריסה קומפקטית" title="פריסה"
+          <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
+            aria-label="פריסת תצוגה" title="פריסה"
             style={{
               width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: density === 'compact' ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-              color: density === 'compact' ? '#fff' : 'var(--ink)',
+              background: density !== 'comfy' ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+              color: density !== 'comfy' ? '#fff' : 'var(--ink)',
               display: 'grid', placeItems: 'center',
               boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
               transition: 'all .2s',
             }}>
-            {density === 'compact' ? <IconGrid size={18} strokeWidth={2.2}/> : <IconRows size={18} strokeWidth={2.2}/>}
+            {density === 'comfy' ? <IconRows size={18} strokeWidth={2.2}/>
+              : density === 'compact' ? <IconGrid size={18} strokeWidth={2.2}/>
+              : <IconColumns2 size={18} strokeWidth={2.2}/>}
           </button>
           <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
             style={{
@@ -105,7 +107,10 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory}/>
       </div>
 
-      <div style={{ padding: '0 18px 130px', display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 }}>
+      <div style={{ padding: '0 18px 130px', ...(density === 'grid'
+        ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
+        : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
+      }}>
         {!recipesLoaded && (
           [1, 2, 3].map(i => <RecipeCardSkeleton key={i} density={density} />)
         )}
@@ -113,14 +118,17 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
           <EmptyState text={q ? `אין תוצאות עבור "${q}"` : 'אין מתכונים בקטגוריה הזו עדיין'} emoji={q ? "🔍" : "🍽️"} />
         )}
         {recipesLoaded && filtered.map((r, i) => (
-          <RecipeCard key={`${sharedKey}-${r.id}`}
-            recipe={r} index={i}
-            onOpen={onOpen}
-            onToggleFav={onToggleFav}
-            density={density}
-            variant={variant}
-            sharedId={r.id}
-          />
+          density === 'grid'
+            ? <RecipeCardGrid key={`${sharedKey}-${r.id}-grid`}
+                recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav} />
+            : <RecipeCard key={`${sharedKey}-${r.id}`}
+                recipe={r} index={i}
+                onOpen={onOpen}
+                onToggleFav={onToggleFav}
+                density={density}
+                variant={variant}
+                sharedId={r.id}
+              />
         ))}
       </div>
     </div>
@@ -517,14 +525,19 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
         {favs.length} {favs.length === 1 ? 'מתכון שמור' : 'מתכונים שמורים'}
       </p>
 
-      <div style={{ padding: '0 18px', display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 }}>
+      <div style={{ padding: '0 18px', ...(density === 'grid'
+        ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
+        : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
+      }}>
         {favs.length === 0 && (
           <EmptyState text="עוד לא הוספת מתכונים למועדפים — לבחור לבך על כל כרטיס" emoji="💝"
             cta={{ label: 'לרשימת המתכונים', onClick: () => onNav('home') }}/>
         )}
         {favs.map((r, i) => (
-          <RecipeCard key={r.id} recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav}
-            density={density} variant={variant}/>
+          density === 'grid'
+            ? <RecipeCardGrid key={r.id} recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav} />
+            : <RecipeCard key={r.id} recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav}
+                density={density} variant={variant}/>
         ))}
       </div>
     </div>
@@ -535,7 +548,7 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 // RecipeFormScreen — used for both "add new" and "edit existing".
 // Includes per-ingredient icon picker.
 // ───────────────────────────────────────────────────────────
-function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp, onAddCategory }) {
+function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -551,6 +564,20 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [mainSlot, setMainSlot] = uS(existing?.mainSlot || gallery[0] || 'main');
   // Stable ID for image slots — persists across re-renders so photos survive form edits
   const [recipeId] = uS(existing?.id || `new-${Date.now().toString(36)}`);
+  const [isDirty, setIsDirty] = uS(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = uS(false);
+  const mountedRef = uR(false);
+  const ingsKey = ings.map(i => (i.name || '') + (i.qty || '')).join('|');
+  const stepsKey = stepsArr.map(s => (s.title || '') + (s.body || '')).join('|');
+  uE(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return; }
+    setIsDirty(true);
+  }, [title, desc, cuisine, category, paletteKey, notes, prepTime, cookTime, servings, ingsKey, stepsKey]);
+  uE(() => { if (onDirtyChange) onDirtyChange(isDirty); }, [isDirty]);
+  const tryCancel = () => {
+    if (isDirty) { setShowLeaveConfirm(true); }
+    else if (onCancel) { onCancel(); }
+  };
 
   const updateIng = (i, k, v) => setIngs(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
   const addIng = () => setIngs(arr => [...arr, { qty: '', name: '', icon: 'chef' }]);
@@ -594,7 +621,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           {mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
         </h1>
         {onCancel && (
-          <button onClick={onCancel} aria-label="ביטול" style={{
+          <button onClick={tryCancel} aria-label="ביטול" style={{
             width: 36, height: 36, borderRadius: 999, border: 'none', background: 'rgba(255,255,255,.85)',
             color: 'var(--ink)', cursor: 'pointer', display: 'grid', placeItems: 'center',
             boxShadow: '0 4px 10px rgba(0,0,0,.1)',
@@ -747,14 +774,23 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
             style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }}/>
         </Field>
 
-        <button onClick={save} disabled={!canSave} style={{
-          marginTop: 14, padding: '18px', border: 'none',
-          cursor: canSave ? 'pointer' : 'default',
-          borderRadius: 22, background: canSave ? 'var(--ink)' : 'rgba(0,0,0,.2)',
-          color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-          boxShadow: canSave ? '0 14px 30px -10px rgba(0,0,0,.4)' : 'none',
-          opacity: canSave ? 1 : .7,
-        }}>{mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}</button>
+        <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+          {onCancel && (
+            <button onClick={tryCancel} style={{
+              flexShrink: 0, padding: '18px 20px', border: 'none', cursor: 'pointer',
+              borderRadius: 22, background: 'rgba(0,0,0,.08)',
+              color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
+            }}>ביטול</button>
+          )}
+          <button onClick={save} disabled={!canSave} style={{
+            flex: 1, padding: '18px', border: 'none',
+            cursor: canSave ? 'pointer' : 'default',
+            borderRadius: 22, background: canSave ? 'var(--ink)' : 'rgba(0,0,0,.2)',
+            color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
+            boxShadow: canSave ? '0 14px 30px -10px rgba(0,0,0,.4)' : 'none',
+            opacity: canSave ? 1 : .7,
+          }}>{mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}</button>
+        </div>
 
         {/* Export / Import — only shown in add mode */}
         {mode === 'add' && onExport && (
@@ -789,6 +825,12 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           </div>
         )}
       </div>
+      {showLeaveConfirm && (
+        <UnsavedChangesDialog
+          onStay={() => setShowLeaveConfirm(false)}
+          onLeave={() => { setIsDirty(false); setShowLeaveConfirm(false); if (onCancel) onCancel(); }}
+        />
+      )}
     </div>
   );
 }
@@ -863,6 +905,10 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
     setGallery(next);
     if (mainSlot === slot) setMainSlot(next[0]);
     setPreviews(prev => { const n = { ...prev }; delete n[slot]; return n; });
+    // Delete from Firestore image_slots
+    const slotId = `food-${recipeId}-${slot}`;
+    if (typeof db_deleteImageSlot !== 'undefined') db_deleteImageSlot(slotId);
+    if (window.__setImageSlot) window.__setImageSlot(slotId, null);
   };
 
   return (
@@ -937,8 +983,8 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onExport, onImport, categories, onAddCategory }) {
-  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories} onAddCategory={onAddCategory}/>;
+function AddRecipeScreen({ onAdd, onExport, onImport, categories, onAddCategory, onDirtyChange }) {
+  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories} onAddCategory={onAddCategory} onDirtyChange={onDirtyChange}/>;
 }
 
 function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory }) {
@@ -1093,6 +1139,60 @@ function EmptyState({ text, emoji, cta }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// UnsavedChangesDialog — warning when leaving with unsaved edits
+// ───────────────────────────────────────────────────────────
+function UnsavedChangesDialog({ onStay, onLeave }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 60,
+      background: 'rgba(28,22,32,.65)',
+      backdropFilter: 'blur(14px)',
+      display: 'grid', placeItems: 'center',
+    }} onClick={onStay}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--cream)',
+        borderRadius: 36, padding: '36px 28px 28px',
+        margin: '0 24px', maxWidth: 340, width: '100%',
+        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
+        textAlign: 'center',
+        animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
+      }}>
+        <div style={{
+          width: 76, height: 76, borderRadius: 999,
+          background: '#fff1c2',
+          display: 'grid', placeItems: 'center',
+          boxShadow: '0 14px 30px -8px #ffd25566, 0 1px 0 rgba(255,255,255,.6) inset',
+        }}>
+          <IconEdit size={32} strokeWidth={1.8} color="#c98a14"/>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h2 className="display" style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--ink)' }}>
+            שינויים לא נשמרו
+          </h2>
+          <p style={{ margin: 0, fontSize: 15.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+            יש שינויים שטרם נשמרו.<br/>לצאת בלי לשמור?
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <button onClick={onLeave} style={{
+            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
+            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+          }}>צא בלי לשמור</button>
+          <button onClick={onStay} style={{
+            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
+            background: 'var(--ink)', color: '#fff',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            boxShadow: '0 10px 24px -8px rgba(28,22,32,.4)',
+          }}>המשך עריכה</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // DeleteConfirm — styled fullscreen confirmation dialog
 // ───────────────────────────────────────────────────────────
 function DeleteConfirm({ recipe, onConfirm, onCancel }) {
@@ -1169,5 +1269,5 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
 Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
-  PhotoManager, DeleteConfirm,
+  PhotoManager, DeleteConfirm, UnsavedChangesDialog,
 });
