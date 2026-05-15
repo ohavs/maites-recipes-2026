@@ -405,14 +405,6 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
                 display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}>{recipe.description}</div>
             )}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: isCompact ? 2 : 4 }}>
-              <Pill color={p.tag} ink={p.ink}>
-                <IconClock size={12} strokeWidth={2.4} /> {recipe.time} ד׳
-              </Pill>
-              <Pill color={p.tag} ink={p.ink}>
-                <IconUsers size={12} strokeWidth={2.4} /> {recipe.servings}
-              </Pill>
-            </div>
           </div>
 
           {/* circle photo — sits on the inline-START side (RTL → right) of
@@ -895,8 +887,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   }, []);
   useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
 
-  const imgSize = 88;
-  const cardBg = p.bg;
+  const imgSize = 110;
 
   return (
     <div style={{
@@ -920,33 +911,23 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 
       {/* card body */}
       <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-        background: cardBg,
         borderRadius: 22,
         paddingTop: imgSize / 2 + 10,
-        paddingBottom: 14,
+        paddingBottom: 16,
         paddingInline: 10,
         boxShadow: 'var(--shadow-card)',
         cursor: 'pointer',
         position: 'relative',
         textAlign: 'center',
-        minHeight: 110,
         background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
         transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
       }}>
         <div style={{
           fontWeight: 700, fontSize: 14, lineHeight: 1.25,
-          color: p.ink, marginBottom: 8,
+          color: p.ink,
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{recipe.title}</div>
-        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Pill color={p.tag} ink={p.ink}>
-            <IconClock size={11} strokeWidth={2.4}/> {recipe.time}ד׳
-          </Pill>
-          <Pill color={p.tag} ink={p.ink}>
-            <IconUsers size={11} strokeWidth={2.4}/> {recipe.servings}
-          </Pill>
-        </div>
         {/* fav button */}
         <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
           aria-label="מועדפים"
