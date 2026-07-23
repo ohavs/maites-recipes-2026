@@ -11,7 +11,7 @@
   "dir": "rtl",
   "icons": [
     {
-      "src": "/maites-icon.png",
+      "src": "/maites-icon.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

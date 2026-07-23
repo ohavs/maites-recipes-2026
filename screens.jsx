@@ -1439,7 +1439,7 @@ function LoginScreen({ onSignIn }) {
       fontFamily: 'var(--font-body)', padding: 32,
     }}>
       <div style={{ textAlign: 'center', maxWidth: 320 }}>
-        <img src="/maites-icon.png" alt="Maites"
+        <img src="/maites-logo.png" alt="Maites"
           style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,.1))' }}/>
         <p style={{ margin: '0 0 40px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
           ספר המתכונים האישי שלך
