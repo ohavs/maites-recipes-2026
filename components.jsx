@@ -1089,9 +1089,65 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// ConfirmDialog — reusable destructive-action confirmation
+// emoji: big icon shown in badge, confirmColor: button color
+// ───────────────────────────────────────────────────────────
+function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', confirmColor = '#e34466', onConfirm, onCancel }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 90,
+      background: 'rgba(28,22,32,.65)',
+      backdropFilter: 'blur(14px)',
+      display: 'grid', placeItems: 'center',
+      padding: 24,
+    }} onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--cream)',
+        borderRadius: 36, padding: '36px 28px 28px',
+        maxWidth: 340, width: '100%',
+        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
+        textAlign: 'center',
+        animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
+      }}>
+        <div style={{
+          width: 76, height: 76, borderRadius: 999,
+          background: `${confirmColor}18`,
+          display: 'grid', placeItems: 'center',
+          fontSize: 36,
+          boxShadow: `0 14px 30px -8px ${confirmColor}44, 0 1px 0 rgba(255,255,255,.6) inset`,
+        }}>{emoji}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <h2 className="display" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{title}</h2>
+          {body && <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
+        </div>
+        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
+            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+          }}>{cancelLabel}</button>
+          <button onClick={onConfirm} style={{
+            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
+            background: confirmColor, color: '#fff',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            boxShadow: `0 10px 24px -8px ${confirmColor}88`,
+          }}
+            onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
+            onMouseUp={e => e.currentTarget.style.transform = ''}
+            onMouseLeave={e => e.currentTarget.style.transform = ''}
+          >{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, Pill, FavHeart,
   BottomNav, CategoryStrip, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
+  ConfirmDialog,
 });

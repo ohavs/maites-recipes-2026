@@ -1,5 +1,5 @@
-const CACHE = 'maites-v1';
-const SHELL = ['/index.html', '/manifest.json', '/icon.svg'];
+const CACHE = 'maites-v3';
+const SHELL = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -20,8 +20,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
 
-  // JSX/JS/HTML: network-first, fall back to cache
-  if (url.pathname.match(/\.(jsx|js|html)$/i) || url.pathname === '/') {
+  // JSX/JS/HTML/SVG: network-first, fall back to cache
+  if (url.pathname.match(/\.(jsx|js|html|svg)$/i) || url.pathname === '/') {
     e.respondWith(
       fetch(e.request)
         .then(res => {

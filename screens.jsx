@@ -909,6 +909,7 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
   const [previews, setPreviews] = uS({});
   const inputRef = uR(null);
   const [pickingSlot, setPickingSlot] = uS(null);
+  const [confirmRemoveSlot, setConfirmRemoveSlot] = uS(null);
   const p = palette;
 
   // Load existing images from bridge on mount (may already be loaded if card was rendered)
@@ -981,6 +982,18 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
   return (
     <div>
       <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
+      {confirmRemoveSlot && (
+        <ConfirmDialog
+          emoji="🖼️"
+          title="הסרת תמונה"
+          body="בטוח להסיר את התמונה הזו?"
+          confirmLabel="הסר תמונה"
+          cancelLabel="ביטול"
+          confirmColor="#e34466"
+          onConfirm={() => { removeSlot(confirmRemoveSlot); setConfirmRemoveSlot(null); }}
+          onCancel={() => setConfirmRemoveSlot(null)}
+        />
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, flexDirection: 'row-reverse' }}>
         {gallery.map(slot => {
           const isMain = slot === mainSlot;
@@ -1023,7 +1036,7 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
                 }}>☆</button>
               )}
               {gallery.length > 1 && (
-                <button type="button" onClick={() => removeSlot(slot)} style={{
+                <button type="button" onClick={() => setConfirmRemoveSlot(slot)} style={{
                   position: 'absolute', top: -7, insetInlineEnd: -7,
                   width: 22, height: 22, borderRadius: 999,
                   background: 'rgba(255,255,255,.95)', color: '#e34466',
@@ -1221,52 +1234,16 @@ function EmptyState({ text, emoji, cta }) {
 // ───────────────────────────────────────────────────────────
 function UnsavedChangesDialog({ onStay, onLeave }) {
   return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 60,
-      background: 'rgba(28,22,32,.65)',
-      backdropFilter: 'blur(14px)',
-      display: 'grid', placeItems: 'center',
-    }} onClick={onStay}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--cream)',
-        borderRadius: 36, padding: '36px 28px 28px',
-        margin: '0 24px', maxWidth: 340, width: '100%',
-        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
-        textAlign: 'center',
-        animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
-      }}>
-        <div style={{
-          width: 76, height: 76, borderRadius: 999,
-          background: '#fff1c2',
-          display: 'grid', placeItems: 'center',
-          boxShadow: '0 14px 30px -8px #ffd25566, 0 1px 0 rgba(255,255,255,.6) inset',
-        }}>
-          <IconEdit size={32} strokeWidth={1.8} color="#c98a14"/>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h2 className="display" style={{ margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--ink)' }}>
-            שינויים לא נשמרו
-          </h2>
-          <p style={{ margin: 0, fontSize: 15.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-            יש שינויים שטרם נשמרו.<br/>לצאת בלי לשמור?
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-          <button onClick={onLeave} style={{
-            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
-            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-          }}>צא בלי לשמור</button>
-          <button onClick={onStay} style={{
-            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
-            background: 'var(--ink)', color: '#fff',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-            boxShadow: '0 10px 24px -8px rgba(28,22,32,.4)',
-          }}>המשך עריכה</button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      emoji="✏️"
+      title="שינויים לא נשמרו"
+      body="יש שינויים שטרם נשמרו. לצאת בלי לשמור?"
+      confirmLabel="המשך עריכה"
+      cancelLabel="צא בלי לשמור"
+      confirmColor="var(--ink)"
+      onConfirm={onStay}
+      onCancel={onLeave}
+    />
   );
 }
 
@@ -1274,73 +1251,17 @@ function UnsavedChangesDialog({ onStay, onLeave }) {
 // DeleteConfirm — styled fullscreen confirmation dialog
 // ───────────────────────────────────────────────────────────
 function DeleteConfirm({ recipe, onConfirm, onCancel }) {
-  const p = PALETTES[recipe.palette];
   return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 25,
-      background: 'rgba(28,22,32,.65)',
-      backdropFilter: 'blur(14px)',
-      display: 'grid', placeItems: 'center',
-    }} onClick={onCancel}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--cream)',
-        borderRadius: 36, padding: '36px 28px 28px',
-        margin: '0 24px', maxWidth: 340, width: '100%',
-        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
-        textAlign: 'center',
-        animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
-      }}>
-        {/* Icon badge */}
-        <div style={{
-          width: 76, height: 76, borderRadius: 999,
-          background: p.bg,
-          display: 'grid', placeItems: 'center',
-          boxShadow: `0 14px 30px -8px ${p.bg}cc, 0 1px 0 rgba(255,255,255,.6) inset`,
-        }}>
-          <IconTrash size={32} strokeWidth={1.8} color={p.ink}/>
-        </div>
-
-        {/* Text */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h2 className="display" style={{
-            margin: 0, fontSize: 26, fontWeight: 700, color: 'var(--ink)',
-          }}>מחיקת מתכון</h2>
-          <p style={{ margin: 0, fontSize: 15.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-            בטוח למחוק את<br/>
-            <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>"{recipe.title}"</strong>?
-          </p>
-          <span style={{
-            display: 'inline-block', padding: '5px 14px',
-            borderRadius: 999,
-            background: 'rgba(227,68,102,.1)',
-            color: '#c0304f', fontSize: 12.5, fontWeight: 700,
-          }}>לא ניתן לשחזר אחרי המחיקה</span>
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
-            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-            transition: 'background .15s',
-          }}>ביטול</button>
-          <button onClick={onConfirm} style={{
-            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
-            background: '#e34466', color: '#fff',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-            boxShadow: '0 10px 24px -8px rgba(227,68,102,.55)',
-            transition: 'transform .15s, box-shadow .15s',
-          }}
-          onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
-          onMouseUp={e => e.currentTarget.style.transform = ''}
-          onMouseLeave={e => e.currentTarget.style.transform = ''}
-          >מחק מתכון</button>
-        </div>
-      </div>
-      <style>{`@keyframes delPop{0%{transform:scale(.82);opacity:0}100%{transform:scale(1);opacity:1}}`}</style>
-    </div>
+    <ConfirmDialog
+      emoji="🗑️"
+      title="מחיקת מתכון"
+      body={<>בטוח למחוק את<br/><strong style={{ color: 'var(--ink)' }}>"{recipe.title}"</strong>?<br/><span style={{ fontSize: 13, color: '#c0304f', fontWeight: 700 }}>לא ניתן לשחזר אחרי המחיקה</span></>}
+      confirmLabel="מחק מתכון"
+      cancelLabel="ביטול"
+      confirmColor="#e34466"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   );
 }
 
@@ -1348,8 +1269,22 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
 // SharedRecipesSection — horizontal strip of recipes shared with me
 // ───────────────────────────────────────────────────────────
 function SharedRecipesSection({ items, onOpen, onRemove }) {
+  const [confirmId, setConfirmId] = uS(null);
+  const confirmItem = items.find(r => r._shareId === confirmId);
   return (
     <div style={{ padding: '4px 0 8px' }}>
+      {confirmItem && (
+        <ConfirmDialog
+          emoji="🤝"
+          title="הסרת מתכון משותף"
+          body={`להסיר את "${confirmItem.title}" ששותף איתך ע״י ${confirmItem._sharedBy}?`}
+          confirmLabel="הסר"
+          cancelLabel="ביטול"
+          confirmColor="#e34466"
+          onConfirm={() => { onRemove(confirmId); setConfirmId(null); }}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
       <div style={{
         padding: '0 22px 10px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1387,7 +1322,7 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
                   <span>👤</span> {r._sharedBy}
                 </div>
               </div>
-              <button onClick={e => { e.stopPropagation(); onRemove(r._shareId); }}
+              <button onClick={e => { e.stopPropagation(); setConfirmId(r._shareId); }}
                 style={{
                   position: 'absolute', top: 6, insetInlineEnd: 6,
                   width: 22, height: 22, borderRadius: 999, border: 'none',
