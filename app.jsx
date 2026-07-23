@@ -304,7 +304,7 @@ function App() {
         background: 'var(--bg)', fontFamily: 'var(--font-display)',
       }}>
         <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
-          <img src="/icon.svg" alt="Maites" style={{ width: 80, height: 80, objectFit: 'contain', marginBottom: 16, opacity: .85 }}/>
+          <img src="/maites-icon.png" alt="Maites" style={{ width: 90, height: 90, objectFit: 'contain', marginBottom: 16 }}/>
           <div style={{ fontSize: 15 }}>טוענת…</div>
         </div>
       </div>
