@@ -457,14 +457,19 @@ function App() {
           />
         )}
         {sharingRecipe && (
-          <ShareRecipeSheet
-            recipe={sharingRecipe}
-            onShare={async (email) => {
+          <RecipeSelectSheet
+            initialRecipe={sharingRecipe}
+            recipes={recipes}
+            categories={categories}
+            onShare={async (email, selectedRecipes) => {
               if (!currentUser) return;
               try {
-                await db_shareRecipeWith(currentUser, email, sharingRecipe);
+                await Promise.all(selectedRecipes.map(r => db_shareRecipeWith(currentUser, email, r)));
                 setSharingRecipe(null);
-                showToast(`"${sharingRecipe.title}" שותף עם ${email} ✓`);
+                const count = selectedRecipes.length;
+                showToast(count === 1
+                  ? `"${selectedRecipes[0].title}" שותף עם ${email} ✓`
+                  : `${count} מתכונים שותפו עם ${email} ✓`);
               } catch { showToast('שגיאה בשיתוף'); }
             }}
             onClose={() => setSharingRecipe(null)}
@@ -481,10 +486,10 @@ function App() {
               setShowAccountPanel(false);
               await auth_signOut();
             }}
-            onInvite={async (email) => {
+            onInvite={async (email, mutual) => {
               if (!currentUser) return;
               try {
-                await db_createInvite(currentUser.uid, currentUser.email, currentUser.displayName, email);
+                await db_createInvite(currentUser.uid, currentUser.email, currentUser.displayName, email, mutual);
                 const inv = await db_getMyInvites(currentUser.uid);
                 setPendingInvites(inv);
                 showToast(`הזמנה נשלחה ל-${email} ✓`);

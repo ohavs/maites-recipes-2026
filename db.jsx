@@ -208,7 +208,7 @@ async function db_saveCategories(cats) {
 }
 
 // ── Sharing ────────────────────────────────────────────────
-async function db_createInvite(ownerUid, ownerEmail, ownerDisplayName, guestEmail) {
+async function db_createInvite(ownerUid, ownerEmail, ownerDisplayName, guestEmail, mutual = false) {
   const safe = guestEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
   const id = ownerUid + '_' + safe;
   await _db.collection('invites').doc(id).set({
@@ -216,6 +216,7 @@ async function db_createInvite(ownerUid, ownerEmail, ownerDisplayName, guestEmai
     ownerEmail,
     ownerDisplayName: ownerDisplayName || ownerEmail,
     guestEmail: guestEmail.toLowerCase().trim(),
+    mutual: !!mutual,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   });
   return id;
@@ -246,8 +247,21 @@ async function db_checkAndAcceptInvites(guestUid, guestEmail) {
       ownerDisplayName: data.ownerDisplayName || data.ownerEmail,
       guestUid,
       guestEmail,
+      mutual: !!data.mutual,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    if (data.mutual) {
+      const reverseRef = _db.collection('shares').doc(guestUid + '_' + data.ownerUid);
+      batch.set(reverseRef, {
+        ownerUid: guestUid,
+        ownerEmail: guestEmail,
+        ownerDisplayName: guestEmail,
+        guestUid: data.ownerUid,
+        guestEmail: data.ownerEmail,
+        mutual: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
     batch.delete(doc.ref);
     accepted.push(data);
   }

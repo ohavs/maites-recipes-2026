@@ -1340,52 +1340,154 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// ShareRecipeSheet — bottom sheet to share a recipe by email
+// RecipeSelectSheet — full-screen multi-recipe selector for sharing
 // ───────────────────────────────────────────────────────────
-function ShareRecipeSheet({ recipe, onShare, onClose }) {
+function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClose }) {
+  const [selectedIds, setSelectedIds] = uS(() => new Set(initialRecipe ? [initialRecipe.id] : []));
+  const [catFilter, setCatFilter] = uS('all');
   const [email, setEmail] = uS('');
   const [sharing, setSharing] = uS(false);
-  const p = PALETTES[recipe.palette] || PALETTES.peach;
+
+  const activeCats = uM(() => {
+    const used = new Set(recipes.map(r => r.category).filter(Boolean));
+    const all = categories || CATEGORIES;
+    return [
+      all.find(c => c.id === 'all') || { id: 'all', label: 'הכל', emoji: '🍽️' },
+      ...all.filter(c => c.id !== 'all' && used.has(c.id)),
+    ];
+  }, [recipes, categories]);
+
+  const filtered = uM(() =>
+    catFilter === 'all' ? recipes : recipes.filter(r => r.category === catFilter),
+    [recipes, catFilter]
+  );
+
+  const allInFilterSelected = filtered.length > 0 && filtered.every(r => selectedIds.has(r.id));
+
+  const toggleRecipe = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const toggleSelectAll = () => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (allInFilterSelected) filtered.forEach(r => next.delete(r.id));
+    else filtered.forEach(r => next.add(r.id));
+    return next;
+  });
 
   const handleShare = async () => {
-    if (!email.trim()) return;
+    if (!email.trim() || selectedIds.size === 0) return;
     setSharing(true);
-    await onShare(email.trim());
+    const selected = recipes.filter(r => selectedIds.has(r.id));
+    await onShare(email.trim(), selected);
     setSharing(false);
   };
+
+  const canSend = email.trim() && selectedIds.size > 0;
 
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(12px)',
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: 'var(--cream)',
-        borderRadius: '32px 32px 0 0',
-        padding: '14px 24px 48px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
-        animation: 'slideUp .32s cubic-bezier(.2,1.1,.35,1)',
+      background: 'var(--bg)',
+      display: 'flex', flexDirection: 'column',
+      animation: 'slideUp .32s cubic-bezier(.2,1.1,.35,1)',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '16px 18px 10px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        borderBottom: '1px solid rgba(0,0,0,.07)', flexShrink: 0,
+        background: 'rgba(255,255,255,.6)', backdropFilter: 'blur(8px)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 999, background: 'rgba(0,0,0,.12)' }}/>
-        </div>
-        {/* Recipe preview chip */}
-        <div style={{
-          background: p.bg, borderRadius: 18, padding: '14px 18px',
-          marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12,
+        <button onClick={onClose} style={{
+          width: 36, height: 36, borderRadius: 999, border: 'none',
+          background: 'rgba(0,0,0,.07)', cursor: 'pointer',
+          display: 'grid', placeItems: 'center', color: 'var(--ink)', flexShrink: 0,
+        }}><IconClose size={16} strokeWidth={2.2}/></button>
+        <h2 className="display" style={{ margin: 0, fontSize: 19, fontWeight: 700, flex: 1 }}>
+          שיתוף מתכונים
+        </h2>
+        <button onClick={toggleSelectAll} style={{
+          border: 'none', cursor: 'pointer', padding: '7px 12px', borderRadius: 12,
+          background: allInFilterSelected ? 'var(--ink)' : 'rgba(0,0,0,.07)',
+          color: allInFilterSelected ? '#fff' : 'var(--ink)',
+          fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, flexShrink: 0,
         }}>
-          <span style={{ fontSize: 28 }}>🍽️</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: p.ink }}>{recipe.title}</div>
-            {recipe.description && (
-              <div style={{ fontSize: 12.5, color: p.ink, opacity: .7, marginTop: 2 }}>{recipe.description}</div>
-            )}
+          {allInFilterSelected ? 'בטל הכל' : 'בחר הכל'}
+        </button>
+      </div>
+
+      {/* Category filter strip */}
+      <div style={{
+        display: 'flex', gap: 8, padding: '10px 18px 6px',
+        overflowX: 'auto', scrollbarWidth: 'none', flexShrink: 0,
+      }}>
+        {activeCats.map(cat => (
+          <button key={cat.id} onClick={() => setCatFilter(cat.id)} style={{
+            padding: '7px 14px', border: 'none', borderRadius: 999, cursor: 'pointer',
+            background: catFilter === cat.id ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+            color: catFilter === cat.id ? '#fff' : 'var(--ink)',
+            fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+            flexShrink: 0, whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,.07)',
+            transition: 'all .15s',
+          }}>{cat.emoji} {cat.label}</button>
+        ))}
+      </div>
+
+      {/* Recipe list */}
+      <div className="scroll-y" style={{ flex: 1, padding: '6px 14px 8px' }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-soft)', fontSize: 14 }}>
+            אין מתכונים בקטגוריה זו
           </div>
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>
-          שלח/י את המתכון הזה ל:
-        </div>
+        )}
+        {filtered.map(r => {
+          const checked = selectedIds.has(r.id);
+          const p = PALETTES[r.palette] || PALETTES.peach;
+          return (
+            <div key={r.id} onClick={() => toggleRecipe(r.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 14px', marginBottom: 8,
+              background: checked ? p.bg : 'rgba(255,255,255,.75)',
+              borderRadius: 18,
+              boxShadow: checked ? 'var(--shadow-card)' : '0 2px 6px rgba(0,0,0,.05)',
+              cursor: 'pointer', transition: 'all .15s',
+              border: `2px solid ${checked ? (p.accent || p.ink) : 'transparent'}`,
+            }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: 8, flexShrink: 0,
+                background: checked ? 'var(--ink)' : 'rgba(0,0,0,.12)',
+                display: 'grid', placeItems: 'center', transition: 'background .15s',
+              }}>
+                {checked && <span style={{ color: '#fff', fontSize: 14, lineHeight: 1 }}>✓</span>}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontWeight: 700, fontSize: 14.5,
+                  color: checked ? p.ink : 'var(--ink)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{r.title}</div>
+                {r.description && (
+                  <div style={{
+                    fontSize: 12, color: 'var(--ink-soft)', marginTop: 2,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{r.description}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{
+        padding: '12px 16px 38px', flexShrink: 0,
+        background: 'var(--cream)',
+        borderTop: '1px solid rgba(0,0,0,.07)',
+      }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             value={email} onChange={e => setEmail(e.target.value)}
@@ -1398,18 +1500,22 @@ function ShareRecipeSheet({ recipe, onShare, onClose }) {
               fontFamily: 'inherit', fontSize: 15, outline: 'none',
               boxShadow: '0 2px 8px rgba(0,0,0,.08)', textAlign: 'right',
             }}/>
-          <button onClick={handleShare} disabled={!email.trim() || sharing} style={{
-            padding: '13px 20px', border: 'none', borderRadius: 16,
-            background: email.trim() ? 'var(--ink)' : 'rgba(0,0,0,.15)',
-            color: email.trim() ? '#fff' : 'var(--ink-soft)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
-            cursor: email.trim() ? 'pointer' : 'default',
-            flexShrink: 0, opacity: sharing ? .7 : 1,
-          }}>{sharing ? '…' : 'שתף'}</button>
+          <button onClick={handleShare} disabled={!canSend || sharing} style={{
+            padding: '13px 18px', border: 'none', borderRadius: 16,
+            background: canSend ? 'var(--ink)' : 'rgba(0,0,0,.15)',
+            color: canSend ? '#fff' : 'var(--ink-soft)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 14.5,
+            cursor: canSend ? 'pointer' : 'default',
+            flexShrink: 0, opacity: sharing ? .7 : 1, whiteSpace: 'nowrap',
+          }}>
+            {sharing ? '…' : selectedIds.size > 0 ? `שתף ${selectedIds.size}` : 'שתף'}
+          </button>
         </div>
-        <p style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-          המתכון יופיע אצל המקבל/ת תחת "שותפו איתי" ברגע שנכנסים לאפליקציה.
-        </p>
+        {selectedIds.size > 0 && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-soft)', textAlign: 'center' }}>
+            {selectedIds.size} מתכונים נבחרו · יופיעו אצל המקבל/ת תחת "שותפו איתי"
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1480,13 +1586,15 @@ function LoginScreen({ onSignIn }) {
 function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare }) {
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
+  const [mutual, setMutual] = uS(false);
   const [tab, setTab] = uS('profile'); // 'profile' | 'share'
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    await onInvite(inviteEmail.trim());
+    await onInvite(inviteEmail.trim(), mutual);
     setInviteEmail('');
+    setMutual(false);
     setInviting(false);
   };
 
@@ -1621,9 +1729,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                           background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
                           display: 'grid', placeItems: 'center', fontSize: 15, flexShrink: 0,
                         }}>{(s.guestEmail || '?')[0].toUpperCase()}</div>
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {s.guestEmail}
-                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.guestEmail}
+                          </div>
+                          {s.mutual && (
+                            <div style={{ fontSize: 11, color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                          )}
+                        </div>
                         <button onClick={() => onRevokeShare(s.id)} style={{
                           border: 'none', background: 'rgba(227,68,102,.1)', color: '#c0304f',
                           borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
@@ -1645,9 +1758,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                         marginBottom: 6, border: '1px dashed rgba(0,0,0,.12)',
                       }}>
                         <span style={{ fontSize: 15 }}>⏳</span>
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {inv.guestEmail}
-                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {inv.guestEmail}
+                          </div>
+                          {inv.mutual && (
+                            <div style={{ fontSize: 11, color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                          )}
+                        </div>
                         <button onClick={() => onCancelInvite(inv.id)} style={{
                           border: 'none', background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
                           borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
@@ -1704,6 +1822,31 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                     opacity: inviting ? .7 : 1,
                   }}>{inviting ? '…' : 'הזמן'}</button>
                 </div>
+
+                {/* Mutual toggle */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 0 2px', gap: 12,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)' }}>שיתוף הדדי</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginTop: 2, lineHeight: 1.4 }}>
+                      גם המוזמן/ת יראו את כל המתכונים שלך, כולל עתידיים
+                    </div>
+                  </div>
+                  <button onClick={() => setMutual(m => !m)} aria-label="שיתוף הדדי" style={{
+                    width: 48, height: 28, borderRadius: 999, border: 'none', cursor: 'pointer',
+                    background: mutual ? '#6b48a0' : 'rgba(0,0,0,.18)',
+                    position: 'relative', flexShrink: 0, transition: 'background .22s', padding: 0,
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: 3, width: 22, height: 22, borderRadius: 999,
+                      background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+                      transition: 'left .22s',
+                      left: mutual ? 23 : 3,
+                    }}/>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1718,5 +1861,5 @@ Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
   PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
-  SharedRecipesSection, ShareRecipeSheet,
+  SharedRecipesSection, RecipeSelectSheet,
 });
