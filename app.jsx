@@ -38,6 +38,10 @@ function App() {
   const [authLoading, setAuthLoading] = $S(true);
   const [showClaimPrompt, setShowClaimPrompt] = $S(false);
   const [claiming, setClaiming] = $S(false);
+  const [showAccountPanel, setShowAccountPanel] = $S(false);
+  const [sharesInfo, setSharesInfo] = $S({ asOwner: [], asGuest: [] });
+  const [pendingInvites, setPendingInvites] = $S([]);
+  const [sharedOwnerUids, setSharedOwnerUids] = $S([]);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -80,20 +84,35 @@ function App() {
   const editingRecipe  = recipes.find(r => r.id === editingRecipeId)  || null;
   const deletingRecipe = recipes.find(r => r.id === deletingRecipeId) || null;
 
-  const loadUserData = (uid) => {
+  const loadUserData = async (user) => {
     setRecipesLoaded(false);
-    db_loadRecipes(uid).then(recs => {
+    try {
+      // Accept any pending share invites for this user
+      const accepted = await db_checkAndAcceptInvites(user.uid, user.email);
+      if (accepted.length > 0) {
+        const names = accepted.map(a => a.ownerDisplayName || a.ownerEmail).join(', ');
+        setTimeout(() => showToast(`${names} שיתפ/ה איתך מתכונים! 🎉`), 800);
+      }
+      // Load share relationships
+      const shares = await db_getMyShares(user.uid);
+      setSharesInfo(shares);
+      const ownerUids = shares.asGuest.map(s => s.ownerUid);
+      setSharedOwnerUids(ownerUids);
+      // Load pending invites sent by this user
+      const myInvites = await db_getMyInvites(user.uid);
+      setPendingInvites(myInvites);
+      // Load recipes (own + shared accounts)
+      const recs = await db_loadRecipes(user.uid, ownerUids);
       setRecipes(recs || []);
       setRecipesLoaded(true);
-      // Show claim prompt once per user if there are unclaimed recipes
-      const claimedKey = `maites.claimed.${uid}`;
+      // Claim prompt (one-time migration)
+      const claimedKey = `maites.claimed.${user.uid}`;
       if (!localStorage.getItem(claimedKey)) {
-        db_hasUnownedRecipes().then(has => {
-          if (has) setShowClaimPrompt(true);
-          else localStorage.setItem(claimedKey, '1');
-        }).catch(() => {});
+        const has = await db_hasUnownedRecipes();
+        if (has) setShowClaimPrompt(true);
+        else localStorage.setItem(claimedKey, '1');
       }
-    }).catch(() => setRecipesLoaded(true));
+    } catch { setRecipesLoaded(true); }
     db_loadCategories().then(cats => {
       if (cats && cats.length > 0) {
         setCategories(cats);
@@ -111,7 +130,7 @@ function App() {
     const unsub = auth_onAuthStateChanged(user => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (user) loadUserData(user.uid);
+      if (user) loadUserData(user);
     });
     return () => unsub();
   }, []);
@@ -280,7 +299,7 @@ function App() {
         background: 'var(--bg)', fontFamily: 'var(--font-display)',
       }}>
         <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🍽️</div>
+          <img src="/icon.svg" alt="Maites" style={{ width: 80, height: 80, objectFit: 'contain', marginBottom: 16, opacity: .85 }}/>
           <div style={{ fontSize: 15 }}>טוענת…</div>
         </div>
       </div>
@@ -313,6 +332,8 @@ function App() {
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
               onManageCategories={() => setShowManageCategories(true)}
+              currentUser={currentUser}
+              onOpenAccount={() => setShowAccountPanel(true)}
             />
           )}
           {tab === 'favorites' && (
@@ -405,6 +426,46 @@ function App() {
             onDelete={deleteCategory}
             onAdd={(cat) => addCategory(cat)}
             onClose={() => setShowManageCategories(false)}
+          />
+        )}
+        {showAccountPanel && (
+          <AccountPanel
+            user={currentUser}
+            recipes={recipes}
+            sharesInfo={sharesInfo}
+            pendingInvites={pendingInvites}
+            onClose={() => setShowAccountPanel(false)}
+            onSignOut={async () => {
+              setShowAccountPanel(false);
+              await auth_signOut();
+            }}
+            onInvite={async (email) => {
+              if (!currentUser) return;
+              try {
+                await db_createInvite(currentUser.uid, currentUser.email, currentUser.displayName, email);
+                const inv = await db_getMyInvites(currentUser.uid);
+                setPendingInvites(inv);
+                showToast(`הזמנה נשלחה ל-${email} ✓`);
+              } catch { showToast('שגיאה בשליחת ההזמנה'); }
+            }}
+            onCancelInvite={async (inviteId) => {
+              try {
+                await db_cancelInvite(inviteId);
+                setPendingInvites(p => p.filter(i => i.id !== inviteId));
+              } catch { showToast('שגיאה'); }
+            }}
+            onRevokeShare={async (shareId) => {
+              try {
+                await db_revokeShare(shareId);
+                const shares = await db_getMyShares(currentUser.uid);
+                setSharesInfo(shares);
+                const ownerUids = shares.asGuest.map(s => s.ownerUid);
+                setSharedOwnerUids(ownerUids);
+                const recs = await db_loadRecipes(currentUser.uid, ownerUids);
+                setRecipes(recs || []);
+                showToast('השיתוף בוטל');
+              } catch { showToast('שגיאה'); }
+            }}
           />
         )}
         {showNavGuard && (

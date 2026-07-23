@@ -123,18 +123,26 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
 })();
 
 // ── Recipe CRUD ───────────────────────────────────────────────
-async function db_loadRecipes(userId) {
-  let query = _db.collection('recipes');
-  if (userId) query = query.where('userId', '==', userId);
-  const snap = await query.get();
-  if (snap.empty) return [];
-  return snap.docs
-    .map(doc => ({ ...doc.data(), id: doc.id }))
-    .sort((a, b) => {
-      const at = a.createdAt?.seconds ?? (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0);
-      const bt = b.createdAt?.seconds ?? (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0);
-      return bt - at;
-    });
+async function db_loadRecipes(userId, sharedOwnerUids = []) {
+  const allUids = [...new Set([userId, ...sharedOwnerUids].filter(Boolean))];
+  const snapshots = await Promise.all(
+    allUids.map(uid => _db.collection('recipes').where('userId', '==', uid).get())
+  );
+  const seen = new Set();
+  const allDocs = [];
+  for (const snap of snapshots) {
+    for (const doc of snap.docs) {
+      if (!seen.has(doc.id)) {
+        seen.add(doc.id);
+        allDocs.push({ ...doc.data(), id: doc.id });
+      }
+    }
+  }
+  return allDocs.sort((a, b) => {
+    const at = a.createdAt?.seconds ?? (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0);
+    const bt = b.createdAt?.seconds ?? (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0);
+    return bt - at;
+  });
 }
 
 async function db_saveRecipe(recipe) {
@@ -199,10 +207,75 @@ async function db_saveCategories(cats) {
   await batch.commit();
 }
 
+// ── Sharing ────────────────────────────────────────────────
+async function db_createInvite(ownerUid, ownerEmail, ownerDisplayName, guestEmail) {
+  const safe = guestEmail.toLowerCase().trim().replace(/[^a-z0-9]/g, '_');
+  const id = ownerUid + '_' + safe;
+  await _db.collection('invites').doc(id).set({
+    ownerUid,
+    ownerEmail,
+    ownerDisplayName: ownerDisplayName || ownerEmail,
+    guestEmail: guestEmail.toLowerCase().trim(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return id;
+}
+
+async function db_cancelInvite(inviteId) {
+  await _db.collection('invites').doc(inviteId).delete();
+}
+
+async function db_getMyInvites(ownerUid) {
+  const snap = await _db.collection('invites').where('ownerUid', '==', ownerUid).get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function db_checkAndAcceptInvites(guestUid, guestEmail) {
+  const snap = await _db.collection('invites')
+    .where('guestEmail', '==', guestEmail.toLowerCase().trim())
+    .get();
+  if (snap.empty) return [];
+  const accepted = [];
+  const batch = _db.batch();
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    const shareRef = _db.collection('shares').doc(data.ownerUid + '_' + guestUid);
+    batch.set(shareRef, {
+      ownerUid: data.ownerUid,
+      ownerEmail: data.ownerEmail,
+      ownerDisplayName: data.ownerDisplayName || data.ownerEmail,
+      guestUid,
+      guestEmail,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.delete(doc.ref);
+    accepted.push(data);
+  }
+  await batch.commit();
+  return accepted;
+}
+
+async function db_getMyShares(uid) {
+  const [ownerSnap, guestSnap] = await Promise.all([
+    _db.collection('shares').where('ownerUid', '==', uid).get(),
+    _db.collection('shares').where('guestUid', '==', uid).get(),
+  ]);
+  return {
+    asOwner: ownerSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    asGuest: guestSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+  };
+}
+
+async function db_revokeShare(shareId) {
+  await _db.collection('shares').doc(shareId).delete();
+}
+
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
   db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot,
   db_seedRecipes, db_loadCategories, db_saveCategories,
   db_claimUnownedRecipes, db_hasUnownedRecipes,
+  db_createInvite, db_cancelInvite, db_getMyInvites,
+  db_checkAndAcceptInvites, db_getMyShares, db_revokeShare,
   compressDataUrl,
 });

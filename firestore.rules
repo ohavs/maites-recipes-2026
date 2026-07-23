@@ -3,21 +3,17 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     match /recipes/{recipeId} {
-      // Read: must be signed in + either your recipe or unclaimed (for migration)
-      allow read: if request.auth != null &&
-        (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
-
-      // Create: must attach your own userId
+      allow read: if request.auth != null && (
+        !('userId' in resource.data) ||
+        resource.data.userId == request.auth.uid ||
+        exists(/databases/$(database)/documents/shares/$(resource.data.userId + '_' + request.auth.uid))
+      );
       allow create: if request.auth != null &&
         request.resource.data.userId == request.auth.uid;
-
-      // Update: claiming an unclaimed recipe OR editing your own
       allow update: if request.auth != null && (
         (!('userId' in resource.data) && request.resource.data.userId == request.auth.uid) ||
         (resource.data.userId == request.auth.uid)
       );
-
-      // Delete: only your own recipes
       allow delete: if request.auth != null &&
         resource.data.userId == request.auth.uid;
     }
@@ -28,6 +24,17 @@ service cloud.firestore {
 
     match /image_slots/{slotId} {
       allow read, write: if request.auth != null;
+    }
+
+    match /invites/{inviteId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null;
+    }
+
+    match /shares/{shareId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
   }
 }

@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories }) {
+function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
 
@@ -35,7 +35,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
 
   return (
     <div className="scroll-y" style={{ height: '100%', position: 'relative' }}>
-      {/* Brand bar: just "Maites" + density toggle + inline search */}
+      {/* Brand bar */}
       <div style={{
         padding: '14px 22px 4px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
@@ -44,7 +44,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
           margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.01em',
           color: 'var(--ink)', fontFamily: 'var(--font-display)',
         }}>Maites</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
             aria-label="פריסת תצוגה" title="פריסה"
             style={{
@@ -70,6 +70,22 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
             }}>
             <IconSearch size={18} strokeWidth={2.2}/>
           </button>
+          {currentUser && (
+            <button onClick={onOpenAccount} aria-label="חשבון"
+              style={{
+                width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
+                background: 'rgba(255,255,255,.85)', padding: 0, overflow: 'hidden',
+                boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}>
+              {currentUser.photoURL
+                ? <img src={currentUser.photoURL} style={{ width: 40, height: 40, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
+                : <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>
+                    {(currentUser.displayName || currentUser.email || '?')[0].toUpperCase()}
+                  </span>
+              }
+            </button>
+          )}
         </div>
       </div>
 
@@ -1327,16 +1343,11 @@ function LoginScreen({ onSignIn }) {
       fontFamily: 'var(--font-body)', padding: 32,
     }}>
       <div style={{ textAlign: 'center', maxWidth: 320 }}>
-        <div style={{ fontSize: 72, marginBottom: 8, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,.12))' }}>🍽️</div>
-        <h1 style={{
-          margin: '0 0 6px', fontSize: 42, fontWeight: 800,
-          fontFamily: 'var(--font-display)', color: 'var(--ink)',
-          letterSpacing: '-.02em',
-        }}>Maites</h1>
+        <img src="/icon.svg" alt="Maites"
+          style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,.1))' }}/>
         <p style={{ margin: '0 0 40px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
           ספר המתכונים האישי שלך
         </p>
-
         <button onClick={handleSignIn} disabled={loading} style={{
           width: '100%', border: 'none', borderRadius: 18,
           padding: '16px 20px', cursor: loading ? 'wait' : 'pointer',
@@ -1351,9 +1362,7 @@ function LoginScreen({ onSignIn }) {
           onMouseUp={e => e.currentTarget.style.transform=''}
           onMouseLeave={e => e.currentTarget.style.transform=''}
         >
-          {loading ? (
-            <span style={{ fontSize: 18 }}>⏳</span>
-          ) : (
+          {loading ? <span style={{ fontSize: 18 }}>⏳</span> : (
             <svg width="22" height="22" viewBox="0 0 48 48">
               <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.8 6.6-9.5 6.6-15.9z"/>
               <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.1-5.5c-2.1 1.4-4.7 2.2-8.1 2.2-6.2 0-11.5-4.2-13.4-9.9H3.3v5.7C7 42.6 15 48 24 48z"/>
@@ -1369,8 +1378,304 @@ function LoginScreen({ onSignIn }) {
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// AccountPanel — bottom sheet: profile, sharing, sign out
+// ───────────────────────────────────────────────────────────
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare }) {
+  const [inviteEmail, setInviteEmail] = uS('');
+  const [inviting, setInviting] = uS(false);
+  const [copied, setCopied] = uS(false);
+  const [tab, setTab] = uS('profile'); // 'profile' | 'share'
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    await onInvite(inviteEmail.trim());
+    setInviteEmail('');
+    setInviting(false);
+  };
+
+  const sendByEmail = () => {
+    const list = recipes.map(r => `• ${r.title}`).join('\n');
+    const body = `הנה רשימת המתכונים שלי ב-Maites:\n\n${list}\n\nלצפייה באפליקציה: https://bookingapp124.web.app`;
+    window.open(`mailto:?subject=${encodeURIComponent('המתכונים שלי — Maites')}&body=${encodeURIComponent(body)}`);
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText('https://bookingapp124.web.app');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 55,
+      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(12px)',
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'var(--cream)',
+        borderRadius: '32px 32px 0 0',
+        maxHeight: '88vh', overflowY: 'auto',
+        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        animation: 'slideUp .36s cubic-bezier(.2,1.1,.35,1)',
+      }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 999, background: 'rgba(0,0,0,.12)' }}/>
+        </div>
+
+        {/* User header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 14,
+          padding: '18px 24px 16px',
+        }}>
+          <div style={{
+            width: 54, height: 54, borderRadius: 999, flexShrink: 0,
+            background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
+            overflow: 'hidden', display: 'grid', placeItems: 'center',
+            boxShadow: '0 4px 14px rgba(0,0,0,.15)',
+          }}>
+            {user?.photoURL
+              ? <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
+              : <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>
+                  {(user?.displayName || user?.email || '?')[0].toUpperCase()}
+                </span>
+            }
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.displayName || 'משתמש'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.email}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: 34, height: 34, borderRadius: 999, border: 'none', cursor: 'pointer',
+            background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
+            display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0,
+          }}>×</button>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ display: 'flex', padding: '0 20px 0', gap: 8, borderBottom: '1px solid rgba(0,0,0,.07)' }}>
+          {[['profile', 'פרופיל'], ['share', 'שיתוף']].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{
+              padding: '10px 16px', border: 'none', cursor: 'pointer', background: 'transparent',
+              fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
+              color: tab === id ? 'var(--ink)' : 'var(--ink-soft)',
+              borderBottom: tab === id ? '2.5px solid var(--ink)' : '2.5px solid transparent',
+              marginBottom: -1,
+            }}>{label}</button>
+          ))}
+        </div>
+
+        <div style={{ padding: '20px 20px 40px' }}>
+
+          {tab === 'profile' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Stats */}
+              <div style={{
+                background: 'rgba(255,255,255,.7)', borderRadius: 18, padding: '16px 20px',
+                display: 'flex', gap: 0,
+              }}>
+                {[
+                  { num: recipes.length, label: 'מתכונים' },
+                  { num: recipes.filter(r => r.favorite).length, label: 'מועדפים' },
+                  { num: (sharesInfo.asGuest || []).length, label: 'שיתופים' },
+                ].map((s, i, arr) => (
+                  <div key={i} style={{
+                    flex: 1, textAlign: 'center',
+                    borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,.08)' : 'none',
+                    padding: '4px 0',
+                  }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{s.num}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sign out */}
+              <button onClick={onSignOut} style={{
+                width: '100%', padding: '15px', border: 'none', borderRadius: 18, cursor: 'pointer',
+                background: 'rgba(227,68,102,.1)', color: '#c0304f',
+                fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                <span style={{ fontSize: 18 }}>🚪</span> יציאה מהחשבון
+              </button>
+            </div>
+          )}
+
+          {tab === 'share' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Simple sharing */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
+                  שיתוף רשימה
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button onClick={sendByEmail} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                    background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 16, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'right',
+                    boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+                  }}>
+                    <span style={{
+                      width: 38, height: 38, borderRadius: 12, background: '#ea4335', flexShrink: 0,
+                      display: 'grid', placeItems: 'center', fontSize: 18,
+                    }}>📧</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>שלח רשימה במייל</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>פותח אפליקציית מייל עם רשימת המתכונים</div>
+                    </div>
+                    <span style={{ color: 'var(--ink-soft)', fontSize: 16 }}>›</span>
+                  </button>
+                  <button onClick={copyLink} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                    background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 16, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'right',
+                    boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+                  }}>
+                    <span style={{
+                      width: 38, height: 38, borderRadius: 12, background: copied ? '#34a853' : '#5b4452', flexShrink: 0,
+                      display: 'grid', placeItems: 'center', fontSize: 18,
+                      transition: 'background .2s',
+                    }}>{copied ? '✓' : '🔗'}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{copied ? 'הקישור הועתק!' : 'העתק קישור לאפליקציה'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>bookingapp124.web.app</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced account sharing */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
+                  שיתוף חשבון
+                </div>
+                <div style={{
+                  background: 'rgba(255,255,255,.6)', borderRadius: 18, padding: '14px 16px',
+                  fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 10,
+                }}>
+                  הזמן/י מישהו לראות את כל המתכונים שלך — כולל עתידיים. הם יקבלו גישה ברגע שיכנסו לאפליקציה עם הג׳ימייל שלהם.
+                </div>
+
+                {/* People I shared with (as owner) */}
+                {(sharesInfo.asOwner || []).length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>שיתפת עם:</div>
+                    {sharesInfo.asOwner.map(s => (
+                      <div key={s.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px', background: 'rgba(255,255,255,.85)', borderRadius: 14,
+                        marginBottom: 6, boxShadow: '0 2px 6px rgba(0,0,0,.05)',
+                      }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 999,
+                          background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
+                          display: 'grid', placeItems: 'center', fontSize: 15, flexShrink: 0,
+                        }}>{(s.guestEmail || '?')[0].toUpperCase()}</div>
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {s.guestEmail}
+                        </span>
+                        <button onClick={() => onRevokeShare(s.id)} style={{
+                          border: 'none', background: 'rgba(227,68,102,.1)', color: '#c0304f',
+                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                        }}>בטל</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pending invites I sent */}
+                {(pendingInvites || []).length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>הזמנות שלחתי (ממתינות):</div>
+                    {pendingInvites.map(inv => (
+                      <div key={inv.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px', background: 'rgba(255,213,85,.15)', borderRadius: 14,
+                        marginBottom: 6, border: '1px dashed rgba(0,0,0,.12)',
+                      }}>
+                        <span style={{ fontSize: 15 }}>⏳</span>
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {inv.guestEmail}
+                        </span>
+                        <button onClick={() => onCancelInvite(inv.id)} style={{
+                          border: 'none', background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
+                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                        }}>בטל</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Accounts I have access to (as guest) */}
+                {(sharesInfo.asGuest || []).length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>יש לי גישה ל:</div>
+                    {sharesInfo.asGuest.map(s => (
+                      <div key={s.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px', background: 'rgba(179,228,195,.25)', borderRadius: 14,
+                        marginBottom: 6, border: '1px solid rgba(0,0,0,.07)',
+                      }}>
+                        <span style={{ fontSize: 15 }}>✅</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{s.ownerDisplayName || s.ownerEmail}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>{s.ownerEmail}</div>
+                        </div>
+                        <button onClick={() => onRevokeShare(s.id)} style={{
+                          border: 'none', background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
+                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                        }}>הסר</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Invite input */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                    placeholder="gmail של מישהו..."
+                    type="email"
+                    style={{
+                      flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none',
+                      background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+                      fontFamily: 'inherit', fontSize: 14, outline: 'none',
+                      boxShadow: '0 2px 6px rgba(0,0,0,.07)',
+                      textAlign: 'right',
+                    }}/>
+                  <button onClick={handleInvite} disabled={!inviteEmail.trim() || inviting} style={{
+                    padding: '12px 18px', border: 'none', borderRadius: 14, cursor: inviteEmail.trim() ? 'pointer' : 'default',
+                    background: inviteEmail.trim() ? 'var(--ink)' : 'rgba(0,0,0,.15)',
+                    color: inviteEmail.trim() ? '#fff' : 'var(--ink-soft)',
+                    fontFamily: 'inherit', fontWeight: 700, fontSize: 14, flexShrink: 0,
+                    opacity: inviting ? .7 : 1,
+                  }}>{inviting ? '…' : 'הזמן'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes slideUp{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+
 Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
-  PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen,
+  PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
 });

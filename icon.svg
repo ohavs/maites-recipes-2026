@@ -1,4 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#f7a8b8"/>
-  <text x="256" y="340" font-family="Rubik,Heebo,sans-serif" font-size="280" font-weight="700" text-anchor="middle" fill="#fff" letter-spacing="-8">M</text>
+  <rect width="512" height="512" rx="112" fill="#fbeef2"/>
+  <!-- Background gradient -->
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="30%" r="80%">
+      <stop offset="0" stop-color="#fff7f0"/>
+      <stop offset="1" stop-color="#f5e7ef"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Serif M letterform (two legs + crossbar) -->
+  <!-- Left leg -->
+  <rect x="102" y="148" width="48" height="220" rx="6" fill="#4a3040"/>
+  <!-- Right leg -->
+  <rect x="362" y="148" width="48" height="220" rx="6" fill="#4a3040"/>
+  <!-- Left diagonal -->
+  <polygon points="102,148 150,148 256,270 256,330 214,330" fill="#4a3040"/>
+  <!-- Right diagonal -->
+  <polygon points="410,148 362,148 256,270 256,330 298,330" fill="#4a3040"/>
+
+  <!-- MAITES text -->
+  <text x="256" y="422" font-family="Georgia,Times New Roman,serif" font-size="60" font-weight="400" text-anchor="middle" fill="#4a3040" letter-spacing="14">MAITES</text>
+
+  <!-- Botanical branch — main stem -->
+  <path d="M 285 155 Q 320 130 350 105" stroke="#7a6070" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Leaves on branch -->
+  <ellipse cx="307" cy="142" rx="14" ry="7" transform="rotate(-35 307 142)" fill="#9a8090" opacity=".75"/>
+  <ellipse cx="327" cy="126" rx="13" ry="6" transform="rotate(-50 327 126)" fill="#9a8090" opacity=".7"/>
+  <ellipse cx="345" cy="113" rx="12" ry="6" transform="rotate(-65 345 113)" fill="#9a8090" opacity=".65"/>
+  <!-- Small flowers/buds -->
+  <circle cx="353" cy="103" r="5" fill="#c9a0b0" opacity=".9"/>
+  <circle cx="360" cy="97"  r="3.5" fill="#c9a0b0" opacity=".8"/>
+  <circle cx="367" cy="103" r="4" fill="#c9a0b0" opacity=".75"/>
+  <!-- Tiny dots (pollen/berries) -->
+  <circle cx="295" cy="148" r="3" fill="#c9a0b0" opacity=".7"/>
+  <circle cx="315" cy="133" r="2.5" fill="#c9a0b0" opacity=".65"/>
+  <circle cx="340" cy="118" r="2" fill="#c9a0b0" opacity=".6"/>
+  <!-- Secondary branch -->
+  <path d="M 310 138 Q 300 118 308 100" stroke="#7a6070" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="309" cy="119" rx="11" ry="5" transform="rotate(10 309 119)" fill="#9a8090" opacity=".6"/>
+  <ellipse cx="311" cy="104" rx="9" ry="4" transform="rotate(5 311 104)" fill="#9a8090" opacity=".55"/>
 </svg>
