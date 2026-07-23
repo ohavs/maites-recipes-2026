@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount }) {
+function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
 
@@ -123,6 +123,10 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory} onManage={onManageCategories}/>
       </div>
 
+      {sharedWithMe && sharedWithMe.length > 0 && !q && (
+        <SharedRecipesSection items={sharedWithMe} onOpen={onOpenShared} onRemove={onRemoveShared}/>
+      )}
+
       <div style={{ padding: '0 18px 130px', ...(density === 'grid'
         ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
         : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
@@ -156,7 +160,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
 // "disappears" behind the recipe body as it scrolls up),
 // swipeable image gallery, ingredients, notes, edit button.
 // ───────────────────────────────────────────────────────────
-function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onUpdateNotes, openMs = 380 }) {
+function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onUpdateNotes, onShare, readOnly = false, openMs = 380 }) {
   const p = PALETTES[recipe.palette];
   const scrollRef = uR(null);
   const [scrollY, setScrollY] = uS(0);
@@ -316,22 +320,43 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
         </div>
       </div>
 
-      {/* Top bar — back / fav / edit / delete */}
+      {/* Top bar — back / fav / share / edit / delete */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: '14px 18px', display: 'flex', justifyContent: 'space-between',
         zIndex: 5, pointerEvents: 'none',
       }}>
         <div style={{ display: 'flex', gap: 8, marginInlineStart: 'auto', pointerEvents: 'auto' }}>
-          <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" color="#fff" ink={recipe.favorite ? '#e34466' : p.ink}>
-            <FavHeart filled={recipe.favorite}/>
-          </RoundBtn>
-          <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" color="#fff" ink={p.ink}>
-            <IconEdit size={18} strokeWidth={2.2}/>
-          </RoundBtn>
-          <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" color="#fff" ink="#e34466">
-            <IconTrash size={18} strokeWidth={2.2}/>
-          </RoundBtn>
+          {!readOnly && (
+            <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" color="#fff" ink={recipe.favorite ? '#e34466' : p.ink}>
+              <FavHeart filled={recipe.favorite}/>
+            </RoundBtn>
+          )}
+          {!readOnly && onShare && (
+            <RoundBtn onClick={() => onShare(recipe)} title="שיתוף" color="#fff" ink={p.ink}>
+              <IconShare size={18} strokeWidth={2.2}/>
+            </RoundBtn>
+          )}
+          {!readOnly && (
+            <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" color="#fff" ink={p.ink}>
+              <IconEdit size={18} strokeWidth={2.2}/>
+            </RoundBtn>
+          )}
+          {!readOnly && (
+            <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" color="#fff" ink="#e34466">
+              <IconTrash size={18} strokeWidth={2.2}/>
+            </RoundBtn>
+          )}
+          {readOnly && recipe._sharedBy && (
+            <div style={{
+              background: 'rgba(255,255,255,.88)', borderRadius: 20, padding: '6px 14px',
+              fontSize: 12.5, fontWeight: 700, color: 'var(--ink)',
+              display: 'flex', alignItems: 'center', gap: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+            }}>
+              <span>👤</span> שותף ע״י {recipe._sharedBy}
+            </div>
+          )}
         </div>
         <div style={{ pointerEvents: 'auto' }}>
           <RoundBtn onClick={onClose} title="חזרה" color="#1c1620" ink="#fff">
@@ -1320,6 +1345,142 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// SharedRecipesSection — horizontal strip of recipes shared with me
+// ───────────────────────────────────────────────────────────
+function SharedRecipesSection({ items, onOpen, onRemove }) {
+  return (
+    <div style={{ padding: '4px 0 8px' }}>
+      <div style={{
+        padding: '0 22px 10px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.06em' }}>
+          שותפו איתי
+        </span>
+        <span style={{
+          fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)',
+          background: 'rgba(0,0,0,.07)', borderRadius: 999, padding: '2px 8px',
+        }}>{items.length}</span>
+      </div>
+      <div style={{
+        display: 'flex', gap: 12, overflowX: 'auto',
+        padding: '2px 22px 8px',
+        scrollbarWidth: 'none', msOverflowStyle: 'none',
+      }}>
+        {items.map(r => {
+          const p = PALETTES[r.palette] || PALETTES.peach;
+          return (
+            <div key={r._shareId} style={{
+              flexShrink: 0, width: 148, position: 'relative',
+              borderRadius: 20, overflow: 'hidden',
+              background: p.bg, boxShadow: 'var(--shadow-card)',
+              cursor: 'pointer',
+            }}>
+              <div onClick={() => onOpen(r)} style={{ padding: '14px 14px 10px' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: p.ink, lineHeight: 1.35, marginBottom: 6 }}>
+                  {r.title}
+                </div>
+                <div style={{
+                  fontSize: 11, color: p.ink, opacity: .65, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span>👤</span> {r._sharedBy}
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); onRemove(r._shareId); }}
+                style={{
+                  position: 'absolute', top: 6, insetInlineEnd: 6,
+                  width: 22, height: 22, borderRadius: 999, border: 'none',
+                  background: 'rgba(0,0,0,.15)', color: p.ink,
+                  display: 'grid', placeItems: 'center', cursor: 'pointer',
+                  fontSize: 14, lineHeight: 1,
+                }}>×</button>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ height: 1, margin: '4px 22px 0', background: 'rgba(0,0,0,.07)' }}/>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// ShareRecipeSheet — bottom sheet to share a recipe by email
+// ───────────────────────────────────────────────────────────
+function ShareRecipeSheet({ recipe, onShare, onClose }) {
+  const [email, setEmail] = uS('');
+  const [sharing, setSharing] = uS(false);
+  const p = PALETTES[recipe.palette] || PALETTES.peach;
+
+  const handleShare = async () => {
+    if (!email.trim()) return;
+    setSharing(true);
+    await onShare(email.trim());
+    setSharing(false);
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 55,
+      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(12px)',
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'var(--cream)',
+        borderRadius: '32px 32px 0 0',
+        padding: '14px 24px 48px',
+        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        animation: 'slideUp .32s cubic-bezier(.2,1.1,.35,1)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 999, background: 'rgba(0,0,0,.12)' }}/>
+        </div>
+        {/* Recipe preview chip */}
+        <div style={{
+          background: p.bg, borderRadius: 18, padding: '14px 18px',
+          marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <span style={{ fontSize: 28 }}>🍽️</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: p.ink }}>{recipe.title}</div>
+            {recipe.description && (
+              <div style={{ fontSize: 12.5, color: p.ink, opacity: .7, marginTop: 2 }}>{recipe.description}</div>
+            )}
+          </div>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>
+          שלח/י את המתכון הזה ל:
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={email} onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleShare()}
+            placeholder="gmail של המקבל/ת..."
+            type="email" autoFocus
+            style={{
+              flex: 1, padding: '13px 16px', borderRadius: 16, border: 'none',
+              background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+              fontFamily: 'inherit', fontSize: 15, outline: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,.08)', textAlign: 'right',
+            }}/>
+          <button onClick={handleShare} disabled={!email.trim() || sharing} style={{
+            padding: '13px 20px', border: 'none', borderRadius: 16,
+            background: email.trim() ? 'var(--ink)' : 'rgba(0,0,0,.15)',
+            color: email.trim() ? '#fff' : 'var(--ink-soft)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
+            cursor: email.trim() ? 'pointer' : 'default',
+            flexShrink: 0, opacity: sharing ? .7 : 1,
+          }}>{sharing ? '…' : 'שתף'}</button>
+        </div>
+        <p style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+          המתכון יופיע אצל המקבל/ת תחת "שותפו איתי" ברגע שנכנסים לאפליקציה.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // LoginScreen
 // ───────────────────────────────────────────────────────────
 function LoginScreen({ onSignIn }) {
@@ -1384,7 +1545,6 @@ function LoginScreen({ onSignIn }) {
 function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare }) {
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
-  const [copied, setCopied] = uS(false);
   const [tab, setTab] = uS('profile'); // 'profile' | 'share'
 
   const handleInvite = async () => {
@@ -1393,20 +1553,6 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
     await onInvite(inviteEmail.trim());
     setInviteEmail('');
     setInviting(false);
-  };
-
-  const sendByEmail = () => {
-    const list = recipes.map(r => `• ${r.title}`).join('\n');
-    const body = `הנה רשימת המתכונים שלי ב-Maites:\n\n${list}\n\nלצפייה באפליקציה: https://bookingapp124.web.app`;
-    window.open(`mailto:?subject=${encodeURIComponent('המתכונים שלי — Maites')}&body=${encodeURIComponent(body)}`);
-  };
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText('https://bookingapp124.web.app');
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
   };
 
   return (
@@ -1512,47 +1658,6 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
           {tab === 'share' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-              {/* Simple sharing */}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
-                  שיתוף רשימה
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <button onClick={sendByEmail} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
-                    background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 16, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'right',
-                    boxShadow: '0 2px 8px rgba(0,0,0,.06)',
-                  }}>
-                    <span style={{
-                      width: 38, height: 38, borderRadius: 12, background: '#ea4335', flexShrink: 0,
-                      display: 'grid', placeItems: 'center', fontSize: 18,
-                    }}>📧</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>שלח רשימה במייל</div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>פותח אפליקציית מייל עם רשימת המתכונים</div>
-                    </div>
-                    <span style={{ color: 'var(--ink-soft)', fontSize: 16 }}>›</span>
-                  </button>
-                  <button onClick={copyLink} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
-                    background: 'rgba(255,255,255,.85)', border: 'none', borderRadius: 16, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'right',
-                    boxShadow: '0 2px 8px rgba(0,0,0,.06)',
-                  }}>
-                    <span style={{
-                      width: 38, height: 38, borderRadius: 12, background: copied ? '#34a853' : '#5b4452', flexShrink: 0,
-                      display: 'grid', placeItems: 'center', fontSize: 18,
-                      transition: 'background .2s',
-                    }}>{copied ? '✓' : '🔗'}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{copied ? 'הקישור הועתק!' : 'העתק קישור לאפליקציה'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>bookingapp124.web.app</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
 
               {/* Advanced account sharing */}
               <div>
@@ -1678,4 +1783,5 @@ Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
   PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
+  SharedRecipesSection, ShareRecipeSheet,
 });

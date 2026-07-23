@@ -270,6 +270,38 @@ async function db_revokeShare(shareId) {
   await _db.collection('shares').doc(shareId).delete();
 }
 
+// ── Per-recipe sharing ────────────────────────────────────
+async function db_shareRecipeWith(fromUser, toEmail, recipe) {
+  const { id, _catInfo, ...data } = recipe;
+  const ref = _db.collection('recipe_shares').doc();
+  await ref.set({
+    fromUid: fromUser.uid,
+    fromEmail: fromUser.email,
+    fromDisplayName: fromUser.displayName || fromUser.email,
+    toEmail: toEmail.toLowerCase().trim(),
+    recipeId: id,
+    recipe: { ...data, id },
+    sharedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return ref.id;
+}
+
+async function db_getSharedWithMe(myEmail) {
+  const snap = await _db.collection('recipe_shares')
+    .where('toEmail', '==', myEmail.toLowerCase().trim())
+    .get();
+  return snap.docs.map(d => ({
+    ...d.data().recipe,
+    _shareId: d.id,
+    _sharedBy: d.data().fromDisplayName || d.data().fromEmail,
+    _sharedByEmail: d.data().fromEmail,
+  }));
+}
+
+async function db_removeSharedRecipe(shareId) {
+  await _db.collection('recipe_shares').doc(shareId).delete();
+}
+
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
   db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot,
@@ -277,5 +309,6 @@ Object.assign(window, {
   db_claimUnownedRecipes, db_hasUnownedRecipes,
   db_createInvite, db_cancelInvite, db_getMyInvites,
   db_checkAndAcceptInvites, db_getMyShares, db_revokeShare,
+  db_shareRecipeWith, db_getSharedWithMe, db_removeSharedRecipe,
   compressDataUrl,
 });

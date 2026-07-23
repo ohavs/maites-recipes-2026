@@ -42,6 +42,8 @@ function App() {
   const [sharesInfo, setSharesInfo] = $S({ asOwner: [], asGuest: [] });
   const [pendingInvites, setPendingInvites] = $S([]);
   const [sharedOwnerUids, setSharedOwnerUids] = $S([]);
+  const [sharedWithMe, setSharedWithMe] = $S([]);
+  const [sharingRecipe, setSharingRecipe] = $S(null);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -101,6 +103,9 @@ function App() {
       // Load pending invites sent by this user
       const myInvites = await db_getMyInvites(user.uid);
       setPendingInvites(myInvites);
+      // Load recipes shared with me individually
+      const shared = await db_getSharedWithMe(user.email);
+      setSharedWithMe(shared);
       // Load recipes (own + shared accounts)
       const recs = await db_loadRecipes(user.uid, ownerUids);
       setRecipes(recs || []);
@@ -334,6 +339,12 @@ function App() {
               onManageCategories={() => setShowManageCategories(true)}
               currentUser={currentUser}
               onOpenAccount={() => setShowAccountPanel(true)}
+              sharedWithMe={sharedWithMe}
+              onOpenShared={r => setOpenRecipeId(r._shareId ? r._shareId + '__shared' : r.id)}
+              onRemoveShared={async (shareId) => {
+                await db_removeSharedRecipe(shareId).catch(() => {});
+                setSharedWithMe(s => s.filter(r => r._shareId !== shareId));
+              }}
             />
           )}
           {tab === 'favorites' && (
@@ -359,7 +370,7 @@ function App() {
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
         </div>
 
-        {/* Overlay: recipe detail */}
+        {/* Overlay: recipe detail (own recipe) */}
         {openRecipe && !editingRecipe && (
           <DetailScreen
             recipe={openRecipe}
@@ -369,9 +380,26 @@ function App() {
             onEdit={(r) => setEditingRecipeId(r.id)}
             onDelete={(r) => setDeletingRecipeId(r.id)}
             onUpdateNotes={updateNotes}
+            onShare={(r) => setSharingRecipe(r)}
             openMs={openMs}
           />
         )}
+
+        {/* Overlay: shared recipe detail (read-only) */}
+        {!openRecipe && !editingRecipe && (() => {
+          const shared = sharedWithMe.find(r => r._shareId && openRecipeId === r._shareId + '__shared');
+          if (!shared) return null;
+          return (
+            <DetailScreen
+              recipe={shared}
+              onClose={() => setOpenRecipeId(null)}
+              onToggleFav={() => {}}
+              onOpenSteps={(r) => setCookRecipeId(r.id)}
+              readOnly={true}
+              openMs={openMs}
+            />
+          );
+        })()}
 
         {/* Overlay: edit recipe */}
         {editingRecipe && (
@@ -426,6 +454,20 @@ function App() {
             onDelete={deleteCategory}
             onAdd={(cat) => addCategory(cat)}
             onClose={() => setShowManageCategories(false)}
+          />
+        )}
+        {sharingRecipe && (
+          <ShareRecipeSheet
+            recipe={sharingRecipe}
+            onShare={async (email) => {
+              if (!currentUser) return;
+              try {
+                await db_shareRecipeWith(currentUser, email, sharingRecipe);
+                setSharingRecipe(null);
+                showToast(`"${sharingRecipe.title}" שותף עם ${email} ✓`);
+              } catch { showToast('שגיאה בשיתוף'); }
+            }}
+            onClose={() => setSharingRecipe(null)}
           />
         )}
         {showAccountPanel && (
