@@ -34,6 +34,10 @@ function App() {
   const [pendingNav, setPendingNav] = $S(null);
   const formDirtyRef = $R(false);
   const [showManageCategories, setShowManageCategories] = $S(false);
+  const [currentUser, setCurrentUser] = $S(null);
+  const [authLoading, setAuthLoading] = $S(true);
+  const [showClaimPrompt, setShowClaimPrompt] = $S(false);
+  const [claiming, setClaiming] = $S(false);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -76,19 +80,40 @@ function App() {
   const editingRecipe  = recipes.find(r => r.id === editingRecipeId)  || null;
   const deletingRecipe = recipes.find(r => r.id === deletingRecipeId) || null;
 
-  // Load from Firestore on mount
-  $E(() => {
-    if (typeof db_loadRecipes === 'undefined') { setRecipesLoaded(true); return; }
-    db_loadRecipes().then(recs => {
-      if (recs && recs.length > 0) setRecipes(recs);
+  const loadUserData = (uid) => {
+    setRecipesLoaded(false);
+    db_loadRecipes(uid).then(recs => {
+      setRecipes(recs || []);
       setRecipesLoaded(true);
-    }).catch(() => { setRecipesLoaded(true); });
+      // Show claim prompt once per user if there are unclaimed recipes
+      const claimedKey = `maites.claimed.${uid}`;
+      if (!localStorage.getItem(claimedKey)) {
+        db_hasUnownedRecipes().then(has => {
+          if (has) setShowClaimPrompt(true);
+          else localStorage.setItem(claimedKey, '1');
+        }).catch(() => {});
+      }
+    }).catch(() => setRecipesLoaded(true));
     db_loadCategories().then(cats => {
       if (cats && cats.length > 0) {
         setCategories(cats);
         try { localStorage.setItem('maites.cats', JSON.stringify(cats)); } catch {}
       }
     }).catch(() => {});
+  };
+
+  // Auth state listener
+  $E(() => {
+    if (typeof auth_onAuthStateChanged === 'undefined') {
+      setAuthLoading(false);
+      return;
+    }
+    const unsub = auth_onAuthStateChanged(user => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+      if (user) loadUserData(user.uid);
+    });
+    return () => unsub();
   }, []);
 
   const addCategory = (cat) => {
@@ -230,6 +255,43 @@ function App() {
   const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
   const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe);
 
+  const handleClaimRecipes = async () => {
+    if (!currentUser) return;
+    setClaiming(true);
+    try {
+      const count = await db_claimUnownedRecipes(currentUser.uid);
+      const recs = await db_loadRecipes(currentUser.uid);
+      setRecipes(recs || []);
+      localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
+      setShowClaimPrompt(false);
+      if (count > 0) showToast(`${count} מתכונים שויכו לחשבון שלך ✓`);
+    } catch (e) {
+      showToast('שגיאה בשיוך המתכונים');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  // Auth loading spinner
+  if (authLoading) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',
+        background: 'var(--bg)', fontFamily: 'var(--font-display)',
+      }}>
+        <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🍽️</div>
+          <div style={{ fontSize: 15 }}>טוענת…</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not signed in → show login screen
+  if (!currentUser) {
+    return <LoginScreen onSignIn={auth_signInWithGoogle} />;
+  }
+
   return (
     <AnimSpeedContext.Provider value={t.anim}>
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
@@ -369,6 +431,44 @@ function App() {
 
         {!hintSeen && !anyOverlay && tab === 'home' && (
           <FirstHint onDismiss={() => { setHintSeen(true); try { localStorage.setItem('receips.hint','1'); } catch {} }}/>
+        )}
+
+        {/* Claim unclaimed recipes prompt */}
+        {showClaimPrompt && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 70,
+            background: 'rgba(28,22,32,.6)', backdropFilter: 'blur(10px)',
+            display: 'grid', placeItems: 'center', padding: 24,
+          }}>
+            <div style={{
+              background: 'var(--cream)', borderRadius: 28,
+              padding: '32px 28px', textAlign: 'center', maxWidth: 340,
+              boxShadow: '0 24px 60px rgba(0,0,0,.25)',
+            }}>
+              <div style={{ fontSize: 52, marginBottom: 16 }}>🍽️</div>
+              <h2 style={{ margin: '0 0 10px', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 800 }}>
+                נמצאו מתכונים!
+              </h2>
+              <p style={{ margin: '0 0 24px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+                יש מתכונים שלא משויכים לאף חשבון.
+                האם לשייך אותם לחשבון שלך?
+              </p>
+              <button onClick={handleClaimRecipes} disabled={claiming} style={{
+                width: '100%', border: 'none', borderRadius: 16, padding: '14px 0',
+                background: 'var(--ink)', color: '#fff',
+                fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer',
+                marginBottom: 10, opacity: claiming ? .7 : 1,
+              }}>{claiming ? 'מעביר…' : 'כן, שייך אליי'}</button>
+              <button onClick={() => {
+                localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
+                setShowClaimPrompt(false);
+              }} style={{
+                width: '100%', border: 'none', borderRadius: 16, padding: '12px 0',
+                background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
+                fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}>דלג בינתיים</button>
+            </div>
+          </div>
         )}
 
         <style>{`

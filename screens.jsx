@@ -1303,8 +1303,74 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
   );
 }
 
+// ───────────────────────────────────────────────────────────
+// LoginScreen
+// ───────────────────────────────────────────────────────────
+function LoginScreen({ onSignIn }) {
+  const [loading, setLoading] = uS(false);
+  const [err, setErr] = uS('');
+
+  const handleSignIn = async () => {
+    setLoading(true); setErr('');
+    try { await onSignIn(); }
+    catch (e) {
+      if (e.code !== 'auth/popup-closed-by-user') setErr('ההתחברות נכשלה, נסי שוב');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(900px 600px at 30% 20%, #ffe5d3 0%, transparent 60%), radial-gradient(800px 600px at 70% 80%, #e0d3f5 0%, transparent 55%), linear-gradient(180deg,#f5e7ef 0%,#efe1ec 100%)',
+      fontFamily: 'var(--font-body)', padding: 32,
+    }}>
+      <div style={{ textAlign: 'center', maxWidth: 320 }}>
+        <div style={{ fontSize: 72, marginBottom: 8, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,.12))' }}>🍽️</div>
+        <h1 style={{
+          margin: '0 0 6px', fontSize: 42, fontWeight: 800,
+          fontFamily: 'var(--font-display)', color: 'var(--ink)',
+          letterSpacing: '-.02em',
+        }}>Maites</h1>
+        <p style={{ margin: '0 0 40px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+          ספר המתכונים האישי שלך
+        </p>
+
+        <button onClick={handleSignIn} disabled={loading} style={{
+          width: '100%', border: 'none', borderRadius: 18,
+          padding: '16px 20px', cursor: loading ? 'wait' : 'pointer',
+          background: '#fff',
+          boxShadow: '0 4px 24px rgba(0,0,0,.14), 0 1px 0 rgba(255,255,255,.8) inset',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+          fontFamily: 'inherit', fontSize: 16, fontWeight: 700, color: '#1f1f1f',
+          opacity: loading ? .7 : 1,
+          transition: 'transform .15s, box-shadow .15s',
+        }}
+          onMouseDown={e => e.currentTarget.style.transform='scale(.98)'}
+          onMouseUp={e => e.currentTarget.style.transform=''}
+          onMouseLeave={e => e.currentTarget.style.transform=''}
+        >
+          {loading ? (
+            <span style={{ fontSize: 18 }}>⏳</span>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 48 48">
+              <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.8 6.6-9.5 6.6-15.9z"/>
+              <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.1-5.5c-2.1 1.4-4.7 2.2-8.1 2.2-6.2 0-11.5-4.2-13.4-9.9H3.3v5.7C7 42.6 15 48 24 48z"/>
+              <path fill="#FBBC05" d="M10.6 29.3c-.5-1.4-.8-2.9-.8-4.3s.3-3 .8-4.3v-5.7H3.3C1.2 18.6 0 21.2 0 24s1.2 5.4 3.3 7l7.3-5.7z"/>
+              <path fill="#EA4335" d="M24 9.6c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.4 2.4 30.1 0 24 0 15 0 7 5.4 3.3 13.3l7.3 5.7C12.5 13.8 17.8 9.6 24 9.6z"/>
+            </svg>
+          )}
+          {loading ? 'מתחברת…' : 'כניסה עם Google'}
+        </button>
+        {err && <p style={{ marginTop: 14, color: '#e34466', fontSize: 14 }}>{err}</p>}
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
-  PhotoManager, DeleteConfirm, UnsavedChangesDialog,
+  PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen,
 });

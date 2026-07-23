@@ -1,8 +1,33 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    match /recipes/{recipeId} {
+      // Read: must be signed in + either your recipe or unclaimed (for migration)
+      allow read: if request.auth != null &&
+        (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
+
+      // Create: must attach your own userId
+      allow create: if request.auth != null &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Update: claiming an unclaimed recipe OR editing your own
+      allow update: if request.auth != null && (
+        (!('userId' in resource.data) && request.resource.data.userId == request.auth.uid) ||
+        (resource.data.userId == request.auth.uid)
+      );
+
+      // Delete: only your own recipes
+      allow delete: if request.auth != null &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    match /categories/{catId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /image_slots/{slotId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

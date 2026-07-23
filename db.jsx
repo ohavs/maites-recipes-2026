@@ -13,7 +13,41 @@ if (!firebase.apps.length) {
   firebase.initializeApp(FIREBASE_CONFIG);
 }
 
-const _db = firebase.firestore();
+const _db   = firebase.firestore();
+const _auth = firebase.auth();
+
+// ── Auth ──────────────────────────────────────────────────────
+async function auth_signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  return _auth.signInWithPopup(provider);
+}
+
+function auth_signOut() {
+  return _auth.signOut();
+}
+
+function auth_onAuthStateChanged(cb) {
+  return _auth.onAuthStateChanged(cb);
+}
+
+// Claim all recipes that have no userId — one-time migration per user.
+async function db_claimUnownedRecipes(userId) {
+  const snap = await _db.collection('recipes').get();
+  const unowned = snap.docs.filter(d => !d.data().userId);
+  if (!unowned.length) return 0;
+  const batch = _db.batch();
+  unowned.forEach(d => batch.update(d.ref, {
+    userId,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }));
+  await batch.commit();
+  return unowned.length;
+}
+
+async function db_hasUnownedRecipes() {
+  const snap = await _db.collection('recipes').get();
+  return snap.docs.some(d => !d.data().userId);
+}
 
 // ── Image compression ─────────────────────────────────────────
 // Re-compresses a base64 data URL to WebP. Skips if already small.
@@ -89,20 +123,26 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
 })();
 
 // ── Recipe CRUD ───────────────────────────────────────────────
-async function db_loadRecipes() {
-  const snap = await _db.collection('recipes').orderBy('createdAt', 'desc').get();
-  if (snap.empty) return null;
-  return snap.docs.map(doc => {
-    const d = doc.data();
-    // Convert Firestore Timestamps to plain values
-    return { ...d, id: doc.id };
-  });
+async function db_loadRecipes(userId) {
+  let query = _db.collection('recipes');
+  if (userId) query = query.where('userId', '==', userId);
+  const snap = await query.get();
+  if (snap.empty) return [];
+  return snap.docs
+    .map(doc => ({ ...doc.data(), id: doc.id }))
+    .sort((a, b) => {
+      const at = a.createdAt?.seconds ?? (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0);
+      const bt = b.createdAt?.seconds ?? (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0);
+      return bt - at;
+    });
 }
 
 async function db_saveRecipe(recipe) {
   const { id, ...data } = recipe;
+  const uid = _auth.currentUser?.uid;
   await _db.collection('recipes').doc(id).set({
     ...data,
+    ...(uid && !data.userId ? { userId: uid } : {}),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdAt: data.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
@@ -160,12 +200,9 @@ async function db_saveCategories(cats) {
 }
 
 Object.assign(window, {
-  db_loadRecipes,
-  db_saveRecipe,
-  db_deleteRecipe,
-  db_deleteImageSlot,
-  db_seedRecipes,
-  db_loadCategories,
-  db_saveCategories,
+  auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
+  db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot,
+  db_seedRecipes, db_loadCategories, db_saveCategories,
+  db_claimUnownedRecipes, db_hasUnownedRecipes,
   compressDataUrl,
 });
