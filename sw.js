@@ -1,4 +1,4 @@
-const CACHE = 'maites-v4';
+const CACHE = 'maites-v5';
 const SHELL = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -20,8 +20,8 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
 
-  // JSX/JS/HTML/SVG: network-first, fall back to cache
-  if (url.pathname.match(/\.(jsx|js|html|svg)$/i) || url.pathname === '/') {
+  // JSX/JS/HTML/SVG/PNG: network-first, fall back to cache
+  if (url.pathname.match(/\.(jsx|js|html|svg|png)$/i) || url.pathname === '/') {
     e.respondWith(
       fetch(e.request)
         .then(res => {
