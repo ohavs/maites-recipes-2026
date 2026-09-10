@@ -91,18 +91,63 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
 // Hooks into image-slot.js so images persist to Firestore.
 // image-slot.js checks window.__imageSlotBridge before falling
 // back to omelette/fetch.
+// Resolves once Firebase has decided whether somebody is signed in. Reads
+// must wait for it: the security rules reject anonymous requests, and a
+// rejected read used to be cached as "this user has no photos".
+let _authReadyPromise = null;
+function authReady() {
+  if (_authReadyPromise) return _authReadyPromise;
+  _authReadyPromise = new Promise((resolve) => {
+    let done = false;
+    const finish = (u) => { if (!done) { done = true; resolve(u || null); } };
+    const unsub = _auth.onAuthStateChanged((u) => { try { unsub(); } catch {} finish(u); });
+    setTimeout(() => finish(_auth.currentUser), 10000);
+  });
+  return _authReadyPromise;
+}
+
 (function initImageBridge() {
-  // Promise resolving to { slotId: {u, s, x, y}, ... }
-  const loadPromise = _db.collection('image_slots').get()
-    .then(snap => {
+  // Read the photo store lazily, after sign-in, with a couple of retries —
+  // a transient failure must not become a permanent "no photos".
+  let slotsPromise = null;
+
+  async function fetchSlots(attempt = 0) {
+    try {
+      await authReady();
+      const snap = await _db.collection('image_slots').get();
       const result = {};
       snap.forEach(doc => { result[doc.id] = doc.data(); });
       return result;
-    })
-    .catch(() => ({}));
+    } catch (err) {
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+        return fetchSlots(attempt + 1);
+      }
+      if (typeof reportError === 'function') reportError('load-images', err);
+      slotsPromise = null;      // let a later attempt try again
+      return {};
+    }
+  }
+
+  const loadSlots = () => {
+    if (!slotsPromise) slotsPromise = fetchSlots();
+    return slotsPromise;
+  };
+
+  // Re-reads the store and merges what comes back into the live one. Used
+  // after sign-in, so photos still arrive even if the first read was too
+  // early or failed.
+  window.db_refreshImageSlots = async () => {
+    slotsPromise = null;
+    const fresh = await loadSlots();
+    if (fresh && Object.keys(fresh).length && window.__mergeImageSlots) {
+      window.__mergeImageSlots(fresh);
+    }
+    return fresh;
+  };
 
   window.__imageSlotBridge = {
-    load: () => loadPromise,
+    load: loadSlots,
 
     save: async (slotsObj) => {
       if (!slotsObj || typeof slotsObj !== 'object') return;
@@ -391,7 +436,7 @@ Object.assign(window, {
   db_loadRecipes, db_watchRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
   db_seedRecipes, db_loadCategories, db_saveCategories,
   db_claimUnownedRecipes, db_hasUnownedRecipes,
-  db_createInvite, db_cancelInvite, db_getMyInvites,
+  db_createInvite, db_cancelInvite, db_getMyInvites, authReady,
   db_checkAndAcceptInvites, db_getMyShares, db_revokeShare,
   db_shareRecipeWith, db_getSharedWithMe, db_removeSharedRecipe,
   compressDataUrl,

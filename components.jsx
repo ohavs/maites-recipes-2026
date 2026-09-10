@@ -982,16 +982,16 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   const bannerH = 118;
   const slotSuffix = `-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`;
 
-  const favBtn = (
-    <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
+  const favBtn = (floating) => (
+    <button type="button" onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
       aria-label="מועדפים"
       style={{
-        position: 'absolute', top: 7, insetInlineEnd: 7,
-        width: 28, height: 28, borderRadius: 'var(--r-pill)',
+        ...(floating ? { position: 'absolute', top: 8, insetInlineEnd: 8, zIndex: 3 } : { flexShrink: 0 }),
+        width: 32, height: 32, borderRadius: 'var(--r-pill)', padding: 0, lineHeight: 0,
         background: 'var(--glass)', border: 'none', backdropFilter: 'blur(6px)',
         cursor: 'pointer', display: 'grid', placeItems: 'center',
         color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
-        boxShadow: 'var(--e1)', zIndex: 3,
+        boxShadow: 'var(--e1)',
       }}>
       <FavHeart filled={recipe.favorite}/>
     </button>
@@ -1001,13 +1001,14 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   if (inside && hasPhoto) {
     return (
       <div style={{
-        position: 'relative',
+        position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
         opacity: mounted ? 1 : 0,
         transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
         transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
       }}>
         <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
           borderRadius: 'var(--r-lg)', overflow: 'hidden', cursor: 'pointer', position: 'relative',
+          flex: 1, display: 'flex', flexDirection: 'column',
           boxShadow: 'var(--shadow-card)',
           background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
           transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
@@ -1025,7 +1026,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
             fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.25, color: p.ink,
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>{recipe.title}</div>
-          {favBtn}
+          {favBtn(true)}
         </div>
       </div>
     );
@@ -1033,7 +1034,8 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 
   return (
     <div style={{
-      position: 'relative',
+      position: 'relative', height: '100%',
+      display: 'flex', flexDirection: 'column',
       paddingTop: hasPhoto ? imgSize / 2 : 0,
       opacity: mounted ? 1 : 0,
       transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
@@ -1052,23 +1054,26 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
       {/* card body */}
       <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
         borderRadius: 'var(--r-lg)',
-        paddingTop: hasPhoto ? imgSize / 2 + 10 : 18,
-        paddingBottom: 16,
-        paddingInline: 10,
-        boxShadow: 'var(--shadow-card)',
+        paddingTop: hasPhoto ? imgSize / 2 + 10 : 14,
+        paddingBottom: hasPhoto ? 16 : 14,
+        paddingInline: 12,
+        boxShadow: 'var(--e2)',
         cursor: 'pointer',
         position: 'relative',
-        textAlign: 'center',
+        flex: 1,
+        display: 'flex', flexDirection: hasPhoto ? 'column' : 'row',
+        alignItems: 'center', gap: 8,
         background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
-        transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
+        transition: 'transform var(--dur-fast) cubic-bezier(.2,.8,.2,1.05)',
       }}>
         <div style={{
-          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.25,
-          color: p.ink,
-          display: '-webkit-box', WebkitLineClamp: 2,
+          flex: 1, minWidth: 0, alignSelf: 'center',
+          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.3,
+          color: p.ink, textAlign: hasPhoto ? 'center' : 'start',
+          display: '-webkit-box', WebkitLineClamp: 3,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{recipe.title}</div>
-        {favBtn}
+        {favBtn(hasPhoto)}
       </div>
     </div>
   );

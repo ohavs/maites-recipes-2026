@@ -125,6 +125,11 @@ function App() {
       // Load recipes shared with me individually
       const shared = await db_getSharedWithMe(user.email);
       setSharedWithMe(shared);
+      // Photos: re-read the store now that we are definitely signed in, in
+      // case the first read happened before the session was known.
+      if (typeof db_refreshImageSlots === 'function') {
+        db_refreshImageSlots().catch(err => reportError('refresh-images', err));
+      }
       // Live recipes (own + shared accounts). Emits from the local cache
       // first, so the list is on screen with no connection at all.
       if (recipesUnsubRef.current) recipesUnsubRef.current();

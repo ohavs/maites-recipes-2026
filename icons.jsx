@@ -1,7 +1,8 @@
 // icons.jsx — small stroke icon set
 const Icon = ({ d, size = 24, fill = 'none', stroke = 'currentColor', strokeWidth = 2, children, viewBox = '0 0 24 24', style }) => (
   <svg width={size} height={size} viewBox={viewBox} fill={fill} stroke={stroke}
-       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+       style={{ display: 'block', ...style }}>
     {d ? <path d={d} /> : children}
   </svg>
 );
