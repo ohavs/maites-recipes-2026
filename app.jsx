@@ -26,6 +26,7 @@ function App() {
   const [showAddCategory, setShowAddCategory] = $S(false);
   const [openRecipeId, setOpenRecipeId] = $S(null);
   const [cookRecipeId, setCookRecipeId] = $S(null);
+  const [cookServings, setCookServings] = $S(0);
   const [editingRecipeId, setEditingRecipeId] = $S(null);
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
@@ -50,7 +51,11 @@ function App() {
   // Recipe book tab
   const [bookRecipeId, setBookRecipeId] = $S(null);
   const [showPrintSheet, setShowPrintSheet] = $S(false);
-  const [printJob, setPrintJob] = $S(null);   // array of recipes being printed
+  const [printJob, setPrintJob] = $S(null);   // array of recipes being exported
+  const [loadError, setLoadError] = $S(null);
+  const [themeMode, setThemeMode] = useTheme();
+  const saveState = useSaveState();
+  const retryLastSave = $R(null);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -98,6 +103,7 @@ function App() {
 
   const loadUserData = async (user) => {
     setRecipesLoaded(false);
+    setLoadError(null);
     try {
       // Accept any pending share invites for this user
       const accepted = await db_checkAndAcceptInvites(user.uid, user.email);
@@ -127,13 +133,17 @@ function App() {
         if (has) setShowClaimPrompt(true);
         else localStorage.setItem(claimedKey, '1');
       }
-    } catch { setRecipesLoaded(true); }
+    } catch (err) {
+      reportError('load-recipes', err);
+      setLoadError(err);
+      setRecipesLoaded(true);
+    }
     db_loadCategories().then(cats => {
       if (cats && cats.length > 0) {
         setCategories(cats);
         try { localStorage.setItem('maites.cats', JSON.stringify(cats)); } catch {}
       }
-    }).catch(() => {});
+    }).catch(err => reportError('load-categories', err));
   };
 
   // Auth state listener
@@ -154,21 +164,21 @@ function App() {
     const next = [...categories, cat];
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   const editCategory = (id, updates) => {
     const next = categories.map(c => c.id === id ? { ...c, ...updates } : c);
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   const deleteCategory = (id) => {
     const next = categories.filter(c => c.id !== id);
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   // Auto-create a category if it doesn't exist yet.
@@ -185,21 +195,27 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(err => reportError('save-recipe', err));
       return updated;
     });
 
   const addRecipe = (rec) => {
     ensureCategoryExists(rec.category, categories, rec._catInfo);
     setRecipes(rs => [rec, ...rs]);
-    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
+    if (typeof db_saveRecipe !== 'undefined') {
+      retryLastSave.current = () => db_saveRecipe(rec);
+      db_saveRecipe(rec).catch(err => reportError('save-recipe', err));
+    }
     setTab('home');
     showToast(`"${rec.title}" נוסף לאוסף 🎉`);
   };
 
   const updateRecipe = (rec) => {
     setRecipes(rs => rs.map(r => r.id === rec.id ? { ...r, ...rec } : r));
-    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
+    if (typeof db_saveRecipe !== 'undefined') {
+      retryLastSave.current = () => db_saveRecipe(rec);
+      db_saveRecipe(rec).catch(err => reportError('save-recipe', err));
+    }
     setEditingRecipeId(null);
     showToast(`עודכן: "${rec.title}"`);
   };
@@ -208,21 +224,23 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, notes } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(err => reportError('save-recipe', err));
       return updated;
     });
 
   const deleteRecipe = (id) => {
     setRecipes(rs => rs.filter(r => r.id !== id));
-    if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(() => {});
+    if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
     setOpenRecipeId(null);
     setDeletingRecipeId(null);
     showToast('המתכון נמחק');
   };
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2400);
+  const toastTimer = $R(0);
+  const showToast = (msg, tone = 'neutral') => {
+    clearTimeout(toastTimer.current);
+    setToast({ msg, tone });
+    toastTimer.current = setTimeout(() => setToast(null), tone === 'danger' ? 4000 : 2400);
   };
 
   const handleExport = (kind) => {
@@ -239,7 +257,7 @@ function App() {
     const f = e.target.files?.[0];
     if (!f) return;
     importFromFile(f, (err, recs) => {
-      if (err) { showToast(err.message || 'שגיאה בקריאת הקובץ'); return; }
+      if (err) { reportError('import-file', err); showToast(err.message || 'שגיאה בקריאת הקובץ', 'danger'); return; }
       if (!recs?.length) { showToast('לא נמצאו מתכונים בקובץ'); return; }
 
       // Auto-create categories for incoming recipes (uses current categories state)
@@ -252,7 +270,7 @@ function App() {
         const dupCount = recs.length - newRecs.length;
 
         if (newRecs.length > 0 && typeof db_saveRecipe !== 'undefined') {
-          newRecs.forEach(r => db_saveRecipe(r).catch(() => {}));
+          newRecs.forEach(r => db_saveRecipe(r).catch(err => reportError('import-save', err)));
         }
 
         const msg = newRecs.length === 0
@@ -374,7 +392,8 @@ function App() {
       setShowClaimPrompt(false);
       if (count > 0) showToast(`${count} מתכונים שויכו לחשבון שלך ✓`);
     } catch (e) {
-      showToast('שגיאה בשיוך המתכונים');
+      reportError('claim-recipes', e);
+      showToast('שגיאה בשיוך המתכונים', 'danger');
     } finally {
       setClaiming(false);
     }
@@ -410,6 +429,8 @@ function App() {
             <HomeScreen
               recipes={recipes}
               recipesLoaded={recipesLoaded}
+              loadError={loadError}
+              onRetryLoad={() => currentUser && loadUserData(currentUser)}
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}
@@ -427,7 +448,7 @@ function App() {
               sharedWithMe={sharedWithMe}
               onOpenShared={r => setOpenRecipeId(r._shareId ? r._shareId + '__shared' : r.id)}
               onRemoveShared={async (shareId) => {
-                await db_removeSharedRecipe(shareId).catch(() => {});
+                await db_removeSharedRecipe(shareId).catch(err => reportError('remove-share', err));
                 setSharedWithMe(s => s.filter(r => r._shareId !== shareId));
               }}
             />
@@ -472,7 +493,7 @@ function App() {
             recipe={openRecipe}
             onClose={() => setOpenRecipeId(null)}
             onToggleFav={toggleFav}
-            onOpenSteps={(r) => setCookRecipeId(r.id)}
+            onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 0); }}
             onEdit={(r) => setEditingRecipeId(r.id)}
             onDelete={(r) => setDeletingRecipeId(r.id)}
             onUpdateNotes={updateNotes}
@@ -490,7 +511,7 @@ function App() {
               recipe={shared}
               onClose={() => setOpenRecipeId(null)}
               onToggleFav={() => {}}
-              onOpenSteps={(r) => setCookRecipeId(r.id)}
+              onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 0); }}
               readOnly={true}
               openMs={openMs}
             />
@@ -512,7 +533,8 @@ function App() {
 
         {/* Overlay: cooking steps */}
         {cookRecipe && (
-          <StepsScreen recipe={cookRecipe} onClose={() => setCookRecipeId(null)} />
+          <CookScreen recipe={cookRecipe} servings={cookServings}
+            onClose={() => setCookRecipeId(null)} />
         )}
 
         {/* Overlay: delete confirmation */}
@@ -529,9 +551,9 @@ function App() {
           <div style={{
             position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(28,22,32,.95)', color: '#fff',
-            padding: '12px 18px', borderRadius: 999,
+            padding: '12px 18px', borderRadius: 'var(--r-pill)',
             fontSize: 13.5, fontWeight: 600, zIndex: 50,
-            boxShadow: '0 12px 30px rgba(0,0,0,.3)',
+            boxShadow: 'var(--e1)',
             animation: 'toastIn .3s cubic-bezier(.2,1.3,.4,1)',
             whiteSpace: 'nowrap', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>{toast}</div>
@@ -566,7 +588,7 @@ function App() {
                 showToast(count === 1
                   ? `"${selectedRecipes[0].title}" שותף עם ${email} ✓`
                   : `${count} מתכונים שותפו עם ${email} ✓`);
-              } catch { showToast('שגיאה בשיתוף'); }
+              } catch (err) { reportError('share-recipe', err); showToast('שגיאה בשיתוף', 'danger'); }
             }}
             onClose={() => setSharingRecipe(null)}
           />
@@ -575,6 +597,8 @@ function App() {
           <AccountPanel
             user={currentUser}
             recipes={recipes}
+            themeMode={themeMode}
+            onThemeChange={setThemeMode}
             sharesInfo={sharesInfo}
             pendingInvites={pendingInvites}
             onClose={() => setShowAccountPanel(false)}
@@ -589,13 +613,13 @@ function App() {
                 const inv = await db_getMyInvites(currentUser.uid);
                 setPendingInvites(inv);
                 showToast(`הזמנה נשלחה ל-${email} ✓`);
-              } catch { showToast('שגיאה בשליחת ההזמנה'); }
+              } catch (err) { reportError('invite', err); showToast('שגיאה בשליחת ההזמנה', 'danger'); }
             }}
             onCancelInvite={async (inviteId) => {
               try {
                 await db_cancelInvite(inviteId);
                 setPendingInvites(p => p.filter(i => i.id !== inviteId));
-              } catch { showToast('שגיאה'); }
+              } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
             }}
             onRevokeShare={async (shareId) => {
               try {
@@ -607,7 +631,7 @@ function App() {
                 const recs = await db_loadRecipes(currentUser.uid, ownerUids);
                 setRecipes(recs || []);
                 showToast('השיתוף בוטל');
-              } catch { showToast('שגיאה'); }
+              } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
             }}
           />
         )}
@@ -655,7 +679,7 @@ function App() {
             <div style={{
               background: 'var(--cream)', borderRadius: 28,
               padding: '32px 28px', textAlign: 'center', maxWidth: 340,
-              boxShadow: '0 24px 60px rgba(0,0,0,.25)',
+              boxShadow: 'var(--e1)',
             }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>🍽️</div>
               <h2 style={{ margin: '0 0 10px', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 800 }}>
@@ -676,7 +700,7 @@ function App() {
                 setShowClaimPrompt(false);
               }} style={{
                 width: '100%', border: 'none', borderRadius: 16, padding: '12px 0',
-                background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
+                background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
                 fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
               }}>דלג בינתיים</button>
             </div>
@@ -689,10 +713,15 @@ function App() {
       </div>
 
       {printJob && (
-        <PrintBook
+        <PdfBook
           recipes={printJob}
           categories={categories}
-          onDone={() => setPrintJob(null)}
+          onDone={() => { setPrintJob(null); showToast('קובץ ה-PDF הורד ✓'); }}
+          onError={(err) => {
+            setPrintJob(null);
+            reportError('pdf-export', err);
+            showToast(navigator.onLine ? 'יצירת ה-PDF נכשלה' : 'צריך חיבור לאינטרנט ליצירת PDF');
+          }}
         />
       )}
 
@@ -740,7 +769,7 @@ function FirstHint({ onDismiss }) {
         position: 'absolute', top: 220, left: '50%', transform: 'translateX(-50%)',
         background: 'rgba(28,22,32,.94)', color: '#fff',
         padding: '12px 16px', borderRadius: 18, fontSize: 13, fontWeight: 600,
-        boxShadow: '0 12px 30px rgba(0,0,0,.35)',
+        boxShadow: 'var(--e1)',
         display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
       }}>
         ✨ הקישו על כרטיס לצפייה במתכון
@@ -779,7 +808,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
             </div>
           </div>
           <button onClick={onDismiss} style={{
-            background: 'rgba(0,0,0,.06)', border: 'none', borderRadius: 999,
+            background: 'var(--surface-sunken)', border: 'none', borderRadius: 'var(--r-pill)',
             width: 30, height: 30, fontSize: 18, color: 'var(--ink-soft)',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
           }}>×</button>
@@ -816,4 +845,8 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppErrorBoundary>
+    <App/>
+  </AppErrorBoundary>
+);

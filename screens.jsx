@@ -7,7 +7,7 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
+function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLoad, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
   const selectedCats = Array.isArray(category) ? category : (category && category !== 'all' ? [category] : []);
@@ -43,20 +43,20 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
       }}>
         <h1 className="display" data-comment-anchor="home-brand" style={{
-          margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.01em',
+          margin: 0, fontSize: 'var(--t-display)', fontWeight: 800, letterSpacing: '-.01em',
           color: 'var(--ink)', fontFamily: 'var(--font-display)',
         }}>Maites</h1>
         {currentUser && (
           <button onClick={onOpenAccount} aria-label="חשבון"
             style={{
-              width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: 'rgba(255,255,255,.85)', padding: 0, overflow: 'hidden',
-              boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+              width: 40, height: 40, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
+              background: 'var(--glass)', padding: 0, overflow: 'hidden',
+              boxShadow: 'var(--e1)',
               display: 'grid', placeItems: 'center', flexShrink: 0,
             }}>
             {currentUser.photoURL
               ? <img src={currentUser.photoURL} style={{ width: 40, height: 40, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-              : <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>
+              : <span style={{ fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)' }}>
                   {(currentUser.displayName || currentUser.email || '?')[0].toUpperCase()}
                 </span>
             }
@@ -82,11 +82,11 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
           aria-label="פריסת תצוגה" title="פריסה"
           style={{
-            width: 44, height: 44, borderRadius: 999, border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: density !== 'comfy' ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-            color: density !== 'comfy' ? '#fff' : 'var(--ink)',
+            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
+            background: density !== 'comfy' ? 'var(--ink)' : 'var(--glass)',
+            color: density !== 'comfy' ? 'var(--bg)' : 'var(--ink)',
             display: 'grid', placeItems: 'center',
-            boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+            boxShadow: 'var(--e1)',
             transition: 'all .2s',
           }}>
           {density === 'comfy' ? <IconRows size={18} strokeWidth={2.2}/>
@@ -95,11 +95,11 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         </button>
         <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
           style={{
-            width: 44, height: 44, borderRadius: 999, border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: searching || q ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-            color: searching || q ? '#fff' : 'var(--ink)',
+            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
+            background: searching || q ? 'var(--ink)' : 'var(--glass)',
+            color: searching || q ? 'var(--bg)' : 'var(--ink)',
             display: 'grid', placeItems: 'center',
-            boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+            boxShadow: 'var(--e1)',
             transition: 'all .2s',
           }}>
           <IconSearch size={18} strokeWidth={2.2}/>
@@ -116,7 +116,7 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         paddingTop: searching ? 10 : 0,
       }}>
         <div style={{
-          background: '#fff', borderRadius: 16, padding: '10px 14px',
+          background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: '10px 14px',
           display: 'flex', alignItems: 'center', gap: 10,
           boxShadow: 'var(--shadow-card)',
         }}>
@@ -125,11 +125,11 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
             placeholder="מתכון, מצרך, או מילת מפתח…"
             style={{
               flex: 1, border: 'none', outline: 'none', background: 'transparent',
-              fontFamily: 'inherit', fontSize: 15, color: 'var(--ink)', textAlign: 'right',
+              fontFamily: 'inherit', fontSize: 'var(--t-body)', color: 'var(--ink)', textAlign: 'right',
             }}/>
           {q && (
             <button onClick={() => setQ('')} style={{
-              border: 'none', background: 'rgba(0,0,0,.06)', borderRadius: 999, width: 24, height: 24,
+              border: 'none', background: 'var(--surface-sunken)', borderRadius: 'var(--r-pill)', width: 24, height: 24,
               display: 'grid', placeItems: 'center', cursor: 'pointer',
             }}><IconClose size={12}/></button>
           )}
@@ -148,13 +148,13 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
               <button key={id} onClick={() => onCategory(id)} style={{
                 flex: '0 0 auto', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '6px 10px 6px 8px', borderRadius: 999,
-                background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-                fontSize: 12.5, fontWeight: 700, boxShadow: '0 3px 10px -3px rgba(64,33,50,.25)',
+                padding: '6px 10px 6px 8px', borderRadius: 'var(--r-pill)',
+                background: 'var(--glass)', color: 'var(--ink)',
+                fontSize: 'var(--t-caption)', fontWeight: 700, boxShadow: 'var(--e1)',
               }}>
                 <span>{c.emoji}</span>{c.label}
                 <span style={{
-                  width: 16, height: 16, borderRadius: 999, background: 'rgba(0,0,0,.08)',
+                  width: 16, height: 16, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)',
                   display: 'grid', placeItems: 'center',
                 }}><IconClose size={9} strokeWidth={3}/></span>
               </button>
@@ -162,8 +162,8 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
           })}
           <button onClick={onClearCategory} style={{
             flex: '0 0 auto', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            padding: '6px 12px', borderRadius: 999, background: 'transparent',
-            color: 'var(--ink-soft)', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline',
+            padding: '6px 12px', borderRadius: 'var(--r-pill)', background: 'transparent',
+            color: 'var(--ink-soft)', fontSize: 'var(--t-caption)', fontWeight: 700, textDecoration: 'underline',
           }}>ניקוי</button>
         </div>
       )}
@@ -181,8 +181,23 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         {!recipesLoaded && (
           [1, 2, 3].map(i => <RecipeCardSkeleton key={i} density={density} />)
         )}
-        {recipesLoaded && filtered.length === 0 && (
-          <EmptyState text={q ? `אין תוצאות עבור "${q}"` : 'אין מתכונים בקטגוריה הזו עדיין'} emoji={q ? "🔍" : "🍽️"} />
+        {recipesLoaded && loadError && (
+          <ErrorState
+            title="לא הצלחנו לטעון את המתכונים"
+            text={navigator.onLine
+              ? 'הבעיה מצד השרת. המתכונים ששמורים במכשיר עדיין כאן.'
+              : 'אין חיבור לאינטרנט כרגע.'}
+            onRetry={onRetryLoad}
+          />
+        )}
+        {recipesLoaded && !loadError && filtered.length === 0 && (
+          q
+            ? <EmptyState emoji="🔍" title={`אין תוצאות עבור "${q}"`} text="אפשר לחפש לפי שם מתכון, מצרך או מילה מתוך התיאור."/>
+            : selectedCats.length
+              ? <EmptyState emoji="🗂️" title="אין מתכונים בקטגוריות שנבחרו"
+                  text="אפשר לבחור קטגוריה אחרת או לנקות את הסינון."
+                  cta={{ label: 'ניקוי הסינון', onClick: onClearCategory }}/>
+              : <EmptyState emoji="🍽️" title="עוד אין מתכונים" text="הוסיפו את המתכון הראשון, או ייבאו קובץ אקסל מסך ההוספה."/>
         )}
         {recipesLoaded && filtered.map((r, i) => (
           density === 'grid'
@@ -208,16 +223,23 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
 // swipeable image gallery, ingredients, notes, edit button.
 // ───────────────────────────────────────────────────────────
 function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onUpdateNotes, onShare, readOnly = false, openMs = 380 }) {
-  const p = PALETTES[recipe.palette];
+  const p = paletteOf(recipe.palette);
   const scrollRef = uR(null);
   const [scrollY, setScrollY] = uS(0);
   const [mounted, setMounted] = uS(false);
+  // How many people are we cooking for right now — scales the quantities.
+  const baseServings = +recipe.servings || 0;
+  const [servings, setServings] = uS(baseServings);
+  uE(() => { setServings(+recipe.servings || 0); }, [recipe.id, recipe.servings]);
+  const factor = baseServings > 0 && servings > 0 ? servings / baseServings : 1;
 
   uE(() => { setMounted(true); }, []);
 
   const onScroll = (e) => setScrollY(e.target.scrollTop);
 
-  const HERO_H = 258;          // hero panel height (compact — body sits higher)
+  // No photo → no empty hero: the colour band shrinks to just the top bar.
+  const heroPhoto = useRecipePhoto(recipe);
+  const HERO_H = heroPhoto ? 258 : 116;
   const BODY_OVERLAP = 30;     // how much body covers the hero by default
 
   // Parallax: as user scrolls up, the image translates up faster than the
@@ -228,7 +250,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 20,
+      position: 'absolute', inset: 0, background: 'var(--bg)', zIndex: 20,
       transform: mounted ? 'translateY(0)' : 'translateY(40px)',
       opacity: mounted ? 1 : 0,
       transition: `transform ${openMs}ms cubic-bezier(.2,.9,.25,1.1), opacity ${Math.round(openMs*.6)}ms ease-out`,
@@ -249,44 +271,46 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           <div style={{ opacity: decorOpacity, transition: 'opacity .2s' }}>
             <DecorScatter palette={p}/>
           </div>
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: 58,
-            transform: `translateY(${-imgTranslate}px)`,
-            transition: 'transform .05s linear',
-            opacity: imgOpacity,
-          }}>
-            <ImageGallery recipeId={recipe.id}
-              slots={recipe.gallery && recipe.gallery.length ? recipe.gallery : ['main']}
-              size={168}
-            />
-          </div>
+          {heroPhoto && (
+            <div style={{
+              position: 'absolute', left: 0, right: 0, top: 58,
+              transform: `translateY(${-imgTranslate}px)`,
+              transition: 'transform .05s linear',
+              opacity: imgOpacity,
+            }}>
+              <ImageGallery recipeId={recipe.id}
+                slots={recipe.gallery && recipe.gallery.length ? recipe.gallery : ['main']}
+                size={168}
+              />
+            </div>
+          )}
         </div>
 
         {/* BODY — slides up over the sticky hero */}
         <div style={{
-          background: '#fbeef2',
+          background: 'var(--bg)',
           borderRadius: '32px 32px 0 0',
           position: 'relative',
           marginTop: -BODY_OVERLAP,
           zIndex: 2,
           padding: '26px 22px 180px',
           minHeight: '70vh',
-          boxShadow: '0 -16px 32px -16px rgba(0,0,0,.12)',
+          boxShadow: 'var(--e3)',
         }}>
           <h1 className="display" data-comment-anchor="detail-title" style={{
-            margin: 0, fontSize: 32, fontWeight: 700, color: 'var(--ink)',
+            margin: 0, fontSize: 'var(--t-display)', fontWeight: 700, color: 'var(--ink)',
             textWrap: 'balance',
           }}>{recipe.title}</h1>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <Pill color={p.tag} ink={p.ink}><IconClock size={13} strokeWidth={2.4}/> {recipe.time} דקות</Pill>
-            <Pill color={p.tag} ink={p.ink}><IconUsers size={13} strokeWidth={2.4}/> {recipe.servings} מנות</Pill>
-            {recipe.cuisine && <Pill color={p.tag} ink={p.ink}>🍽 {recipe.cuisine}</Pill>}
+            <Chip tone="palette" palette={p}><IconClock size={13} strokeWidth={2.4}/> {recipe.time} דקות</Chip>
+            <Chip tone="palette" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings || recipe.servings} מנות</Chip>
+            {recipe.cuisine && <Chip tone="palette" palette={p}>🍽 {recipe.cuisine}</Chip>}
           </div>
 
           {recipe.description && (
             <p style={{
-              marginTop: 18, fontSize: 15.5, lineHeight: 1.55, color: 'var(--ink-soft)',
+              marginTop: 18, fontSize: 'var(--t-body)', lineHeight: 1.55, color: 'var(--ink-soft)',
               fontWeight: 400,
             }}>{typeof stripHTML === 'function' ? stripHTML(recipe.description) : recipe.description}</p>
           )}
@@ -294,9 +318,14 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           {/* Ingredients */}
           <div style={{ marginTop: 26 }}>
             <SectionLabel ink={p.accent}>מצרכים</SectionLabel>
+            {baseServings > 0 && (recipe.ingredients || []).length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <ServingScaler base={baseServings} servings={servings} onChange={setServings} palette={p}/>
+              </div>
+            )}
             <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
               {(recipe.ingredients || []).map((ing, i) => (
-                <IngredientRow key={i} ing={ing} palette={p} index={i}/>
+                <IngredientRow key={i} ing={ing} palette={p} index={i} factor={factor}/>
               ))}
             </div>
           </div>
@@ -313,13 +342,13 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               const notes = typeof stripHTML === 'function' ? stripHTML(recipe.notes || '') : (recipe.notes || '');
               return notes.trim() ? (
                 <p style={{
-                  margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.65, color: 'var(--ink)',
-                  whiteSpace: 'pre-line', padding: '14px 16px', borderRadius: 16,
-                  background: 'rgba(255,255,255,.7)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,.06), inset 0 0 0 1px rgba(0,0,0,.05)',
+                  margin: '10px 0 0', fontSize: 'var(--t-small)', lineHeight: 1.65, color: 'var(--ink)',
+                  whiteSpace: 'pre-line', padding: '14px 16px', borderRadius: 'var(--r-md)',
+                  background: 'var(--glass)',
+                  boxShadow: 'var(--e1)',
                 }}>{notes}</p>
               ) : (
-                <p style={{ margin: '10px 0 0', padding: '4px 0', fontSize: 14, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
+                <p style={{ margin: '10px 0 0', padding: '4px 0', fontSize: 'var(--t-small)', color: 'var(--ink-soft)', fontStyle: 'italic' }}>
                   לא נוספו הערות
                 </p>
               );
@@ -336,9 +365,9 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             if (!hasContent) {
               return (
                 <div style={{
-                  marginTop: 28, padding: '18px 22px', borderRadius: 22,
-                  background: 'rgba(0,0,0,.04)', textAlign: 'center',
-                  color: 'var(--ink-soft)', fontSize: 14.5, fontWeight: 500,
+                  marginTop: 28, padding: '18px 22px', borderRadius: 'var(--r-lg)',
+                  background: 'var(--surface-sunken)', textAlign: 'center',
+                  color: 'var(--ink-soft)', fontSize: 'var(--t-small)', fontWeight: 500,
                 }}>
                   אין הוראות הכנה למתכון זה
                 </div>
@@ -346,19 +375,19 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             }
             const label = (s.length > 0 && !isAuto) ? `בואו נכין יחד · ${s.length} שלבים` : 'הוראות הכנה';
             return (
-              <button onClick={() => onOpenSteps(recipe)}
+              <button onClick={() => onOpenSteps(recipe, servings)}
                 style={{
                   marginTop: 28, width: '100%',
                   border: 'none', cursor: 'pointer',
-                  padding: '20px 22px', borderRadius: 22,
+                  padding: '20px 22px', borderRadius: 'var(--r-lg)',
                   background: p.bg, color: p.ink,
-                  fontFamily: 'inherit', fontWeight: 700, fontSize: 17,
+                  fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   boxShadow: 'var(--shadow-card)',
                 }}>
                 <span>{label}</span>
                 <span style={{
-                  width: 36, height: 36, borderRadius: 999, background: p.ink, color: p.bg,
+                  width: 36, height: 36, borderRadius: 'var(--r-pill)', background: p.ink, color: p.bg,
                   display: 'grid', placeItems: 'center',
                 }}><IconBack size={18} strokeWidth={2.4}/></span>
               </button>
@@ -376,7 +405,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
         zIndex: 5, pointerEvents: 'none',
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          <RoundBtn onClick={onClose} title="חזרה" color="#1c1620" ink="#fff" size={42}>
+          <RoundBtn onClick={onClose} title="חזרה" color="var(--ink)" ink="var(--bg)" size={42}>
             <IconForward size={19} strokeWidth={2.4}/>
           </RoundBtn>
         </div>
@@ -385,10 +414,10 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           recipe._sharedBy ? (
             <div style={{
               pointerEvents: 'auto',
-              background: 'rgba(255,255,255,.9)', borderRadius: 999, padding: '8px 14px',
-              fontSize: 12.5, fontWeight: 700, color: 'var(--ink)',
+              background: 'var(--glass)', borderRadius: 'var(--r-pill)', padding: '8px 14px',
+              fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)',
               display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 6px 16px -6px rgba(0,0,0,.3)',
+              boxShadow: 'var(--e1)',
             }}>
               <span>👤</span> שותף ע״י {recipe._sharedBy}
             </div>
@@ -397,12 +426,12 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           <div style={{
             pointerEvents: 'auto',
             display: 'flex', alignItems: 'center', gap: 2, padding: 4,
-            borderRadius: 999, background: 'rgba(255,255,255,.92)',
+            borderRadius: 'var(--r-pill)', background: 'var(--glass-strong)',
             backdropFilter: 'blur(14px) saturate(160%)',
-            boxShadow: '0 10px 24px -8px rgba(64,33,50,.4), 0 1px 0 rgba(255,255,255,.8) inset',
+            boxShadow: 'var(--e2)',
           }}>
             <BarBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים"
-              ink={recipe.favorite ? '#e34466' : p.ink}>
+              ink={recipe.favorite ? 'var(--brand-strong)' : p.ink}>
               <FavHeart filled={recipe.favorite}/>
             </BarBtn>
             {onShare && (
@@ -413,7 +442,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             <BarBtn onClick={() => onEdit(recipe)} title="עריכה" ink={p.ink}>
               <IconEdit size={18} strokeWidth={2.2}/>
             </BarBtn>
-            <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,.12)', margin: '0 3px' }}/>
+            <span style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 3px' }}/>
             <BarBtn onClick={() => onDelete(recipe)} title="מחיקה" ink="#e34466">
               <IconTrash size={18} strokeWidth={2.2}/>
             </BarBtn>
@@ -429,11 +458,11 @@ function BarBtn({ children, onClick, title, ink = '#000' }) {
   return (
     <button onClick={onClick} title={title} aria-label={title}
       style={{
-        width: 38, height: 38, borderRadius: 999, border: 'none', cursor: 'pointer',
+        width: 38, height: 38, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
         background: 'transparent', color: ink,
         display: 'grid', placeItems: 'center', transition: 'background .18s, transform .18s',
       }}
-      onPointerDown={e => { e.currentTarget.style.background = 'rgba(0,0,0,.07)'; e.currentTarget.style.transform = 'scale(.9)'; }}
+      onPointerDown={e => { e.currentTarget.style.background = 'var(--surface-sunken)'; e.currentTarget.style.transform = 'scale(.9)'; }}
       onPointerUp={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
       onPointerLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
     >{children}</button>
@@ -458,14 +487,14 @@ function NotesEditor({ value, onChange, palette }) {
         rows={3}
         style={{
           width: '100%', resize: 'vertical', minHeight: 60,
-          fontFamily: 'inherit', fontSize: 14.5, lineHeight: 1.55,
+          fontFamily: 'inherit', fontSize: 'var(--t-small)', lineHeight: 1.55,
           color: 'var(--ink)',
-          background: focused ? '#fff' : 'rgba(255,255,255,.7)',
+          background: focused ? 'var(--surface-raised)' : 'var(--glass)',
           border: 'none', outline: 'none',
-          padding: '14px 16px', borderRadius: 16,
+          padding: '14px 16px', borderRadius: 'var(--r-md)',
           boxShadow: focused
-            ? `0 0 0 2px ${palette.accent}, 0 4px 12px rgba(0,0,0,.05)`
-            : '0 2px 8px rgba(0,0,0,.06), inset 0 0 0 1px rgba(0,0,0,.05)',
+            ? `0 0 0 2px ${palette.accent}, var(--e1)`
+            : 'var(--e1)',
           textAlign: 'right', boxSizing: 'border-box',
           transition: 'box-shadow .2s, background .2s',
         }}/>
@@ -495,14 +524,14 @@ function DecorScatter({ palette }) {
   );
 }
 
-function RoundBtn({ children, onClick, title, color = '#fff', ink = '#000', size = 40 }) {
+function RoundBtn({ children, onClick, title, color = 'var(--surface-raised)', ink = 'var(--ink)', size = 40 }) {
   return (
     <button onClick={onClick} title={title} aria-label={title}
       style={{
-        width: size, height: size, borderRadius: 999, border: 'none', cursor: 'pointer',
+        width: size, height: size, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
         background: color, color: ink,
         display: 'grid', placeItems: 'center',
-        boxShadow: '0 8px 18px -6px rgba(0,0,0,.25)',
+        boxShadow: 'var(--e2)',
         transition: 'transform .18s',
       }}
       onMouseDown={e => e.currentTarget.style.transform = 'scale(.92)'}
@@ -512,16 +541,8 @@ function RoundBtn({ children, onClick, title, color = '#fff', ink = '#000', size
   );
 }
 
-function SectionLabel({ children, ink = '#222' }) {
-  return (
-    <div style={{
-      fontSize: 13, letterSpacing: '.12em', textTransform: 'uppercase',
-      fontWeight: 800, color: ink,
-    }}>{children}</div>
-  );
-}
 
-function IngredientRow({ ing, palette, index }) {
+function IngredientRow({ ing, palette, index, factor = 1 }) {
   const ms = useAnimMs(420);
   const enabled = useAnimEnabled();
   const [shown, setShown] = uS(false);
@@ -532,120 +553,26 @@ function IngredientRow({ ing, palette, index }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'row-reverse', alignItems: 'center', gap: 14, padding: '12px 4px',
-      borderBottom: '1px solid rgba(0,0,0,.06)',
+      borderBottom: '1px solid var(--line)',
       opacity: shown ? 1 : 0,
       transform: shown ? 'translateX(0)' : 'translateX(20px)',
       transition: `opacity ${ms}ms ease, transform ${ms}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
       <span style={{
-        width: 40, height: 40, borderRadius: 999, background: palette.tag,
+        width: 40, height: 40, borderRadius: 'var(--r-pill)', background: palette.tag,
         display: 'grid', placeItems: 'center', color: palette.accent, flexShrink: 0,
-        boxShadow: '0 4px 10px rgba(0,0,0,.06)',
+        boxShadow: 'var(--e1)',
       }}>
         <IngredientIcon kind={ing.icon || 'chef'} size={20}/>
       </span>
       <span style={{
-        fontSize: 15, fontWeight: 600, color: 'var(--ink)', flex: 1,
+        fontSize: 'var(--t-body)', fontWeight: 600, color: 'var(--ink)', flex: 1,
       }}>
-        <span style={{ color: palette.accent, fontVariantNumeric: 'tabular-nums', marginInlineEnd: 8 }}>{ing.qty}</span>
+        <span style={{ color: palette.accent, fontVariantNumeric: 'tabular-nums', marginInlineEnd: 8 }}>
+          {typeof scaleQuantity === 'function' ? scaleQuantity(ing.qty, factor) : ing.qty}
+        </span>
         {ing.name}
       </span>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// StepsScreen — scrollable vertical list of all steps
-// ───────────────────────────────────────────────────────────
-function StepsScreen({ recipe, onClose }) {
-  const p = PALETTES[recipe.palette];
-  const steps = recipe.steps || [];
-
-  const isAutoGenerated = steps.length > 0 && steps.every(s => /^שלב\s*\d+$/.test((s.title || '').trim()));
-  const showPlainText = steps.length === 0 || isAutoGenerated;
-  const clean = typeof stripHTML === 'function' ? stripHTML : (s => s);
-  const plainText = clean(
-    recipe.instructions
-    || (isAutoGenerated ? steps.map(s => s.body).filter(Boolean).join('\n\n') : '')
-    || recipe.description
-    || ''
-  );
-
-  if (showPlainText) {
-    return (
-      <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 22, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: p.bg, padding: '18px 22px 26px', borderRadius: '0 0 32px 32px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>הוראות הכנה</div>
-            <RoundBtn onClick={onClose} title="חזרה" color="rgba(255,255,255,.85)" ink={p.ink} size={36}>
-              <IconClose size={18} strokeWidth={2.4}/>
-            </RoundBtn>
-          </div>
-          <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
-        </div>
-        <div className="scroll-y" style={{ flex: 1, padding: '24px 22px 40px' }}>
-          <p style={{ margin: 0, fontSize: 18, lineHeight: 2, color: 'var(--ink)', whiteSpace: 'pre-line' }}>
-            {plainText || 'אין הוראות הכנה למתכון זה.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 22, display: 'flex', flexDirection: 'column' }}>
-      {/* header */}
-      <div style={{
-        background: p.bg, padding: '18px 22px 22px',
-        borderRadius: '0 0 32px 32px', flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>{steps.length} שלבים</div>
-          <RoundBtn onClick={onClose} title="חזרה" color="rgba(255,255,255,.85)" ink={p.ink} size={36}>
-            <IconClose size={18} strokeWidth={2.4}/>
-          </RoundBtn>
-        </div>
-        <h2 className="display" style={{ margin: '14px 0 0', fontSize: 28, fontWeight: 700, color: p.ink }}>{recipe.title}</h2>
-      </div>
-
-      {/* Scrollable step cards */}
-      <div className="scroll-y" style={{ flex: 1, padding: '30px 18px 60px', display: 'flex', flexDirection: 'column', gap: 28 }}>
-        {steps.map((step, i) => (
-          <StepCard key={i} step={step} index={i} palette={p} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StepCard({ step, index, palette }) {
-  const [shown, setShown] = uS(false);
-  const enabled = useAnimEnabled();
-  const ms = useAnimMs(400);
-  uE(() => {
-    const t = setTimeout(() => setShown(true), enabled ? index * 70 : 0);
-    return () => clearTimeout(t);
-  }, [index]);
-  return (
-    <div style={{
-      background: '#fff',
-      borderRadius: 26, padding: '22px 20px 22px',
-      boxShadow: 'var(--shadow-card)',
-      position: 'relative',
-      opacity: enabled ? (shown ? 1 : 0) : 1,
-      transform: enabled ? (shown ? 'translateY(0)' : 'translateY(18px)') : 'none',
-      transition: `opacity ${ms}ms ease, transform ${ms}ms cubic-bezier(.2,.9,.25,1.1)`,
-    }}>
-      <div style={{
-        position: 'absolute', top: -18, insetInlineStart: 18,
-        width: 48, height: 48, borderRadius: 999, background: palette.bg,
-        color: palette.ink, display: 'grid', placeItems: 'center',
-        fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700,
-        boxShadow: '0 8px 18px -6px rgba(0,0,0,.2)',
-      }}>{index + 1}</div>
-      <p style={{
-        margin: '22px 0 0', fontSize: 15.5, lineHeight: 1.8, color: 'var(--ink)',
-      }}>{step.body || step.title}</p>
     </div>
   );
 }
@@ -658,9 +585,9 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
   return (
     <div className="scroll-y" style={{ height: '100%', padding: '14px 0 130px' }}>
       <h1 className="display" style={{
-        margin: '0 22px', fontSize: 30, fontWeight: 700, color: 'var(--ink)',
+        margin: '0 22px', fontSize: 'var(--t-display)', fontWeight: 700, color: 'var(--ink)',
       }}>המועדפים שלי</h1>
-      <p style={{ margin: '4px 22px 18px', color: 'var(--ink-soft)', fontSize: 14 }}>
+      <p style={{ margin: '4px 22px 18px', color: 'var(--ink-soft)', fontSize: 'var(--t-small)' }}>
         {favs.length} {favs.length === 1 ? 'מתכון שמור' : 'מתכונים שמורים'}
       </p>
 
@@ -669,7 +596,8 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
         : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
       }}>
         {favs.length === 0 && (
-          <EmptyState text="עוד לא הוספת מתכונים למועדפים — לבחור לבך על כל כרטיס" emoji="💝"
+          <EmptyState emoji="💝" title="אין עדיין מועדפים"
+            text="נגיעה בלב שעל כל כרטיס תשמור אותו כאן, כדי למצוא אותו מהר בפעם הבאה."
             cta={{ label: 'לרשימת המתכונים', onClick: () => onNav('home') }}/>
         )}
         {favs.map((r, i) => (
@@ -729,7 +657,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const addGallerySlot = () => setGallery(arr => [...arr, `g${Date.now().toString(36)}`]);
   const removeGallerySlot = (slot) => setGallery(arr => arr.length > 1 ? arr.filter(s => s !== slot) : arr);
 
-  const p = PALETTES[paletteKey];
+  const p = paletteOf(paletteKey);
   const canSave = title.trim();
 
   const save = () => {
@@ -758,14 +686,14 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   return (
     <div className="scroll-y" style={{ height: '100%', padding: '14px 0 140px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px' }}>
-        <h1 className="display" style={{ margin: 0, fontSize: 28, fontWeight: 700, whiteSpace: 'nowrap' }}>
+        <h1 className="display" style={{ margin: 0, fontSize: 'var(--t-title)', fontWeight: 700, whiteSpace: 'nowrap' }}>
           {mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
         </h1>
         {onCancel && (
           <button onClick={tryCancel} aria-label="ביטול" style={{
-            width: 36, height: 36, borderRadius: 999, border: 'none', background: 'rgba(255,255,255,.85)',
+            width: 36, height: 36, borderRadius: 'var(--r-pill)', border: 'none', background: 'var(--glass)',
             color: 'var(--ink)', cursor: 'pointer', display: 'grid', placeItems: 'center',
-            boxShadow: '0 4px 10px rgba(0,0,0,.1)',
+            boxShadow: 'var(--e1)',
           }}><IconClose size={16} strokeWidth={2.2}/></button>
         )}
       </div>
@@ -773,20 +701,20 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
       {/* preview chip */}
       <div style={{
         margin: '18px 18px 22px', padding: '20px',
-        borderRadius: 24, background: p.bg, color: p.ink,
+        borderRadius: 'var(--r-lg)', background: p.bg, color: p.ink,
         boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden',
       }}>
-        <div style={{ fontSize: 12, fontWeight: 700, opacity: .65, letterSpacing: '.12em' }}>תצוגה מקדימה</div>
-        <div className="display" style={{ fontSize: 26, fontWeight: 700, marginTop: 6 }}>
+        <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, opacity: .65, letterSpacing: '.12em' }}>תצוגה מקדימה</div>
+        <div className="display" style={{ fontSize: 'var(--t-title)', fontWeight: 700, marginTop: 6 }}>
           {title || 'שם המתכון שלי'}
         </div>
-        <div style={{ fontSize: 14, marginTop: 6, opacity: .75 }}>
+        <div style={{ fontSize: 'var(--t-small)', marginTop: 6, opacity: .75 }}>
           {desc || 'תיאור קצר שיופיע בכרטיס המתכון…'}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <Pill color="#fff" ink={p.ink}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Pill>
-          <Pill color="#fff" ink={p.ink}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Pill>
-          {cuisine && <Pill color="#fff" ink={p.ink}>🍽 {cuisine}</Pill>}
+          <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
+          <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>
+          {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
         </div>
       </div>
 
@@ -821,18 +749,18 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
             {(catsProp || []).filter(c => c.id !== 'all').map(c => (
               <button key={c.id} onClick={() => setCategory(c.id)}
                 style={{
-                  border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 999,
-                  fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-                  background: category === c.id ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-                  color: category === c.id ? '#fff' : 'var(--ink)',
-                  boxShadow: '0 4px 10px rgba(0,0,0,.07)',
+                  border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 'var(--r-pill)',
+                  fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700,
+                  background: category === c.id ? 'var(--ink)' : 'var(--glass)',
+                  color: category === c.id ? 'var(--bg)' : 'var(--ink)',
+                  boxShadow: 'var(--e1)',
                 }}>{c.emoji} {c.label}</button>
             ))}
             {onAddCategory && (
               <button onClick={onAddCategory} style={{
-                border: '1.5px dashed rgba(0,0,0,.2)', cursor: 'pointer',
-                padding: '8px 14px', borderRadius: 999, background: 'transparent',
-                fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: 'var(--ink-soft)',
+                border: '1.5px dashed var(--line-strong)', cursor: 'pointer',
+                padding: '8px 14px', borderRadius: 'var(--r-pill)', background: 'transparent',
+                fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink-soft)',
               }}>+ קטגוריה חדשה</button>
             )}
           </div>
@@ -844,11 +772,11 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
               <button key={k} onClick={() => setPaletteKey(k)}
                 aria-label={k}
                 style={{
-                  width: 36, height: 36, borderRadius: 12, border: 'none', cursor: 'pointer',
+                  width: 36, height: 36, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
                   background: PALETTES[k].bg,
                   boxShadow: paletteKey === k
-                    ? '0 0 0 3px var(--ink), 0 6px 14px rgba(0,0,0,.14)'
-                    : '0 4px 10px rgba(0,0,0,.1)',
+                    ? '0 0 0 3px var(--ink), var(--e1)'
+                    : 'var(--e1)',
                   transform: paletteKey === k ? 'scale(1.05)' : 'scale(1)',
                   transition: 'all .18s',
                 }}/>
@@ -866,16 +794,16 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
               return (
                 <button key={opt.id} onClick={() => setImageMode(opt.id)} style={{
                   flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  borderRadius: 18, padding: '12px 10px 11px', textAlign: 'center',
-                  background: on ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-                  color: on ? '#fff' : 'var(--ink)',
-                  boxShadow: on ? '0 10px 22px -8px rgba(64,33,50,.5)' : '0 4px 10px rgba(0,0,0,.07)',
+                  borderRadius: 'var(--r-md)', padding: '12px 10px 11px', textAlign: 'center',
+                  background: on ? 'var(--ink)' : 'var(--glass)',
+                  color: on ? 'var(--bg)' : 'var(--ink)',
+                  boxShadow: on ? 'var(--e1)' : 'var(--e1)',
                   transition: 'all .18s',
                 }}>
                   {/* mini preview of the card layout */}
                   <div style={{
-                    position: 'relative', height: 40, borderRadius: 10,
-                    background: on ? 'rgba(255,255,255,.16)' : p.bg,
+                    position: 'relative', height: 40, borderRadius: 'var(--r-sm)',
+                    background: on ? 'rgba(255,255,255,.14)' : p.bg2,
                     marginBottom: 8, overflow: opt.id === 'inside' ? 'hidden' : 'visible',
                   }}>
                     <div style={{
@@ -884,19 +812,19 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
                       transform: opt.id === 'inside' ? 'none' : 'translateY(-50%)',
                       width: 28, height: 28,
                       borderRadius: opt.id === 'inside' ? 8 : 999,
-                      background: on ? '#fff' : 'rgba(255,255,255,.9)',
-                      boxShadow: '0 2px 6px rgba(0,0,0,.2)',
+                      background: on ? 'var(--bg)' : 'var(--surface-raised)',
+                      boxShadow: 'var(--e1)',
                     }}/>
                     <div style={{
                       position: 'absolute', insetInlineEnd: 8, top: 12, width: '45%', height: 5,
-                      borderRadius: 99, background: on ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.22)',
+                      borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.55)' : 'var(--line-strong)',
                     }}/>
                     <div style={{
                       position: 'absolute', insetInlineEnd: 8, top: 22, width: '32%', height: 4,
-                      borderRadius: 99, background: on ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.13)',
+                      borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.35)' : 'var(--line)',
                     }}/>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.label}</div>
+                  <div style={{ fontSize: 'var(--t-small)', fontWeight: 800 }}>{opt.label}</div>
                   <div style={{ fontSize: 10.5, opacity: .7, marginTop: 2 }}>{opt.hint}</div>
                 </button>
               );
@@ -934,8 +862,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {stepsArr.map((s, i) => (
               <div key={i} style={{
-                background: '#fff', borderRadius: 16, padding: 12,
-                boxShadow: '0 4px 10px rgba(0,0,0,.06)', position: 'relative',
+                background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 12,
+                boxShadow: 'var(--e1)', position: 'relative',
               }}>
                 <input value={s.title} onChange={e => updateStep(i, 'title', e.target.value)}
                   placeholder={`כותרת שלב ${i+1}`} style={{...inputStyle, marginBottom: 6}}/>
@@ -944,8 +872,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
                 {stepsArr.length > 1 && (
                   <button onClick={() => removeStep(i)} aria-label="מחיקה" style={{
                     position: 'absolute', top: 6, insetInlineEnd: 6,
-                    width: 26, height: 26, borderRadius: 999, border: 'none',
-                    background: 'rgba(0,0,0,.06)', color: 'var(--ink-soft)', cursor: 'pointer',
+                    width: 26, height: 26, borderRadius: 'var(--r-pill)', border: 'none',
+                    background: 'var(--surface-sunken)', color: 'var(--ink-soft)', cursor: 'pointer',
                     display: 'grid', placeItems: 'center',
                   }}><IconTrash size={14}/></button>
                 )}
@@ -967,16 +895,16 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           {onCancel && (
             <button onClick={tryCancel} style={{
               flexShrink: 0, padding: '18px 20px', border: 'none', cursor: 'pointer',
-              borderRadius: 22, background: 'rgba(0,0,0,.08)',
-              color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
+              borderRadius: 'var(--r-lg)', background: 'var(--surface-sunken)',
+              color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
             }}>ביטול</button>
           )}
           <button onClick={save} disabled={!canSave} style={{
             flex: 1, padding: '18px', border: 'none',
             cursor: canSave ? 'pointer' : 'default',
-            borderRadius: 22, background: canSave ? 'var(--ink)' : 'rgba(0,0,0,.2)',
-            color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 16,
-            boxShadow: canSave ? '0 14px 30px -10px rgba(0,0,0,.4)' : 'none',
+            borderRadius: 'var(--r-lg)', background: canSave ? 'var(--ink)' : 'var(--line)',
+            color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
+            boxShadow: canSave ? 'var(--e1)' : 'none',
             opacity: canSave ? 1 : .7,
           }}>{mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}</button>
         </div>
@@ -984,12 +912,12 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
         {/* Export / Import — only shown in add mode */}
         {mode === 'add' && onExport && (
           <div style={{
-            marginTop: 22, padding: 16, borderRadius: 20,
-            background: 'rgba(255,255,255,.6)', backdropFilter: 'blur(10px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,.05)',
+            marginTop: 22, padding: 16, borderRadius: 'var(--r-md)',
+            background: 'var(--glass)', backdropFilter: 'blur(10px)',
+            boxShadow: 'var(--e1)',
           }}>
             <SectionLabel ink="var(--ink-soft)">ייצוא וייבוא</SectionLabel>
-            <p style={{ margin: '8px 0 12px', fontSize: 13.5, lineHeight: 1.55, color: 'var(--ink-soft)' }}>
+            <p style={{ margin: '8px 0 12px', fontSize: 'var(--t-small)', lineHeight: 1.55, color: 'var(--ink-soft)' }}>
               גיבוי ספריית המתכונים, או ייבוא מקובץ Excel.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1000,12 +928,12 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
                 sub="ספר מתכונים מעוצב להדפסה · עמוד נפרד לכל מתכון"
                 onClick={() => onExport('word')}/>
               <label style={{
-                ...exportRowStyle, background: 'rgba(255,255,255,.85)', color: 'var(--ink)', cursor: 'pointer',
+                ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)', cursor: 'pointer',
               }}>
                 <span style={{ ...exportIconStyle, background: '#5b4452' }}><IconUpload size={20}/></span>
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>ייבוא מקובץ Excel</span>
-                  <span style={{ fontSize: 12, opacity: .7 }}>קובץ .xlsx · עמודות בעברית</span>
+                  <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>ייבוא מקובץ Excel</span>
+                  <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>קובץ .xlsx · עמודות בעברית</span>
                 </div>
                 <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={onImport} style={{ display: 'none' }}/>
@@ -1123,10 +1051,10 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
           return (
             <div key={slot} style={{ position: 'relative' }}>
               <button type="button" onClick={() => openPicker(slot)} style={{
-                width: 84, height: 84, borderRadius: 18, border: 'none', cursor: 'pointer',
-                background: preview ? 'transparent' : 'rgba(0,0,0,.07)',
+                width: 84, height: 84, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+                background: preview ? 'transparent' : 'var(--surface-sunken)',
                 overflow: 'hidden', padding: 0,
-                boxShadow: isMain ? `0 0 0 3px ${p.accent}` : '0 2px 10px rgba(0,0,0,.1)',
+                boxShadow: isMain ? `0 0 0 3px ${p.accent}` : 'var(--e1)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'box-shadow .2s',
               }}>
@@ -1141,38 +1069,38 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
               {isMain && (
                 <div style={{
                   position: 'absolute', top: -7, insetInlineStart: -7,
-                  width: 22, height: 22, borderRadius: 999,
-                  background: p.accent, color: '#fff',
-                  display: 'grid', placeItems: 'center', fontSize: 12,
-                  pointerEvents: 'none', boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
+                  background: p.accent, color: 'var(--surface-raised)',
+                  display: 'grid', placeItems: 'center', fontSize: 'var(--t-caption)',
+                  pointerEvents: 'none', boxShadow: 'var(--e1)',
                 }}>★</div>
               )}
               {!isMain && preview && (
                 <button type="button" onClick={() => setMainSlot(slot)} title="הגדר כתמונה ראשית" style={{
                   position: 'absolute', top: -7, insetInlineStart: -7,
-                  width: 22, height: 22, borderRadius: 999,
-                  background: 'rgba(255,255,255,.95)', color: 'var(--ink-soft)',
-                  border: 'none', cursor: 'pointer', fontSize: 12,
+                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
+                  background: 'var(--glass-strong)', color: 'var(--ink-soft)',
+                  border: 'none', cursor: 'pointer', fontSize: 'var(--t-caption)',
                   display: 'grid', placeItems: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,.15)',
+                  boxShadow: 'var(--e1)',
                 }}>☆</button>
               )}
               {gallery.length > 1 && (
                 <button type="button" onClick={() => setConfirmRemoveSlot(slot)} style={{
                   position: 'absolute', top: -7, insetInlineEnd: -7,
-                  width: 22, height: 22, borderRadius: 999,
-                  background: 'rgba(255,255,255,.95)', color: '#e34466',
-                  border: 'none', cursor: 'pointer', fontSize: 17, lineHeight: 1,
+                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
+                  background: 'var(--glass-strong)', color: 'var(--brand-strong)',
+                  border: 'none', cursor: 'pointer', fontSize: 'var(--t-body)', lineHeight: 1,
                   display: 'grid', placeItems: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,.15)',
+                  boxShadow: 'var(--e1)',
                 }}>×</button>
               )}
             </div>
           );
         })}
         <button type="button" onClick={addSlot} style={{
-          width: 84, height: 84, borderRadius: 18,
-          border: '1.5px dashed rgba(0,0,0,.2)', background: 'transparent',
+          width: 84, height: 84, borderRadius: 'var(--r-md)',
+          border: '1.5px dashed var(--line-strong)', background: 'transparent',
           cursor: 'pointer', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 4, color: 'var(--ink-soft)',
         }}>
@@ -1206,10 +1134,10 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
         <button onClick={() => setPickerOpen(o => !o)}
           aria-label="בחר אמוג׳י"
           style={{
-            width: 44, height: '100%', minHeight: 44, borderRadius: 14, border: 'none',
-            background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 22,
-            boxShadow: '0 2px 6px rgba(0,0,0,.07), inset 0 0 0 1px rgba(0,0,0,.04)',
+            width: 44, height: '100%', minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none',
+            background: 'var(--glass)', color: 'var(--ink)',
+            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 'var(--t-title)',
+            boxShadow: 'var(--e1)',
           }}>{emoji}</button>
         {pickerOpen && (
           <EmojiPickerPopover current={emoji}
@@ -1224,8 +1152,8 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
         placeholder="מצרך" style={{ ...inputStyle, flex: 1 }}/>
       {canRemove && (
         <button onClick={onRemove} aria-label="מחיקה" style={{
-          width: 36, borderRadius: 14, border: 'none', cursor: 'pointer',
-          background: 'rgba(0,0,0,.06)', color: 'var(--ink-soft)',
+          width: 36, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+          background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
           display: 'grid', placeItems: 'center',
         }}><IconTrash size={14}/></button>
       )}
@@ -1252,16 +1180,16 @@ function EmojiPickerPopover({ current, onPick, onClose }) {
   return (
     <div data-emoji-pop="1" style={{
       position: 'absolute', top: '100%', insetInlineEnd: 0, marginTop: 6,
-      background: '#fff', borderRadius: 16, padding: 10,
-      boxShadow: '0 16px 40px -10px rgba(0,0,0,.3)',
+      background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 10,
+      boxShadow: 'var(--e2)',
       width: 260, zIndex: 20,
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
         {FOOD_EMOJIS.map(e => (
           <button key={e} onClick={() => onPick(e)}
             style={{
-              height: 36, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 20,
-              background: e === current ? 'var(--ink)' : 'rgba(0,0,0,.04)',
+              height: 36, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 'var(--t-heading)',
+              background: e === current ? 'var(--ink)' : 'var(--surface-sunken)',
               transition: 'all .12s',
             }}>{e}</button>
         ))}
@@ -1270,84 +1198,51 @@ function EmojiPickerPopover({ current, onPick, onClose }) {
         <input value={custom} onChange={e => setCustom(e.target.value)}
           placeholder="הקלד/י אמוג׳י…"
           style={{
-            flex: 1, border: 'none', borderRadius: 10, padding: '8px 10px', fontSize: 16,
-            background: 'rgba(0,0,0,.06)', fontFamily: 'inherit', outline: 'none', textAlign: 'right',
+            flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '8px 10px', fontSize: 'var(--t-body)',
+            background: 'var(--surface-sunken)', fontFamily: 'inherit', outline: 'none', textAlign: 'right',
           }}/>
         <button onClick={() => { if (custom.trim()) onPick(custom.trim()); }}
           disabled={!custom.trim()}
           style={{
-            border: 'none', borderRadius: 10, padding: '8px 12px', cursor: 'pointer',
-            background: custom.trim() ? 'var(--ink)' : 'rgba(0,0,0,.1)',
-            color: custom.trim() ? '#fff' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700, fontSize: 13,
+            border: 'none', borderRadius: 'var(--r-sm)', padding: '8px 12px', cursor: 'pointer',
+            background: custom.trim() ? 'var(--ink)' : 'var(--line)',
+            color: custom.trim() ? 'var(--bg)' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
           }}>בחר</button>
       </div>
     </div>
   );
 }
 
-const inputStyle = {
-  width: '100%', padding: '12px 14px', borderRadius: 14, border: 'none',
-  background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-  fontFamily: 'inherit', fontSize: 15, outline: 'none',
-  boxShadow: '0 2px 6px rgba(0,0,0,.05), inset 0 0 0 1px rgba(0,0,0,.04)',
-  textAlign: 'right', boxSizing: 'border-box',
-};
 const addRowBtn = {
-  border: '1.5px dashed rgba(0,0,0,.2)', background: 'transparent',
-  borderRadius: 14, padding: '10px', cursor: 'pointer',
-  fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600, color: 'var(--ink-soft)',
+  border: '1.5px dashed var(--line-strong)', background: 'transparent',
+  borderRadius: 'var(--r-sm)', padding: '10px', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 600, color: 'var(--ink-soft)',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
 };
 
-function Field({ label, children, style }) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 7, ...style }}>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ink-soft)', letterSpacing: '.04em' }}>{label}</span>
-      {children}
-    </label>
-  );
-}
 
 const exportRowStyle = {
   display: 'flex', alignItems: 'center', gap: 12,
-  padding: '12px 14px', borderRadius: 16,
+  padding: '12px 14px', borderRadius: 'var(--r-md)',
   border: 'none', cursor: 'pointer', textAlign: 'right',
   fontFamily: 'inherit',
 };
 const exportIconStyle = {
-  width: 40, height: 40, borderRadius: 12,
-  display: 'grid', placeItems: 'center', color: '#fff',
+  width: 40, height: 40, borderRadius: 'var(--r-sm)',
+  display: 'grid', placeItems: 'center', color: 'var(--bg)',
   flexShrink: 0,
 };
 
 function ExportRow({ icon, bg, label, sub, onClick }) {
   return (
-    <button onClick={onClick} style={{ ...exportRowStyle, background: 'rgba(255,255,255,.85)', color: 'var(--ink)' }}>
+    <button onClick={onClick} style={{ ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)' }}>
       <span style={{ ...exportIconStyle, background: bg }}>{icon}</span>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'flex-end' }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>{label}</span>
-        <span style={{ fontSize: 12, opacity: .7 }}>{sub}</span>
+        <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>{label}</span>
+        <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>{sub}</span>
       </div>
       <IconBack size={18} strokeWidth={2.2}/>
     </button>
-  );
-}
-
-function EmptyState({ text, emoji, cta }) {
-  return (
-    <div style={{
-      textAlign: 'center', padding: '60px 20px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-    }}>
-      <div style={{ fontSize: 56, lineHeight: 1 }}>{emoji}</div>
-      <p style={{ margin: 0, color: 'var(--ink-soft)', fontSize: 15, fontWeight: 500, textWrap: 'balance' }}>{text}</p>
-      {cta && (
-        <button onClick={cta.onClick} style={{
-          marginTop: 8, padding: '10px 18px', borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: 'var(--ink)', color: '#fff', fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
-        }}>{cta.label}</button>
-      )}
-    </div>
   );
 }
 
@@ -1377,7 +1272,7 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
     <ConfirmDialog
       emoji="🗑️"
       title="מחיקת מתכון"
-      body={<>בטוח למחוק את<br/><strong style={{ color: 'var(--ink)' }}>"{recipe.title}"</strong>?<br/><span style={{ fontSize: 13, color: '#c0304f', fontWeight: 700 }}>לא ניתן לשחזר אחרי המחיקה</span></>}
+      body={<>בטוח למחוק את<br/><strong style={{ color: 'var(--ink)' }}>"{recipe.title}"</strong>?<br/><span style={{ fontSize: 'var(--t-small)', color: '#c0304f', fontWeight: 700 }}>לא ניתן לשחזר אחרי המחיקה</span></>}
       confirmLabel="מחק מתכון"
       cancelLabel="ביטול"
       confirmColor="#e34466"
@@ -1411,12 +1306,12 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
         padding: '0 22px 10px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.06em' }}>
+        <span style={{ fontSize: 'var(--t-small)', fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.06em' }}>
           שותפו איתי
         </span>
         <span style={{
-          fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)',
-          background: 'rgba(0,0,0,.07)', borderRadius: 999, padding: '2px 8px',
+          fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)',
+          background: 'var(--surface-sunken)', borderRadius: 'var(--r-pill)', padding: '2px 8px',
         }}>{items.length}</span>
       </div>
       <div style={{
@@ -1425,20 +1320,20 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
         scrollbarWidth: 'none', msOverflowStyle: 'none',
       }}>
         {items.map(r => {
-          const p = PALETTES[r.palette] || PALETTES.peach;
+          const p = paletteOf(r.palette);
           return (
             <div key={r._shareId} style={{
               flexShrink: 0, width: 148, position: 'relative',
-              borderRadius: 20, overflow: 'hidden',
+              borderRadius: 'var(--r-md)', overflow: 'hidden',
               background: p.bg, boxShadow: 'var(--shadow-card)',
               cursor: 'pointer',
             }}>
               <div onClick={() => onOpen(r)} style={{ padding: '14px 14px 10px' }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: p.ink, lineHeight: 1.35, marginBottom: 6 }}>
+                <div style={{ fontSize: 'var(--t-small)', fontWeight: 700, color: p.ink, lineHeight: 1.35, marginBottom: 6 }}>
                   {r.title}
                 </div>
                 <div style={{
-                  fontSize: 11, color: p.ink, opacity: .65, fontWeight: 600,
+                  fontSize: 'var(--t-caption)', color: p.ink, opacity: .65, fontWeight: 600,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   <span>👤</span> {r._sharedBy}
@@ -1447,16 +1342,16 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
               <button onClick={e => { e.stopPropagation(); setConfirmId(r._shareId); }}
                 style={{
                   position: 'absolute', top: 6, insetInlineEnd: 6,
-                  width: 22, height: 22, borderRadius: 999, border: 'none',
-                  background: 'rgba(0,0,0,.15)', color: p.ink,
+                  width: 22, height: 22, borderRadius: 'var(--r-pill)', border: 'none',
+                  background: 'var(--line)', color: p.ink,
                   display: 'grid', placeItems: 'center', cursor: 'pointer',
-                  fontSize: 14, lineHeight: 1,
+                  fontSize: 'var(--t-small)', lineHeight: 1,
                 }}>×</button>
             </div>
           );
         })}
       </div>
-      <div style={{ height: 1, margin: '4px 22px 0', background: 'rgba(0,0,0,.07)' }}/>
+      <div style={{ height: 1, margin: '4px 22px 0', background: 'var(--surface-sunken)' }}/>
     </div>
   );
 }
@@ -1520,22 +1415,22 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
       <div style={{
         padding: '16px 18px 10px',
         display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: '1px solid rgba(0,0,0,.07)', flexShrink: 0,
-        background: 'rgba(255,255,255,.6)', backdropFilter: 'blur(8px)',
+        borderBottom: '1px solid var(--line)', flexShrink: 0,
+        background: 'var(--glass)', backdropFilter: 'blur(8px)',
       }}>
         <button onClick={onClose} style={{
-          width: 36, height: 36, borderRadius: 999, border: 'none',
-          background: 'rgba(0,0,0,.07)', cursor: 'pointer',
+          width: 36, height: 36, borderRadius: 'var(--r-pill)', border: 'none',
+          background: 'var(--surface-sunken)', cursor: 'pointer',
           display: 'grid', placeItems: 'center', color: 'var(--ink)', flexShrink: 0,
         }}><IconClose size={16} strokeWidth={2.2}/></button>
-        <h2 className="display" style={{ margin: 0, fontSize: 19, fontWeight: 700, flex: 1 }}>
+        <h2 className="display" style={{ margin: 0, fontSize: 'var(--t-heading)', fontWeight: 700, flex: 1 }}>
           שיתוף מתכונים
         </h2>
         <button onClick={toggleSelectAll} style={{
-          border: 'none', cursor: 'pointer', padding: '7px 12px', borderRadius: 12,
-          background: allInFilterSelected ? 'var(--ink)' : 'rgba(0,0,0,.07)',
-          color: allInFilterSelected ? '#fff' : 'var(--ink)',
-          fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, flexShrink: 0,
+          border: 'none', cursor: 'pointer', padding: '7px 12px', borderRadius: 'var(--r-sm)',
+          background: allInFilterSelected ? 'var(--ink)' : 'var(--surface-sunken)',
+          color: allInFilterSelected ? 'var(--bg)' : 'var(--ink)',
+          fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
         }}>
           {allInFilterSelected ? 'בטל הכל' : 'בחר הכל'}
         </button>
@@ -1548,12 +1443,12 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
       }}>
         {activeCats.map(cat => (
           <button key={cat.id} onClick={() => setCatFilter(cat.id)} style={{
-            padding: '7px 14px', border: 'none', borderRadius: 999, cursor: 'pointer',
-            background: catFilter === cat.id ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-            color: catFilter === cat.id ? '#fff' : 'var(--ink)',
-            fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+            padding: '7px 14px', border: 'none', borderRadius: 'var(--r-pill)', cursor: 'pointer',
+            background: catFilter === cat.id ? 'var(--ink)' : 'var(--glass)',
+            color: catFilter === cat.id ? 'var(--bg)' : 'var(--ink)',
+            fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700,
             flexShrink: 0, whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(0,0,0,.07)',
+            boxShadow: 'var(--e1)',
             transition: 'all .15s',
           }}>{cat.emoji} {cat.label}</button>
         ))}
@@ -1562,39 +1457,39 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
       {/* Recipe list */}
       <div className="scroll-y" style={{ flex: 1, padding: '6px 14px 8px' }}>
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-soft)', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-soft)', fontSize: 'var(--t-small)' }}>
             אין מתכונים בקטגוריה זו
           </div>
         )}
         {filtered.map(r => {
           const checked = selectedIds.has(r.id);
-          const p = PALETTES[r.palette] || PALETTES.peach;
+          const p = paletteOf(r.palette);
           return (
             <div key={r.id} onClick={() => toggleRecipe(r.id)} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '12px 14px', marginBottom: 8,
-              background: checked ? p.bg : 'rgba(255,255,255,.75)',
-              borderRadius: 18,
-              boxShadow: checked ? 'var(--shadow-card)' : '0 2px 6px rgba(0,0,0,.05)',
+              background: checked ? p.bg : 'var(--glass)',
+              borderRadius: 'var(--r-md)',
+              boxShadow: checked ? 'var(--shadow-card)' : 'var(--e1)',
               cursor: 'pointer', transition: 'all .15s',
               border: `2px solid ${checked ? (p.accent || p.ink) : 'transparent'}`,
             }}>
               <div style={{
                 width: 24, height: 24, borderRadius: 8, flexShrink: 0,
-                background: checked ? 'var(--ink)' : 'rgba(0,0,0,.12)',
+                background: checked ? 'var(--ink)' : 'var(--line)',
                 display: 'grid', placeItems: 'center', transition: 'background .15s',
               }}>
-                {checked && <span style={{ color: '#fff', fontSize: 14, lineHeight: 1 }}>✓</span>}
+                {checked && <span style={{ color: p.ink, fontSize: 'var(--t-small)', lineHeight: 1 }}>✓</span>}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontWeight: 700, fontSize: 14.5,
+                  fontWeight: 700, fontSize: 'var(--t-small)',
                   color: checked ? p.ink : 'var(--ink)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{r.title}</div>
                 {r.description && (
                   <div style={{
-                    fontSize: 12, color: 'var(--ink-soft)', marginTop: 2,
+                    fontSize: 'var(--t-caption)', color: 'var(--ink-soft)', marginTop: 2,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>{r.description}</div>
                 )}
@@ -1607,8 +1502,8 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
       {/* Bottom bar */}
       <div style={{
         padding: '12px 16px 38px', flexShrink: 0,
-        background: 'var(--cream)',
-        borderTop: '1px solid rgba(0,0,0,.07)',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--line)',
       }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
@@ -1617,16 +1512,16 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
             placeholder="gmail של המקבל/ת..."
             type="email" autoFocus
             style={{
-              flex: 1, padding: '13px 16px', borderRadius: 16, border: 'none',
-              background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-              fontFamily: 'inherit', fontSize: 15, outline: 'none',
-              boxShadow: '0 2px 8px rgba(0,0,0,.08)', textAlign: 'right',
+              flex: 1, padding: '13px 16px', borderRadius: 'var(--r-md)', border: 'none',
+              background: 'var(--glass)', color: 'var(--ink)',
+              fontFamily: 'inherit', fontSize: 'var(--t-body)', outline: 'none',
+              boxShadow: 'var(--e1)', textAlign: 'right',
             }}/>
           <button onClick={handleShare} disabled={!canSend || sharing} style={{
-            padding: '13px 18px', border: 'none', borderRadius: 16,
-            background: canSend ? 'var(--ink)' : 'rgba(0,0,0,.15)',
-            color: canSend ? '#fff' : 'var(--ink-soft)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 14.5,
+            padding: '13px 18px', border: 'none', borderRadius: 'var(--r-md)',
+            background: canSend ? 'var(--ink)' : 'var(--line)',
+            color: canSend ? 'var(--bg)' : 'var(--ink-soft)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
             cursor: canSend ? 'pointer' : 'default',
             flexShrink: 0, opacity: sharing ? .7 : 1, whiteSpace: 'nowrap',
           }}>
@@ -1634,7 +1529,7 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
           </button>
         </div>
         {selectedIds.size > 0 && (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-soft)', textAlign: 'center' }}>
+          <div style={{ marginTop: 8, fontSize: 'var(--t-caption)', color: 'var(--ink-soft)', textAlign: 'center' }}>
             {selectedIds.size} מתכונים נבחרו · יופיעו אצל המקבל/ת תחת "שותפו איתי"
           </div>
         )}
@@ -1668,17 +1563,17 @@ function LoginScreen({ onSignIn }) {
     }}>
       <div style={{ textAlign: 'center', maxWidth: 320 }}>
         <img src="/maites-logo.png" alt="Maites"
-          style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,.1))' }}/>
-        <p style={{ margin: '0 0 40px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+          style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,.18))' }}/>
+        <p style={{ margin: '0 0 40px', fontSize: 'var(--t-body)', color: 'var(--ink-soft)', lineHeight: 1.5 }}>
           ספר המתכונים האישי שלך
         </p>
         <button onClick={handleSignIn} disabled={loading} style={{
-          width: '100%', border: 'none', borderRadius: 18,
+          width: '100%', border: 'none', borderRadius: 'var(--r-md)',
           padding: '16px 20px', cursor: loading ? 'wait' : 'pointer',
-          background: '#fff',
-          boxShadow: '0 4px 24px rgba(0,0,0,.14), 0 1px 0 rgba(255,255,255,.8) inset',
+          background: 'var(--surface-raised)',
+          boxShadow: 'var(--e2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-          fontFamily: 'inherit', fontSize: 16, fontWeight: 700, color: '#1f1f1f',
+          fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 700, color: '#1f1f1f',
           opacity: loading ? .7 : 1,
           transition: 'transform .15s, box-shadow .15s',
         }}
@@ -1686,7 +1581,7 @@ function LoginScreen({ onSignIn }) {
           onMouseUp={e => e.currentTarget.style.transform=''}
           onMouseLeave={e => e.currentTarget.style.transform=''}
         >
-          {loading ? <span style={{ fontSize: 18 }}>⏳</span> : (
+          {loading ? <span style={{ fontSize: 'var(--t-heading)' }}>⏳</span> : (
             <svg width="22" height="22" viewBox="0 0 48 48">
               <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.8 6.6-9.5 6.6-15.9z"/>
               <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.1-5.5c-2.1 1.4-4.7 2.2-8.1 2.2-6.2 0-11.5-4.2-13.4-9.9H3.3v5.7C7 42.6 15 48 24 48z"/>
@@ -1696,7 +1591,7 @@ function LoginScreen({ onSignIn }) {
           )}
           {loading ? 'מתחברת…' : 'כניסה עם Google'}
         </button>
-        {err && <p style={{ marginTop: 14, color: '#e34466', fontSize: 14 }}>{err}</p>}
+        {err && <p style={{ marginTop: 14, color: 'var(--brand-strong)', fontSize: 'var(--t-small)' }}>{err}</p>}
       </div>
     </div>
   );
@@ -1705,7 +1600,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange }) {
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
   const [mutual, setMutual] = uS(false);
@@ -1723,19 +1618,19 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(12px)',
+      background: 'var(--overlay)', backdropFilter: 'blur(12px)',
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: 'var(--cream)',
+        background: 'var(--surface)',
         borderRadius: '32px 32px 0 0',
         maxHeight: '88vh', overflowY: 'auto',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        boxShadow: 'var(--e3)',
         animation: 'slideUp .36s cubic-bezier(.2,1.1,.35,1)',
       }}>
         {/* Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 999, background: 'rgba(0,0,0,.12)' }}/>
+          <div style={{ width: 40, height: 4, borderRadius: 'var(--r-pill)', background: 'var(--line)' }}/>
         </div>
 
         {/* User header */}
@@ -1744,39 +1639,39 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
           padding: '18px 24px 16px',
         }}>
           <div style={{
-            width: 54, height: 54, borderRadius: 999, flexShrink: 0,
+            width: 54, height: 54, borderRadius: 'var(--r-pill)', flexShrink: 0,
             background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
             overflow: 'hidden', display: 'grid', placeItems: 'center',
-            boxShadow: '0 4px 14px rgba(0,0,0,.15)',
+            boxShadow: 'var(--e1)',
           }}>
             {user?.photoURL
               ? <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-              : <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>
+              : <span style={{ fontSize: 'var(--t-title)', fontWeight: 700, color: 'var(--ink)' }}>
                   {(user?.displayName || user?.email || '?')[0].toUpperCase()}
                 </span>
             }
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 700, fontSize: 'var(--t-body)', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.displayName || 'משתמש'}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 'var(--t-small)', color: 'var(--ink-soft)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.email}
             </div>
           </div>
           <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: 999, border: 'none', cursor: 'pointer',
-            background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
-            display: 'grid', placeItems: 'center', fontSize: 20, flexShrink: 0,
+            width: 34, height: 34, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
+            background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+            display: 'grid', placeItems: 'center', fontSize: 'var(--t-heading)', flexShrink: 0,
           }}>×</button>
         </div>
 
         {/* Tab bar */}
-        <div style={{ display: 'flex', padding: '0 20px 0', gap: 8, borderBottom: '1px solid rgba(0,0,0,.07)' }}>
+        <div style={{ display: 'flex', padding: '0 20px 0', gap: 8, borderBottom: '1px solid var(--line)' }}>
           {[['profile', 'פרופיל'], ['share', 'שיתוף']].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
               padding: '10px 16px', border: 'none', cursor: 'pointer', background: 'transparent',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
+              fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
               color: tab === id ? 'var(--ink)' : 'var(--ink-soft)',
               borderBottom: tab === id ? '2.5px solid var(--ink)' : '2.5px solid transparent',
               marginBottom: -1,
@@ -1790,7 +1685,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* Stats */}
               <div style={{
-                background: 'rgba(255,255,255,.7)', borderRadius: 18, padding: '16px 20px',
+                background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: '16px 20px',
                 display: 'flex', gap: 0,
               }}>
                 {[
@@ -1800,24 +1695,39 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 ].map((s, i, arr) => (
                   <div key={i} style={{
                     flex: 1, textAlign: 'center',
-                    borderRight: i < arr.length - 1 ? '1px solid rgba(0,0,0,.08)' : 'none',
+                    borderRight: i < arr.length - 1 ? '1px solid var(--line)' : 'none',
                     padding: '4px 0',
                   }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{s.num}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
+                    <div style={{ fontSize: 'var(--t-title)', fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{s.num}</div>
+                    <div style={{ fontSize: 'var(--t-caption)', color: 'var(--ink-soft)', fontWeight: 600, marginTop: 2 }}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
+              {/* Appearance */}
+              <div style={{ marginTop: 4 }}>
+                <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>מראה</SectionLabel>
+                <SegmentedControl
+                  label="ערכת נושא"
+                  value={themeMode}
+                  onChange={onThemeChange}
+                  options={[
+                    { value: 'auto',  label: 'לפי המכשיר' },
+                    { value: 'light', label: 'בהיר' },
+                    { value: 'dark',  label: 'כהה' },
+                  ]}
+                />
+              </div>
+
+              {/* Diagnostics */}
+              <DiagnosticsBlock/>
+
               {/* Sign out */}
-              <button onClick={onSignOut} style={{
-                width: '100%', padding: '15px', border: 'none', borderRadius: 18, cursor: 'pointer',
-                background: 'rgba(227,68,102,.1)', color: '#c0304f',
-                fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              <Button tone="quiet" full onClick={onSignOut} style={{
+                background: 'var(--danger-soft)', color: 'var(--danger)', marginTop: 4,
               }}>
-                <span style={{ fontSize: 18 }}>🚪</span> יציאה מהחשבון
-              </button>
+                <span style={{ fontSize: 'var(--t-heading)' }} aria-hidden="true">🚪</span> יציאה מהחשבון
+              </Button>
             </div>
           )}
 
@@ -1826,12 +1736,12 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
               {/* Advanced account sharing */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
+                <div style={{ fontSize: 'var(--t-caption)', fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
                   שיתוף חשבון
                 </div>
                 <div style={{
-                  background: 'rgba(255,255,255,.6)', borderRadius: 18, padding: '14px 16px',
-                  fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 10,
+                  background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: '14px 16px',
+                  fontSize: 'var(--t-small)', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 10,
                 }}>
                   הזמן/י מישהו לראות את כל המתכונים שלך — כולל עתידיים. הם יקבלו גישה ברגע שיכנסו לאפליקציה עם הג׳ימייל שלהם.
                 </div>
@@ -1839,30 +1749,30 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 {/* People I shared with (as owner) */}
                 {(sharesInfo.asOwner || []).length > 0 && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>שיתפת עם:</div>
+                    <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>שיתפת עם:</div>
                     {sharesInfo.asOwner.map(s => (
                       <div key={s.id} style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px', background: 'rgba(255,255,255,.85)', borderRadius: 14,
-                        marginBottom: 6, boxShadow: '0 2px 6px rgba(0,0,0,.05)',
+                        padding: '10px 14px', background: 'var(--glass)', borderRadius: 'var(--r-sm)',
+                        marginBottom: 6, boxShadow: 'var(--e1)',
                       }}>
                         <div style={{
-                          width: 32, height: 32, borderRadius: 999,
+                          width: 32, height: 32, borderRadius: 'var(--r-pill)',
                           background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
-                          display: 'grid', placeItems: 'center', fontSize: 15, flexShrink: 0,
+                          display: 'grid', placeItems: 'center', fontSize: 'var(--t-body)', flexShrink: 0,
                         }}>{(s.guestEmail || '?')[0].toUpperCase()}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 'var(--t-small)', fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {s.guestEmail}
                           </div>
                           {s.mutual && (
-                            <div style={{ fontSize: 11, color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                            <div style={{ fontSize: 'var(--t-caption)', color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
                         <button onClick={() => onRevokeShare(s.id)} style={{
                           border: 'none', background: 'rgba(227,68,102,.1)', color: '#c0304f',
-                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
-                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                          borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
                         }}>בטל</button>
                       </div>
                     ))}
@@ -1872,26 +1782,26 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 {/* Pending invites I sent */}
                 {(pendingInvites || []).length > 0 && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>הזמנות שלחתי (ממתינות):</div>
+                    <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>הזמנות שלחתי (ממתינות):</div>
                     {pendingInvites.map(inv => (
                       <div key={inv.id} style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px', background: 'rgba(255,213,85,.15)', borderRadius: 14,
-                        marginBottom: 6, border: '1px dashed rgba(0,0,0,.12)',
+                        padding: '10px 14px', background: 'rgba(255,213,85,.15)', borderRadius: 'var(--r-sm)',
+                        marginBottom: 6, border: '1px dashed var(--line-strong)',
                       }}>
-                        <span style={{ fontSize: 15 }}>⏳</span>
+                        <span style={{ fontSize: 'var(--t-body)' }}>⏳</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 'var(--t-small)', fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {inv.guestEmail}
                           </div>
                           {inv.mutual && (
-                            <div style={{ fontSize: 11, color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                            <div style={{ fontSize: 'var(--t-caption)', color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
                         <button onClick={() => onCancelInvite(inv.id)} style={{
-                          border: 'none', background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
-                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
-                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                          border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+                          borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
                         }}>בטל</button>
                       </div>
                     ))}
@@ -1901,22 +1811,22 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 {/* Accounts I have access to (as guest) */}
                 {(sharesInfo.asGuest || []).length > 0 && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>יש לי גישה ל:</div>
+                    <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>יש לי גישה ל:</div>
                     {sharesInfo.asGuest.map(s => (
                       <div key={s.id} style={{
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px', background: 'rgba(179,228,195,.25)', borderRadius: 14,
-                        marginBottom: 6, border: '1px solid rgba(0,0,0,.07)',
+                        padding: '10px 14px', background: 'rgba(179,228,195,.25)', borderRadius: 'var(--r-sm)',
+                        marginBottom: 6, border: '1px solid var(--line)',
                       }}>
-                        <span style={{ fontSize: 15 }}>✅</span>
+                        <span style={{ fontSize: 'var(--t-body)' }}>✅</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{s.ownerDisplayName || s.ownerEmail}</div>
-                          <div style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>{s.ownerEmail}</div>
+                          <div style={{ fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink)' }}>{s.ownerDisplayName || s.ownerEmail}</div>
+                          <div style={{ fontSize: 'var(--t-caption)', color: 'var(--ink-soft)' }}>{s.ownerEmail}</div>
                         </div>
                         <button onClick={() => onRevokeShare(s.id)} style={{
-                          border: 'none', background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
-                          borderRadius: 10, padding: '6px 10px', cursor: 'pointer',
-                          fontFamily: 'inherit', fontSize: 12, fontWeight: 700, flexShrink: 0,
+                          border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+                          borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
+                          fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
                         }}>הסר</button>
                       </div>
                     ))}
@@ -1930,17 +1840,17 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                     placeholder="gmail של מישהו..."
                     type="email"
                     style={{
-                      flex: 1, padding: '12px 14px', borderRadius: 14, border: 'none',
-                      background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
-                      fontFamily: 'inherit', fontSize: 14, outline: 'none',
-                      boxShadow: '0 2px 6px rgba(0,0,0,.07)',
+                      flex: 1, padding: '12px 14px', borderRadius: 'var(--r-sm)', border: 'none',
+                      background: 'var(--glass)', color: 'var(--ink)',
+                      fontFamily: 'inherit', fontSize: 'var(--t-small)', outline: 'none',
+                      boxShadow: 'var(--e1)',
                       textAlign: 'right',
                     }}/>
                   <button onClick={handleInvite} disabled={!inviteEmail.trim() || inviting} style={{
-                    padding: '12px 18px', border: 'none', borderRadius: 14, cursor: inviteEmail.trim() ? 'pointer' : 'default',
-                    background: inviteEmail.trim() ? 'var(--ink)' : 'rgba(0,0,0,.15)',
-                    color: inviteEmail.trim() ? '#fff' : 'var(--ink-soft)',
-                    fontFamily: 'inherit', fontWeight: 700, fontSize: 14, flexShrink: 0,
+                    padding: '12px 18px', border: 'none', borderRadius: 'var(--r-sm)', cursor: inviteEmail.trim() ? 'pointer' : 'default',
+                    background: inviteEmail.trim() ? 'var(--ink)' : 'var(--line)',
+                    color: inviteEmail.trim() ? 'var(--bg)' : 'var(--ink-soft)',
+                    fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)', flexShrink: 0,
                     opacity: inviting ? .7 : 1,
                   }}>{inviting ? '…' : 'הזמן'}</button>
                 </div>
@@ -1951,19 +1861,19 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   padding: '12px 0 2px', gap: 12,
                 }}>
                   <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--ink)' }}>שיתוף הדדי</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', marginTop: 2, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink)' }}>שיתוף הדדי</div>
+                    <div style={{ fontSize: 'var(--t-caption)', color: 'var(--ink-soft)', marginTop: 2, lineHeight: 1.4 }}>
                       גם המוזמן/ת יראו את כל המתכונים שלך, כולל עתידיים
                     </div>
                   </div>
                   <button onClick={() => setMutual(m => !m)} aria-label="שיתוף הדדי" style={{
-                    width: 48, height: 28, borderRadius: 999, border: 'none', cursor: 'pointer',
-                    background: mutual ? '#6b48a0' : 'rgba(0,0,0,.18)',
+                    width: 48, height: 28, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
+                    background: mutual ? '#6b48a0' : 'var(--line)',
                     position: 'relative', flexShrink: 0, transition: 'background .22s', padding: 0,
                   }}>
                     <div style={{
-                      position: 'absolute', top: 3, width: 22, height: 22, borderRadius: 999,
-                      background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+                      position: 'absolute', top: 3, width: 22, height: 22, borderRadius: 'var(--r-pill)',
+                      background: 'var(--surface-raised)', boxShadow: 'var(--e1)',
                       transition: 'left .22s',
                       left: mutual ? 23 : 3,
                     }}/>
@@ -1979,9 +1889,64 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
   );
 }
 
+// Shows recorded failures so a problem on the phone leaves a trace.
+function DiagnosticsBlock() {
+  const [log, setLog] = uS(() => (typeof readErrorLog === 'function' ? readErrorLog() : []));
+  const [open, setOpen] = uS(false);
+  uE(() => (typeof onErrorLogChange === 'function' ? onErrorLogChange(setLog) : undefined), []);
+
+  const copy = async () => {
+    const text = log.map(e => `${e.at} · ${e.context} · ${e.message}`).join('\n');
+    try { await navigator.clipboard.writeText(text); } catch {}
+  };
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>תקלות</SectionLabel>
+      {log.length === 0 ? (
+        <div style={{
+          ...TYPE.small, color: 'var(--ink-soft)', fontWeight: 500,
+          background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)', padding: '12px 14px',
+        }}>לא נרשמו תקלות ✓</div>
+      ) : (
+        <div style={{ background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)', padding: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: open ? 10 : 0 }}>
+            <span style={{ ...TYPE.small, fontWeight: 700, color: 'var(--danger)', flex: 1 }}>
+              {log.length} תקלות נרשמו
+            </span>
+            <Button size="sm" tone="glass" onClick={() => setOpen(o => !o)}>{open ? 'הסתרה' : 'הצגה'}</Button>
+          </div>
+          {open && (
+            <>
+              <div className="scroll-y" style={{ maxHeight: 180, display: 'grid', gap: 8 }}>
+                {log.slice(0, 12).map((e, i) => (
+                  <div key={i} style={{
+                    background: 'var(--surface-raised)', borderRadius: 'var(--r-sm)', padding: '9px 11px',
+                  }}>
+                    <div style={{ ...TYPE.caption, color: 'var(--ink-faint)' }}>
+                      {new Date(e.at).toLocaleString('he-IL')} · {e.context}{e.online ? '' : ' · לא מקוון'}
+                    </div>
+                    <div style={{ ...TYPE.caption, color: 'var(--ink)', marginTop: 3, wordBreak: 'break-word', fontWeight: 500 }}>
+                      {e.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <Button size="sm" tone="glass" onClick={copy} style={{ flex: 1 }}>העתקת הפירוט</Button>
+                <Button size="sm" tone="quiet" onClick={() => clearErrorLog()} style={{ flex: 1 }}>ניקוי</Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 Object.assign(window, {
-  HomeScreen, DetailScreen, StepsScreen, FavoritesScreen,
+  HomeScreen, DetailScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
   PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
-  SharedRecipesSection, RecipeSelectSheet,
+  SharedRecipesSection, RecipeSelectSheet, DiagnosticsBlock,
 });

@@ -16,6 +16,19 @@ if (!firebase.apps.length) {
 const _db   = firebase.firestore();
 const _auth = firebase.auth();
 
+// Offline-first: writes are kept locally and replayed when the connection
+// comes back, and the last-known data is readable with no network at all.
+// (Fails harmlessly when several tabs are open, or in private mode.)
+_db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  if (err && err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+    if (typeof reportError === 'function') reportError('persistence', err);
+  }
+});
+
+// Every write goes through here, so the UI can always say what happened.
+const track = (label, promise) =>
+  (typeof saveTracker !== 'undefined' ? saveTracker.track(label, promise) : promise);
+
 // ── Auth ──────────────────────────────────────────────────────
 async function auth_signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
@@ -116,7 +129,8 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
         }
         await batch.commit();
       } catch (e) {
-        console.warn('image_slots save failed:', e);
+        if (typeof reportError === 'function') reportError('save-image', e);
+        else console.warn('image_slots save failed:', e);
       }
     },
   };
@@ -146,18 +160,18 @@ async function db_loadRecipes(userId, sharedOwnerUids = []) {
 }
 
 async function db_saveRecipe(recipe) {
-  const { id, ...data } = recipe;
+  const { id, _catInfo, _shareId, _sharedBy, _sharedByEmail, ...data } = recipe;
   const uid = _auth.currentUser?.uid;
-  await _db.collection('recipes').doc(id).set({
+  return track('save-recipe', _db.collection('recipes').doc(id).set({
     ...data,
     ...(uid && !data.userId ? { userId: uid } : {}),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdAt: data.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }));
 }
 
 async function db_deleteRecipe(id) {
-  await _db.collection('recipes').doc(id).delete();
+  await track('delete-recipe', _db.collection('recipes').doc(id).delete());
   // Clean up orphaned image slots
   const slotsSnap = await _db.collection('image_slots')
     .where('recipeId', '==', id)
@@ -204,7 +218,16 @@ async function db_saveCategories(cats) {
   cats.forEach((cat, idx) => {
     batch.set(_db.collection('categories').doc(cat.id), { ...cat, order: idx });
   });
-  await batch.commit();
+  return track('save-categories', batch.commit());
+}
+
+// Error log copy in the cloud — best effort, never blocks anything.
+async function db_logError(entry) {
+  const uid = _auth.currentUser?.uid || null;
+  return _db.collection('error_logs').add({
+    ...entry, uid,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).catch(() => {});
 }
 
 // ── Sharing ────────────────────────────────────────────────
@@ -318,7 +341,7 @@ async function db_removeSharedRecipe(shareId) {
 
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
-  db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot,
+  db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
   db_seedRecipes, db_loadCategories, db_saveCategories,
   db_claimUnownedRecipes, db_hasUnownedRecipes,
   db_createInvite, db_cancelInvite, db_getMyInvites,

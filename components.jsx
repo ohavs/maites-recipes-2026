@@ -8,178 +8,26 @@ const AnimSpeedContext = createContext('normal');
 const SPEED_MULTIPLIER = { slow: 1.7, normal: 1, fast: 0.55, off: 0 };
 function useAnimMs(base) {
   const speed = useContext(AnimSpeedContext);
+  const enabled = useAnimEnabled();
+  if (!enabled) return 0;
   const m = SPEED_MULTIPLIER[speed] ?? 1;
   return Math.round(base * m);
 }
+// The OS "reduce motion" setting wins over the in-app animation speed.
+const prefersReducedMotion = () => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch { return false; }
+};
 function useAnimEnabled() {
-  return useContext(AnimSpeedContext) !== 'off';
-}
-
-// ───────────────────────────────────────────────────────────
-// Tilt wrapper — perspective tilt on pointer move / scroll
-// ───────────────────────────────────────────────────────────
-function Tilt({ children, max = 8, scale = 1.0, style, perspective = 1100, ...rest }) {
-  const ref = useRef(null);
-  const rafRef = useRef(0);
-  const enabled = useAnimEnabled();
-
-  const apply = useCallback((rx, ry, s = 1) => {
-    if (!ref.current) return;
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      if (!ref.current) return;
-      ref.current.style.transform =
-        `perspective(${perspective}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
-    });
-  }, [perspective]);
-
-  const onMove = (e) => {
-    if (!enabled || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width;
-    const py = (e.clientY - r.top) / r.height;
-    apply((0.5 - py) * max, (px - 0.5) * max, scale);
-  };
-  const onLeave = () => apply(0, 0, 1);
-
-  return (
-    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
-      style={{
-        transformStyle: 'preserve-3d',
-        transition: 'transform .4s cubic-bezier(.2,.8,.2,1)',
-        willChange: 'transform',
-        ...style,
-      }} {...rest}>
-      {children}
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// FoodArt — stylized SVG illustration per recipe (default art
-// before user drops a real photo via the slot).
-// ───────────────────────────────────────────────────────────
-function FoodArt({ id, size = 200 }) {
-  const styleBase = { width: size, height: size, display: 'block' };
-  switch (id) {
-    case 'cheesecake': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <defs>
-          <radialGradient id="cc-g" cx="50%" cy="40%" r="70%">
-            <stop offset="0" stopColor="#fffbe9"/><stop offset="1" stopColor="#ffe89d"/>
-          </radialGradient>
-        </defs>
-        <circle cx="100" cy="100" r="86" fill="url(#cc-g)"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#e08c2c" strokeWidth="14"/>
-        {[0,45,90,135,180,225,270,315].map(a => (
-          <line key={a} x1="100" y1="100"
-            x2={100 + 80*Math.cos(a*Math.PI/180)}
-            y2={100 + 80*Math.sin(a*Math.PI/180)}
-            stroke="#fff" strokeWidth="4" opacity="0.85"/>
-        ))}
-        <circle cx="60"  cy="70"  r="6" fill="#fff094" stroke="#e0a83a" strokeWidth="2"/>
-        <circle cx="140" cy="135" r="7" fill="#fff094" stroke="#e0a83a" strokeWidth="2"/>
-        <path d="M70 130 q4 -8 12 -4" stroke="#7bbb4a" strokeWidth="3" fill="none" strokeLinecap="round"/>
-        <path d="M120 60 q6 -4 10 4" stroke="#7bbb4a" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      </svg>
-    );
-    case 'shakshuka': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#c84a26"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#7a2912" strokeWidth="10"/>
-        <ellipse cx="78"  cy="80"  rx="20" ry="16" fill="#fff7d9"/>
-        <ellipse cx="78"  cy="80"  rx="9"  ry="7"  fill="#ffc34a"/>
-        <ellipse cx="130" cy="95"  rx="22" ry="17" fill="#fff7d9"/>
-        <ellipse cx="130" cy="95"  rx="10" ry="8"  fill="#ffc34a"/>
-        <ellipse cx="95"  cy="135" rx="20" ry="15" fill="#fff7d9"/>
-        <ellipse cx="95"  cy="135" rx="9"  ry="7"  fill="#ffc34a"/>
-        <path d="M50 50 q5 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-        <path d="M155 130 q-5 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-      </svg>
-    );
-    case 'macaroons': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#f0e8df"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#a78b6f" strokeWidth="8"/>
-        {[
-          {x:65, y:75, c:'#ff7b6e'},
-          {x:115,y:65, c:'#b6e07a'},
-          {x:140,y:105,c:'#ffd255'},
-          {x:75, y:120,c:'#f7a8b8'},
-          {x:115,y:125,c:'#c9b8e8'},
-        ].map((m, i) => (
-          <g key={i}>
-            <ellipse cx={m.x} cy={m.y-6} rx="22" ry="9" fill={m.c}/>
-            <rect x={m.x-22} y={m.y-6} width="44" height="8" fill="#fff5d8"/>
-            <ellipse cx={m.x} cy={m.y+6} rx="22" ry="9" fill={m.c}/>
-          </g>
-        ))}
-      </svg>
-    );
-    case 'greek-salad': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#f8f4ea"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#7bbb4a" strokeWidth="10"/>
-        <rect x="80" y="85" width="40" height="30" fill="#fff" stroke="#cfc7b3" strokeWidth="2"/>
-        <circle cx="60"  cy="75"  r="11" fill="#e74c3c"/>
-        <circle cx="135" cy="65"  r="10" fill="#e74c3c"/>
-        <circle cx="145" cy="125" r="10" fill="#7bbb4a"/>
-        <circle cx="55"  cy="125" r="9"  fill="#7bbb4a"/>
-        <circle cx="115" cy="140" r="8"  fill="#3a2a4a"/>
-        <circle cx="75"  cy="55"  r="7"  fill="#3a2a4a"/>
-        <path d="M100 50 q4 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-      </svg>
-    );
-    case 'mushroom-pasta': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#fff4e0"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#a07a4a" strokeWidth="10"/>
-        {/* pasta swirls */}
-        <g stroke="#f0c060" strokeWidth="4" fill="none" strokeLinecap="round">
-          <path d="M60 70 q15 20 0 40 q-15 20 0 40"/>
-          <path d="M85 60 q15 22 0 45 q-12 18 0 35"/>
-          <path d="M115 60 q15 20 0 42 q-12 20 0 40"/>
-          <path d="M140 70 q15 22 0 42 q-15 18 0 38"/>
-        </g>
-        {/* mushrooms */}
-        <g>
-          <ellipse cx="72" cy="115" rx="14" ry="8" fill="#8b5a3c"/>
-          <rect x="68" y="115" width="8" height="9" fill="#e8d4b8"/>
-        </g>
-        <g>
-          <ellipse cx="125" cy="100" rx="16" ry="9" fill="#a07252"/>
-          <rect x="121" y="100" width="8" height="11" fill="#e8d4b8"/>
-        </g>
-        <circle cx="100" cy="140" r="4" fill="#2c8a52"/>
-        <circle cx="90" cy="60" r="3" fill="#2c8a52"/>
-      </svg>
-    );
-    case 'cupcakes': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#3a2a4a"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#1f1530" strokeWidth="8"/>
-        {[
-          {x:65, y:80,  c:'#f7a8b8'},
-          {x:105,y:70,  c:'#c9b8e8'},
-          {x:140,y:90,  c:'#fff094'},
-          {x:75, y:125, c:'#9adfb1'},
-          {x:115,y:130, c:'#ffb494'},
-          {x:145,y:135, c:'#f7a8b8'},
-        ].map((m,i) => (
-          <g key={i}>
-            <ellipse cx={m.x} cy={m.y+10} rx="14" ry="6" fill="#6e4b2a"/>
-            <path d={`M${m.x-12} ${m.y+8} Q${m.x} ${m.y-14} ${m.x+12} ${m.y+8} Z`} fill={m.c}/>
-            <circle cx={m.x-4} cy={m.y-6} r="2" fill="#fff" opacity=".6"/>
-          </g>
-        ))}
-      </svg>
-    );
-    default: return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#fff" stroke="#aaa" strokeWidth="6"/>
-      </svg>
-    );
-  }
+  const speed = useContext(AnimSpeedContext);
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setReduced(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return speed !== 'off' && !reduced;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -353,7 +201,7 @@ function useScrollPhysics(ref, opts = {}) {
 // Three variants via Tweaks: 'block' (TikTok), 'bleed', 'soft'.
 // ───────────────────────────────────────────────────────────
 function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block', onToggleFav, sharedId }) {
-  const p = PALETTES[recipe.palette];
+  const p = paletteOf(recipe.palette);
   const enterMs = useAnimMs(550);
   const enabled = useAnimEnabled();
   const cardRef = useRef(null);
@@ -370,6 +218,8 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   const isCompact = density === 'compact';
   // Per-recipe choice: 'inside' keeps the photo within the card bounds,
   // anything else (default) lets the circle poke out past the edge.
+  // With no photo at all we simply leave the space to the text.
+  const hasPhoto = !!useRecipePhoto(recipe);
   const inside   = recipe.imageMode === 'inside';
   const cardH    = isCompact ? 116 : 168;
   const padY     = isCompact ? 14 : 18;
@@ -412,7 +262,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
         <div style={{
           position: 'absolute', inset: 0,
           borderRadius: 'var(--radius-card)',
-          background: 'linear-gradient(160deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,.04) 100%)',
+          background: 'linear-gradient(160deg, var(--sheen) 0%, transparent 38%, rgba(0,0,0,.04) 100%)',
           pointerEvents: 'none',
           overflow: 'hidden',
         }} />
@@ -430,7 +280,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
             }}>{recipe.title}</div>
             {!isCompact && (
               <div style={{
-                fontSize: 13.5, lineHeight: 1.45,
+                fontSize: 'var(--t-small)', lineHeight: 1.45,
                 color: p.ink, opacity: .75, fontWeight: 400,
                 display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}>{recipe.description}</div>
@@ -440,7 +290,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           {/* photo — 'inside' keeps a rounded thumbnail within the card,
              otherwise the circle sits on the inline-START side (RTL → right)
              and pokes OUT past that edge. */}
-          <div style={{
+          {hasPhoto && <div style={{
             position: 'relative',
             width: imgSize - imgPokeOut, // space the row reserves
             height: imgSize,
@@ -451,23 +301,17 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               top: '50%', insetInlineStart: -imgPokeOut,
               transform: 'translateY(-50%)',
               ...(inside ? {
-                borderRadius: 20, overflow: 'hidden',
-                boxShadow: '0 8px 20px -8px rgba(0,0,0,.35), 0 0 0 3px rgba(255,255,255,.55)',
+                borderRadius: 'var(--r-md)', overflow: 'hidden',
+                boxShadow: 'var(--e2)',
                 background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
                 display: 'grid', placeItems: 'center',
               } : {}),
             }}>
-              {inside && (
-                <span style={{
-                  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-                  fontSize: Math.round(imgSize * .34), opacity: .35,
-                }}>🍽️</span>
-              )}
               <FoodImage recipeId={recipe.id} size={imgSize}
                 shape={inside ? 'rounded' : 'circle'} radius={20} fit={inside ? 'cover' : 'contain'}
                 slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* favorite button — anchored to the OPPOSITE side (left in RTL = inline-end) */}
@@ -476,11 +320,11 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           aria-label="הוסף למועדפים"
           style={{
             position: 'absolute', top: 12, insetInlineEnd: 12,
-            width: 36, height: 36, borderRadius: 999,
+            width: 36, height: 36, borderRadius: 'var(--r-pill)',
             display: 'grid', placeItems: 'center',
-            background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(6px)',
-            border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,.12)',
-            cursor: 'pointer', color: recipe.favorite ? '#e34466' : p.ink,
+            background: 'var(--glass)', backdropFilter: 'blur(6px)',
+            border: 'none', boxShadow: 'var(--e1)',
+            cursor: 'pointer', color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
             zIndex: 2,
           }}>
           <FavHeart filled={recipe.favorite} />
@@ -554,13 +398,13 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
           }}>
             <button onClick={onAddSlot} style={{
               width: size, height: size, borderRadius: '50%',
-              border: '2px dashed rgba(0,0,0,.25)',
-              background: 'rgba(255,255,255,.4)', cursor: 'pointer',
+              border: '2px dashed var(--line-strong)',
+              background: 'var(--surface-sunken)', cursor: 'pointer',
               display: 'grid', placeItems: 'center', gap: 8,
               fontFamily: 'inherit', color: 'var(--ink-soft)',
             }}>
               <IconPlus size={28} strokeWidth={2.2}/>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>הוסיפו תמונה</span>
+              <span style={{ fontSize: 'var(--t-caption)', fontWeight: 700 }}>הוסיפו תמונה</span>
             </button>
           </div>
         )}
@@ -574,7 +418,7 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
           {slots.map((slot, i) => slotsWithImages.has(slot) ? (
             <button key={i} onClick={() => goTo(i)} aria-label={`תמונה ${i+1}`}
               style={{
-                width: i === index ? 22 : 7, height: 7, borderRadius: 999,
+                width: i === index ? 22 : 7, height: 7, borderRadius: 'var(--r-pill)',
                 background: i === index ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.5)',
                 border: 'none', cursor: 'pointer', padding: 0,
                 transition: 'width .25s, background .25s',
@@ -583,22 +427,6 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
         </div>
       )}
     </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// Pill — small chip with icon
-// ───────────────────────────────────────────────────────────
-function Pill({ children, color = '#fff', ink = '#222', strong = false }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: 12.5, fontWeight: strong ? 700 : 600,
-      color: ink,
-      background: color,
-      padding: '5px 10px', borderRadius: 999,
-      boxShadow: '0 1px 0 rgba(255,255,255,.6) inset, 0 2px 4px rgba(0,0,0,.05)',
-    }}>{children}</span>
   );
 }
 
@@ -631,7 +459,7 @@ function FavHeart({ filled }) {
             return (
               <span key={i} style={{
                 position: 'absolute', left: '50%', top: '50%',
-                width: 4, height: 4, borderRadius: 999, background: '#e34466',
+                width: 4, height: 4, borderRadius: 'var(--r-pill)', background: 'var(--brand-strong)',
                 transform: `translate(-50%,-50%) translate(${Math.cos(angle)*22}px,${Math.sin(angle)*22}px) scale(0)`,
                 animation: 'pop .6s cubic-bezier(.2,.9,.4,1) forwards',
               }} />
@@ -647,7 +475,7 @@ function FavHeart({ filled }) {
 // ───────────────────────────────────────────────────────────
 // BottomNav — three pill buttons floating above content
 // ───────────────────────────────────────────────────────────
-function BottomNav({ active, onChange, accent = '#e34466' }) {
+function BottomNav({ active, onChange, accent = 'var(--brand-strong)' }) {
   const items = [
     { id: 'home',      icon: IconHome,     label: 'בית' },
     { id: 'book',      icon: IconBook,     label: 'ספר' },
@@ -657,10 +485,10 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
   return (
     <div style={{
       position: 'absolute', bottom: 18, left: 18, right: 18, zIndex: 5,
-      background: 'rgba(255,255,255,.85)',
+      background: 'var(--glass)',
       backdropFilter: 'blur(20px) saturate(160%)',
-      borderRadius: 999,
-      boxShadow: '0 12px 40px -10px rgba(64,33,50,.35), 0 1px 0 rgba(255,255,255,.7) inset',
+      borderRadius: 'var(--r-pill)',
+      boxShadow: 'var(--e3)',
       padding: 6,
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
     }}>
@@ -671,15 +499,15 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
           <button key={it.id} onClick={() => onChange(it.id)} aria-label={it.label}
             style={{
               flex: 1, height: 46, border: 'none', cursor: 'pointer', background: 'transparent',
-              borderRadius: 999, position: 'relative', minWidth: 0, padding: 0,
+              borderRadius: 'var(--r-pill)', position: 'relative', minWidth: 0, padding: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              color: isActive ? '#fff' : 'var(--ink)',
-              fontWeight: 700, fontSize: 13,
+              color: isActive ? 'var(--bg)' : 'var(--ink)',
+              fontWeight: 700, fontSize: 'var(--t-small)',
               transition: 'color .2s',
             }}>
             {isActive && (
               <span style={{
-                position: 'absolute', inset: 0, borderRadius: 999, background: accent, zIndex: -1,
+                position: 'absolute', inset: 0, borderRadius: 'var(--r-pill)', background: accent, zIndex: -1,
                 boxShadow: `0 8px 18px -6px ${accent}`,
                 animation: 'navPop .35s cubic-bezier(.2,1.4,.4,1)',
               }} />
@@ -728,21 +556,21 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
         style={{
           width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', alignItems: 'center', gap: 9,
-          padding: '0 14px 0 12px', height: 44, borderRadius: 999,
-          background: open || chosen.length ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-          color: open || chosen.length ? '#fff' : 'var(--ink)',
-          boxShadow: open ? '0 10px 26px -8px rgba(64,33,50,.45)' : '0 6px 18px -6px rgba(64,33,50,.2)',
+          padding: '0 14px 0 12px', height: 44, borderRadius: 'var(--r-pill)',
+          background: open || chosen.length ? 'var(--ink)' : 'var(--glass)',
+          color: open || chosen.length ? 'var(--bg)' : 'var(--ink)',
+          boxShadow: open ? 'var(--e2)' : 'var(--e1)',
           transition: 'background .2s, color .2s, box-shadow .2s',
         }}>
-        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{emojis}</span>
+        <span style={{ fontSize: 'var(--t-body)', lineHeight: 1, flexShrink: 0 }}>{emojis}</span>
         <span style={{
-          fontSize: 14.5, fontWeight: 700, flex: 1, textAlign: 'start',
+          fontSize: 'var(--t-small)', fontWeight: 700, flex: 1, textAlign: 'start',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{label}</span>
         {chosen.length > 1 && (
           <span style={{
-            fontSize: 11, fontWeight: 800, borderRadius: 999, padding: '2px 7px',
-            background: 'rgba(255,255,255,.25)', flexShrink: 0,
+            fontSize: 'var(--t-caption)', fontWeight: 800, borderRadius: 'var(--r-pill)', padding: '2px 7px',
+            background: 'var(--surface-sunken)', flexShrink: 0,
           }}>{chosen.length}</span>
         )}
         <span style={{
@@ -754,29 +582,29 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
       {open && (
         <div role="listbox" style={{
           position: 'absolute', top: 52, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
-          background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(18px) saturate(160%)',
-          borderRadius: 22, zIndex: 40, overflow: 'hidden',
-          boxShadow: '0 24px 60px -14px rgba(64,33,50,.4), 0 2px 0 rgba(255,255,255,.8) inset',
+          background: 'var(--glass-strong)', backdropFilter: 'blur(18px) saturate(160%)',
+          borderRadius: 'var(--r-lg)', zIndex: 40, overflow: 'hidden',
+          boxShadow: 'var(--e3)',
           animation: 'ddIn .2s cubic-bezier(.2,1.1,.4,1)', transformOrigin: 'top center',
         }}>
           <div className="scroll-y" style={{ maxHeight: 300, padding: 6 }}>
             <DropRow emoji="🍽️" label="הכל" count={total} checked={selected.length === 0}
               onClick={() => { onClear(); }} />
-            <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '5px 12px' }}/>
+            <div style={{ height: 1, background: 'var(--surface-sunken)', margin: '5px 12px' }}/>
             {cats.map(c => (
               <DropRow key={c.id} emoji={c.emoji} label={c.label} count={counts[c.id] || 0}
                 checked={selected.includes(c.id)} onClick={() => onToggle(c.id)}/>
             ))}
             {cats.length === 0 && (
-              <div style={{ padding: '14px 14px', fontSize: 13, color: 'var(--ink-soft)', textAlign: 'center' }}>
+              <div style={{ padding: '14px 14px', fontSize: 'var(--t-small)', color: 'var(--ink-soft)', textAlign: 'center' }}>
                 אין עדיין קטגוריות
               </div>
             )}
           </div>
           {(onAdd || onManage) && (
             <div style={{
-              display: 'flex', gap: 8, padding: 10, borderTop: '1px solid rgba(0,0,0,.07)',
-              background: 'rgba(247,168,184,.10)',
+              display: 'flex', gap: 8, padding: 10, borderTop: '1px solid var(--line)',
+              background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
             }}>
               {onAdd && (
                 <button onClick={() => { setOpen(false); onAdd(); }} style={ddFootBtn}>
@@ -800,9 +628,9 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
 const ddFootBtn = {
   flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  padding: '9px 10px', borderRadius: 999, background: 'rgba(255,255,255,.9)',
-  color: 'var(--ink)', fontSize: 12.5, fontWeight: 700,
-  boxShadow: '0 3px 8px rgba(0,0,0,.08)',
+  padding: '9px 10px', borderRadius: 'var(--r-pill)', background: 'var(--glass)',
+  color: 'var(--ink)', fontSize: 'var(--t-caption)', fontWeight: 700,
+  boxShadow: 'var(--e1)',
 };
 
 function DropRow({ emoji, label, count, checked, onClick }) {
@@ -811,23 +639,23 @@ function DropRow({ emoji, label, count, checked, onClick }) {
       style={{
         width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
         display: 'flex', alignItems: 'center', gap: 10, textAlign: 'start',
-        padding: '9px 10px', borderRadius: 14, background: checked ? 'rgba(247,168,184,.22)' : 'transparent',
+        padding: '9px 10px', borderRadius: 'var(--r-sm)', background: checked ? 'color-mix(in srgb, var(--brand) 24%, transparent)' : 'transparent',
         color: 'var(--ink)', transition: 'background .15s',
       }}>
       <span style={{
-        width: 30, height: 30, borderRadius: 10, flexShrink: 0,
-        display: 'grid', placeItems: 'center', fontSize: 16,
-        background: checked ? 'rgba(255,255,255,.9)' : 'rgba(0,0,0,.04)',
+        width: 30, height: 30, borderRadius: 'var(--r-sm)', flexShrink: 0,
+        display: 'grid', placeItems: 'center', fontSize: 'var(--t-body)',
+        background: checked ? 'var(--surface-raised)' : 'var(--surface-sunken)',
       }}>{emoji}</span>
-      <span style={{ flex: 1, fontSize: 14.5, fontWeight: checked ? 800 : 600, minWidth: 0,
+      <span style={{ flex: 1, fontSize: 'var(--t-small)', fontWeight: checked ? 800 : 600, minWidth: 0,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-      <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)', flexShrink: 0 }}>{count}</span>
+      <span style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', flexShrink: 0 }}>{count}</span>
       <span style={{
         width: 20, height: 20, borderRadius: 7, flexShrink: 0,
         display: 'grid', placeItems: 'center',
         background: checked ? 'var(--ink)' : 'transparent',
-        boxShadow: checked ? 'none' : 'inset 0 0 0 2px rgba(0,0,0,.16)',
-        color: '#fff', transition: 'background .15s',
+        boxShadow: checked ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
+        color: 'var(--bg)', transition: 'background var(--dur-fast)',
       }}>{checked && <IconCheck size={12} strokeWidth={3}/>}</span>
     </button>
   );
@@ -862,20 +690,20 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
   return (
     <div onClick={onClose} style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
+      background: 'var(--overlay)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'flex-end',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--cream)',
+        width: '100%', background: 'var(--surface)',
         borderRadius: '28px 28px 0 0',
         padding: '24px 22px 40px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        boxShadow: 'var(--e3)',
         maxHeight: '80vh', overflowY: 'auto',
         animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>ניהול קטגוריות</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
+          <h2 style={{ margin: 0, fontSize: 'var(--t-heading)', fontWeight: 700, fontFamily: 'var(--font-display)' }}>ניהול קטגוריות</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 'var(--t-title)', color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
         </div>
 
         {/* Existing categories */}
@@ -884,22 +712,22 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
             <div key={cat.id} style={{ position: 'relative' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
-                background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: '12px 14px',
-                boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+                background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: '12px 14px',
+                boxShadow: 'var(--e1)',
               }}>
                 {/* Emoji button — opens picker */}
                 <button onClick={() => setEditingEmoji(editingEmoji === cat.id ? null : cat.id)}
                   style={{
-                    width: 44, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer',
-                    background: editingEmoji === cat.id ? 'var(--ink)' : 'rgba(0,0,0,.06)',
-                    fontSize: 24, display: 'grid', placeItems: 'center',
+                    width: 44, height: 44, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                    background: editingEmoji === cat.id ? 'var(--ink)' : 'var(--surface-sunken)',
+                    fontSize: 'var(--t-title)', display: 'grid', placeItems: 'center',
                     flexShrink: 0, transition: 'all .15s',
                   }}>{cat.emoji}</button>
-                <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{cat.label}</span>
+                <span style={{ flex: 1, fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{cat.label}</span>
                 <button onClick={() => onDelete(cat.id)}
                   style={{
-                    width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: 'rgba(220,53,69,.1)', color: '#dc3545',
+                    width: 32, height: 32, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                    background: 'var(--danger-soft)', color: 'var(--danger)',
                     display: 'grid', placeItems: 'center', flexShrink: 0,
                   }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -910,15 +738,15 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
               {/* Inline emoji picker */}
               {editingEmoji === cat.id && (
                 <div style={{
-                  marginTop: 8, background: '#fff', borderRadius: 16, padding: 12,
-                  boxShadow: '0 8px 24px rgba(0,0,0,.14)',
+                  marginTop: 8, background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 12,
+                  boxShadow: 'var(--e2)',
                   display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse',
                 }}>
                   {CAT_EMOJIS_ALL.map(e => (
                     <button key={e} onClick={() => { onEdit(cat.id, { emoji: e }); setEditingEmoji(null); }}
                       style={{
-                        width: 40, height: 40, border: 'none', borderRadius: 10, fontSize: 22,
-                        cursor: 'pointer', background: e === cat.emoji ? 'var(--ink)' : 'rgba(0,0,0,.05)',
+                        width: 40, height: 40, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-title)',
+                        cursor: 'pointer', background: e === cat.emoji ? 'var(--ink)' : 'var(--surface-sunken)',
                         transition: 'all .12s',
                       }}>{e}</button>
                   ))}
@@ -931,18 +759,18 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
         {/* Add new */}
         {!addMode ? (
           <button onClick={() => setAddMode(true)} style={{
-            width: '100%', border: '1.5px dashed rgba(0,0,0,.2)', borderRadius: 16,
+            width: '100%', border: '1.5px dashed var(--line-strong)', borderRadius: 'var(--r-md)',
             padding: '12px 0', cursor: 'pointer', background: 'transparent',
-            fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: 'var(--ink-soft)',
+            fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink-soft)',
           }}>+ קטגוריה חדשה</button>
         ) : (
-          <div style={{ background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
+          <div style={{ background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: 16 }}>
+            <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse', marginBottom: 14 }}>
               {CAT_EMOJIS_ALL.slice(0, 24).map(e => (
                 <button key={e} onClick={() => setNewEmoji(e)} style={{
-                  width: 38, height: 38, border: 'none', borderRadius: 10, fontSize: 20,
-                  cursor: 'pointer', background: newEmoji === e ? 'var(--ink)' : 'rgba(0,0,0,.05)',
+                  width: 38, height: 38, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-heading)',
+                  cursor: 'pointer', background: newEmoji === e ? 'var(--ink)' : 'var(--surface-sunken)',
                   transition: 'all .12s',
                 }}>{e}</button>
               ))}
@@ -951,20 +779,20 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
               onKeyDown={e => e.key === 'Enter' && confirmAdd()}
               placeholder="שם הקטגוריה" autoFocus
               style={{
-                width: '100%', border: 'none', borderRadius: 12, padding: '10px 14px',
-                fontSize: 15, background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
+                width: '100%', border: 'none', borderRadius: 'var(--r-sm)', padding: '10px 14px',
+                fontSize: 'var(--t-body)', background: 'var(--surface-sunken)', color: 'var(--ink)',
                 fontFamily: 'inherit', outline: 'none', textAlign: 'right',
                 marginBottom: 10, boxSizing: 'border-box',
               }}/>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={confirmAdd} disabled={!newName.trim()} style={{
-                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
-                background: newName.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
-                color: newName.trim() ? '#fff' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
+                flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '11px 0', cursor: 'pointer',
+                background: newName.trim() ? 'var(--ink)' : 'var(--line)',
+                color: newName.trim() ? 'var(--bg)' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
               }}>הוסיפי</button>
               <button onClick={() => setAddMode(false)} style={{
-                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
-                background: 'rgba(0,0,0,.06)', color: 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
+                flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '11px 0', cursor: 'pointer',
+                background: 'var(--surface-sunken)', color: 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
               }}>ביטול</button>
             </div>
           </div>
@@ -993,30 +821,30 @@ function AddCategorySheet({ onAdd, onCancel }) {
   return (
     <div onClick={onCancel} style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
+      background: 'var(--overlay)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'flex-end',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--cream)',
+        width: '100%', background: 'var(--surface)',
         borderRadius: '28px 28px 0 0',
         padding: '24px 22px 40px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
+        boxShadow: 'var(--e3)',
         animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>קטגוריה חדשה</h2>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
+          <h2 style={{ margin: 0, fontSize: 'var(--t-heading)', fontWeight: 700, fontFamily: 'var(--font-display)' }}>קטגוריה חדשה</h2>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 'var(--t-title)', color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
+          <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flexDirection: 'row-reverse' }}>
             {CAT_EMOJIS.map(e => (
               <button key={e} onClick={() => setEmoji(e)} style={{
-                width: 42, height: 42, border: 'none', borderRadius: 12, fontSize: 22,
+                width: 42, height: 42, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-title)',
                 cursor: 'pointer',
-                background: emoji === e ? 'var(--ink)' : 'rgba(0,0,0,.06)',
-                boxShadow: emoji === e ? '0 4px 12px rgba(0,0,0,.25)' : 'none',
+                background: emoji === e ? 'var(--ink)' : 'var(--surface-sunken)',
+                boxShadow: emoji === e ? 'var(--e1)' : 'none',
                 transition: 'all .15s',
               }}>{e}</button>
             ))}
@@ -1024,7 +852,7 @@ function AddCategorySheet({ onAdd, onCancel }) {
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 8, letterSpacing: '.08em' }}>שם הקטגוריה</div>
+          <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 8, letterSpacing: '.08em' }}>שם הקטגוריה</div>
           <input
             value={name}
             onChange={e => setName(e.target.value)}
@@ -1032,77 +860,25 @@ function AddCategorySheet({ onAdd, onCancel }) {
             placeholder="לדוגמה: נשנושים, ממרחים…"
             autoFocus
             style={{
-              width: '100%', border: 'none', borderRadius: 16,
-              padding: '12px 16px', fontSize: 15,
-              background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
+              width: '100%', border: 'none', borderRadius: 'var(--r-md)',
+              padding: '12px 16px', fontSize: 'var(--t-body)',
+              background: 'var(--surface-sunken)', color: 'var(--ink)',
               fontFamily: 'inherit', outline: 'none', textAlign: 'right',
             }}
           />
         </div>
 
         <button onClick={confirm} disabled={!name.trim()} style={{
-          width: '100%', border: 'none', borderRadius: 18,
+          width: '100%', border: 'none', borderRadius: 'var(--r-md)',
           padding: '14px 0',
-          background: name.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
-          color: name.trim() ? '#fff' : 'var(--ink-soft)',
-          fontSize: 15, fontWeight: 700,
+          background: name.trim() ? 'var(--ink)' : 'var(--line)',
+          color: name.trim() ? 'var(--bg)' : 'var(--ink-soft)',
+          fontSize: 'var(--t-body)', fontWeight: 700,
           fontFamily: 'var(--font-display)', cursor: name.trim() ? 'pointer' : 'default',
           transition: 'all .2s',
         }}>הוסיפי קטגוריה</button>
       </div>
       <style>{`@keyframes catSlide{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// StatusBar — top of phone screen, dynamic ink color
-// ───────────────────────────────────────────────────────────
-function StatusBar({ ink = '#2c1d27', time = '9:30' }) {
-  return (
-    <div style={{
-      height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 22px', fontSize: 13, fontWeight: 600, color: ink, position: 'relative', flexShrink: 0,
-    }}>
-      <span style={{ flex: 1 }}>{time}</span>
-      <div style={{
-        position: 'absolute', left: '50%', top: 8, transform: 'translateX(-50%)',
-        width: 18, height: 18, borderRadius: '50%', background: '#1b1620',
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
-        <svg width="16" height="11" viewBox="0 0 16 11" fill={ink}><path d="M8 11L.7 3.7a10.4 10.4 0 0 1 14.6 0L8 11z"/></svg>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill={ink}><path d="M13 13V1L1 13h12z"/></svg>
-        <span style={{ fontSize: 12 }}>86%</span>
-        <svg width="22" height="11" viewBox="0 0 22 11" fill="none" stroke={ink} strokeWidth="1.2">
-          <rect x="1" y="1" width="18" height="9" rx="2"/>
-          <rect x="2.5" y="2.5" width="14" height="6" rx="1" fill={ink} stroke="none"/>
-          <rect x="20" y="3.5" width="1.5" height="4" rx=".5" fill={ink} stroke="none"/>
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// Phone frame — fixed-aspect device shell with status bar
-// ───────────────────────────────────────────────────────────
-function Phone({ children, statusInk = '#2c1d27', bg = 'transparent', width = 390, height = 844 }) {
-  return (
-    <div style={{
-      width, height, borderRadius: 48,
-      background: bg,
-      boxShadow: '0 50px 100px -30px rgba(40,15,30,.55), 0 0 0 12px #1c1620, 0 0 0 13px #3a2e36',
-      overflow: 'hidden', position: 'relative',
-      display: 'flex', flexDirection: 'column',
-    }}>
-      <StatusBar ink={statusInk} />
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>{children}</div>
-      {/* home indicator */}
-      <div style={{
-        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-        width: 130, height: 5, borderRadius: 999, background: statusInk, opacity: .35,
-        zIndex: 100, pointerEvents: 'none',
-      }} />
     </div>
   );
 }
@@ -1119,7 +895,7 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
       <div style={{
         borderRadius: 'var(--radius-card)', minHeight: cardH,
-        background: 'rgba(255,255,255,.55)',
+        background: 'var(--glass)',
         boxShadow: 'var(--shadow-card)', overflow: 'visible',
       }}>
         <div style={{
@@ -1127,11 +903,11 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
           padding: `${isCompact ? 14 : 18}px 24px`, gap: 8, alignItems: 'center',
         }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ height: isCompact ? 18 : 24, width: '55%', borderRadius: 8, background: 'rgba(0,0,0,.09)' }}/>
-            {!isCompact && <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'rgba(0,0,0,.06)' }}/>}
+            <div style={{ height: isCompact ? 18 : 24, width: '55%', borderRadius: 8, background: 'var(--surface-sunken)' }}/>
+            {!isCompact && <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--surface-sunken)' }}/>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ height: 26, width: 64, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
-              <div style={{ height: 26, width: 44, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
+              <div style={{ height: 26, width: 64, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
+              <div style={{ height: 26, width: 44, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
             </div>
           </div>
           <div style={{ width: imgSize - imgPoke, height: imgSize, flexShrink: 0, position: 'relative' }}>
@@ -1139,7 +915,7 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
               position: 'absolute', top: '50%', insetInlineStart: -imgPoke,
               transform: 'translateY(-50%)',
               width: imgSize, height: imgSize, borderRadius: '50%',
-              background: 'rgba(0,0,0,.07)',
+              background: 'var(--surface-sunken)',
             }}/>
           </div>
         </div>
@@ -1154,7 +930,7 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
 // from the top center. Used in 'grid' density mode.
 // ───────────────────────────────────────────────────────────
 function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
-  const p = PALETTES[recipe.palette];
+  const p = paletteOf(recipe.palette);
   const enabled = useAnimEnabled();
   const enterMs = useAnimMs(500);
   const [mounted, setMounted] = useState(false);
@@ -1165,6 +941,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   }, []);
   useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
 
+  const hasPhoto = !!useRecipePhoto(recipe);
   const inside = recipe.imageMode === 'inside';
   const imgSize = 110;
   const bannerH = 118;
@@ -1175,18 +952,18 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
       aria-label="מועדפים"
       style={{
         position: 'absolute', top: 7, insetInlineEnd: 7,
-        width: 28, height: 28, borderRadius: 999,
-        background: 'rgba(255,255,255,.78)', border: 'none', backdropFilter: 'blur(6px)',
+        width: 28, height: 28, borderRadius: 'var(--r-pill)',
+        background: 'var(--glass)', border: 'none', backdropFilter: 'blur(6px)',
         cursor: 'pointer', display: 'grid', placeItems: 'center',
-        color: recipe.favorite ? '#e34466' : p.ink,
-        boxShadow: '0 2px 8px rgba(0,0,0,.12)', zIndex: 3,
+        color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
+        boxShadow: 'var(--e1)', zIndex: 3,
       }}>
       <FavHeart filled={recipe.favorite}/>
     </button>
   );
 
   // Photo contained in the card — banner on top, title underneath.
-  if (inside) {
+  if (inside && hasPhoto) {
     return (
       <div style={{
         position: 'relative',
@@ -1195,7 +972,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
         transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
       }}>
         <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-          borderRadius: 22, overflow: 'hidden', cursor: 'pointer', position: 'relative',
+          borderRadius: 'var(--r-lg)', overflow: 'hidden', cursor: 'pointer', position: 'relative',
           boxShadow: 'var(--shadow-card)',
           background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
           transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
@@ -1205,13 +982,12 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
             background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
             display: 'grid', placeItems: 'center',
           }}>
-            <span style={{ position: 'absolute', fontSize: 34, opacity: .35 }}>🍽️</span>
             <FoodImage recipeId={recipe.id} width="100%" height={bannerH}
               shape="rounded" radius={0} fit="cover" slotIdSuffix={slotSuffix} readonly />
           </div>
           <div style={{
             padding: '10px 10px 14px', textAlign: 'center',
-            fontWeight: 700, fontSize: 14, lineHeight: 1.25, color: p.ink,
+            fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.25, color: p.ink,
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>{recipe.title}</div>
           {favBtn}
@@ -1223,23 +999,25 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   return (
     <div style={{
       position: 'relative',
-      paddingTop: imgSize / 2,
+      paddingTop: hasPhoto ? imgSize / 2 : 0,
       opacity: mounted ? 1 : 0,
       transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
       transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
       {/* image circle — centered at the top edge of the card */}
-      <div style={{
-        position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-        zIndex: 2, pointerEvents: 'none',
-      }}>
-        <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={slotSuffix} readonly />
-      </div>
+      {hasPhoto && (
+        <div style={{
+          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 2, pointerEvents: 'none',
+        }}>
+          <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={slotSuffix} readonly />
+        </div>
+      )}
 
       {/* card body */}
       <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-        borderRadius: 22,
-        paddingTop: imgSize / 2 + 10,
+        borderRadius: 'var(--r-lg)',
+        paddingTop: hasPhoto ? imgSize / 2 + 10 : 18,
         paddingBottom: 16,
         paddingInline: 10,
         boxShadow: 'var(--shadow-card)',
@@ -1250,7 +1028,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
         transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
       }}>
         <div style={{
-          fontWeight: 700, fontSize: 14, lineHeight: 1.25,
+          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.25,
           color: p.ink,
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
@@ -1265,45 +1043,45 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 // ConfirmDialog — reusable destructive-action confirmation
 // emoji: big icon shown in badge, confirmColor: button color
 // ───────────────────────────────────────────────────────────
-function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', confirmColor = '#e34466', onConfirm, onCancel }) {
+function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', confirmColor = 'var(--danger)', onConfirm, onCancel }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 90,
-      background: 'rgba(28,22,32,.65)',
+      background: 'var(--overlay)',
       backdropFilter: 'blur(14px)',
       display: 'grid', placeItems: 'center',
       padding: 24,
     }} onClick={onCancel}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--cream)',
+        background: 'var(--surface)',
         borderRadius: 36, padding: '36px 28px 28px',
         maxWidth: 340, width: '100%',
-        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
+        boxShadow: 'var(--e3)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
         textAlign: 'center',
         animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
       }}>
         <div style={{
-          width: 76, height: 76, borderRadius: 999,
+          width: 76, height: 76, borderRadius: 'var(--r-pill)',
           background: `${confirmColor}18`,
           display: 'grid', placeItems: 'center',
           fontSize: 36,
-          boxShadow: `0 14px 30px -8px ${confirmColor}44, 0 1px 0 rgba(255,255,255,.6) inset`,
+          boxShadow: 'var(--e2)',
         }}>{emoji}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h2 className="display" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{title}</h2>
-          {body && <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
+          <h2 className="display" style={{ margin: 0, fontSize: 'var(--t-title)', fontWeight: 700, color: 'var(--ink)' }}>{title}</h2>
+          {body && <p style={{ margin: 0, fontSize: 'var(--t-body)', color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
         </div>
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
           <button onClick={onCancel} style={{
-            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
-            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            flex: 1, padding: '16px', border: 'none', borderRadius: 'var(--r-md)',
+            background: 'var(--surface-sunken)', color: 'var(--ink)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)', cursor: 'pointer',
           }}>{cancelLabel}</button>
           <button onClick={onConfirm} style={{
-            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
+            flex: 1.5, padding: '16px', border: 'none', borderRadius: 'var(--r-md)',
             background: confirmColor, color: '#fff',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)', cursor: 'pointer',
             boxShadow: `0 10px 24px -8px ${confirmColor}88`,
           }}
             onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
@@ -1318,8 +1096,8 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  Tilt, FoodArt, FoodImage, getRecipePhoto, useRecipePhoto, ImageGallery, RecipeCardSkeleton,
-  RecipeCard, RecipeCardGrid, Pill, FavHeart,
-  BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
+  FoodImage, getRecipePhoto, useRecipePhoto, ImageGallery, RecipeCardSkeleton,
+  RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
+  BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet,
   ConfirmDialog,
 });

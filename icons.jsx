@@ -54,26 +54,6 @@ const IconUsers = (p) => (
     <path d="M3 21c0-3.866 4.03-6 9-6s9 2.134 9 6" />
   </Icon>
 );
-const IconFire = (p) => (
-  <Icon {...p}>
-    <path d="M12 22c4.5 0 8-3 8-7 0-3-2-5-3-7-1.5-3-1-5-1-5s-3 1.5-4.5 5C10 11 8 11 7 14c-.7 2 0 8 5 8z" />
-  </Icon>
-);
-const IconChef = (p) => (
-  <Icon {...p} strokeWidth={p.strokeWidth || 2.2}>
-    <path d="M7 21h10M8 21v-6M16 21v-6M6 15h12M7 15c-2 0-3-1.5-3-3.5C4 9 6 8 7 8c0-2.5 2-4 5-4s5 1.5 5 4c1 0 3 1 3 3.5 0 2-1 3.5-3 3.5" />
-  </Icon>
-);
-const IconFilter = (p) => (
-  <Icon {...p}>
-    <path d="M3 5h18M6 12h12M10 19h4" />
-  </Icon>
-);
-const IconDownload = (p) => (
-  <Icon {...p}>
-    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-  </Icon>
-);
 const IconUpload = (p) => (
   <Icon {...p}>
     <path d="M12 21V9M7 14l5-5 5 5M5 3h14" />
@@ -90,18 +70,6 @@ const IconShare = (p) => (
     <circle cx="18" cy="6" r="2" />
     <circle cx="18" cy="18" r="2" />
     <path d="M7.7 11l8.6-4M7.7 13l8.6 4" />
-  </Icon>
-);
-const IconBookmark = ({ filled = false, ...p }) => (
-  <Icon {...p} fill={filled ? 'currentColor' : 'none'}>
-    <path d="M6 3h12v18l-6-4-6 4V3z" />
-  </Icon>
-);
-const IconDots = (p) => (
-  <Icon {...p}>
-    <circle cx="5" cy="12" r="1.5" />
-    <circle cx="12" cy="12" r="1.5" />
-    <circle cx="19" cy="12" r="1.5" />
   </Icon>
 );
 const IconExcel = (p) => (
@@ -124,19 +92,6 @@ const IconEdit = (p) => (
 const IconNote = (p) => (
   <Icon {...p}>
     <path d="M5 4h11l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM15 4v5h5M8 13h8M8 17h5" />
-  </Icon>
-);
-const IconChevronLeft = (p) => (
-  <Icon {...p}><path d="M15 6l-6 6 6 6"/></Icon>
-);
-const IconChevronRight = (p) => (
-  <Icon {...p}><path d="M9 6l6 6-6 6"/></Icon>
-);
-const IconImage = (p) => (
-  <Icon {...p}>
-    <rect x="3" y="4" width="18" height="16" rx="2"/>
-    <circle cx="9" cy="10" r="2"/>
-    <path d="M21 16l-5-5-9 9"/>
   </Icon>
 );
 const IconTrash = (p) => (
@@ -293,17 +248,8 @@ const IconBook = (p) => (
 const IconChevronDown = (p) => (
   <Icon {...p}><path d="M6 9l6 6 6-6"/></Icon>
 );
-const IconPrinter = (p) => (
-  <Icon {...p}><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></Icon>
-);
 const IconFilePdf = (p) => (
   <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 0 0 0-3H9v6"/><path d="M14 18h1.5a1.5 1.5 0 0 0 1.5-1.5v-2A1.5 1.5 0 0 0 15.5 13H14z"/></Icon>
-);
-const IconSliders = (p) => (
-  <Icon {...p}><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></Icon>
-);
-const IconMore = (p) => (
-  <Icon {...p} fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></Icon>
 );
 
 function IngredientIcon({ kind = '🍽️', size = 20 }) {
@@ -313,12 +259,11 @@ function IngredientIcon({ kind = '🍽️', size = 20 }) {
 
 Object.assign(window, {
   Icon, IconBack, IconForward, IconHome, IconSearch, IconHeart, IconPlus, IconClose,
-  IconClock, IconUsers, IconFire, IconChef, IconFilter, IconDownload, IconUpload,
-  IconCheck, IconShare, IconBookmark, IconDots, IconExcel, IconWord,
-  IconEdit, IconNote, IconChevronLeft, IconChevronRight, IconImage, IconTrash,
+  IconClock, IconUsers, IconUpload,
+  IconCheck, IconShare, IconExcel, IconWord,
+  IconEdit, IconNote, IconTrash,
   IconGrid, IconRows, IconColumns2,
-  IconBook, IconChevronDown, IconPrinter, IconFilePdf, IconSliders, IconMore,
-  IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
+  IconBook, IconChevronDown, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,
   ING_ICONS, ING_KEY_EMOJI, IngredientIcon,

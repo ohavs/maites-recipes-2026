@@ -152,11 +152,11 @@ function parseCategoryLabel(raw) {
 }
 
 // Pick a palette deterministically from a string so colors are spread.
-const PALETTE_KEYS = ['peach','sky','mint','lavender','pink','yellow'];
 function pickPalette(seed) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return PALETTE_KEYS[h % PALETTE_KEYS.length];
+  const keys = PALETTE_KEYS;
+  return keys[h % keys.length];
 }
 
 // Make a clean id from a Hebrew title.
@@ -516,7 +516,7 @@ function recipesToWordHTML(recipes) {
     .notes { background: #fff7e8; padding: 12px 16px; border-radius: 12px; font-size: 11.5pt; line-height: 1.55; }
   `;
   const colorFor = pk => {
-    const p = PALETTES[pk] || PALETTES.peach;
+    const p = paletteHexOf(pk);
     return { bg: p.bg, bg2: p.bg2, ink: p.ink };
   };
   const recipeHtml = (r, idx) => {
