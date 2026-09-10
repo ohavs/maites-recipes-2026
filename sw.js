@@ -1,4 +1,4 @@
-const CACHE = 'maites-v6';
+const CACHE = 'maites-v7';
 const SHELL = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
