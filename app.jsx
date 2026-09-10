@@ -19,7 +19,10 @@ function App() {
     catch { return CATEGORIES; }
   });
   const [tab, setTab] = $S('home');
-  const [category, setCategory] = $S('all');
+  // Category filter — array of ids; empty means "all"
+  const [catFilter, setCatFilter] = $S([]);
+  const toggleCatFilter = (id) =>
+    setCatFilter(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
   const [showAddCategory, setShowAddCategory] = $S(false);
   const [openRecipeId, setOpenRecipeId] = $S(null);
   const [cookRecipeId, setCookRecipeId] = $S(null);
@@ -44,6 +47,10 @@ function App() {
   const [sharedOwnerUids, setSharedOwnerUids] = $S([]);
   const [sharedWithMe, setSharedWithMe] = $S([]);
   const [sharingRecipe, setSharingRecipe] = $S(null);
+  // Recipe book tab
+  const [bookRecipeId, setBookRecipeId] = $S(null);
+  const [showPrintSheet, setShowPrintSheet] = $S(false);
+  const [printJob, setPrintJob] = $S(null);   // array of recipes being printed
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -257,6 +264,11 @@ function App() {
     e.target.value = '';
   };
 
+  const TABS = ['home', 'book', 'favorites', 'add'];
+  const goTab = (id) => {
+    setTab(TABS.includes(id) ? id : 'home');
+    if (id !== 'book') setBookRecipeId(null);
+  };
   const navTo = (id) => {
     if (tab === 'add' && id !== 'add' && formDirtyRef.current) {
       setPendingNav(id);
@@ -264,17 +276,86 @@ function App() {
       return;
     }
     formDirtyRef.current = false;
-    if (id === 'add')            setTab('add');
-    else if (id === 'favorites') setTab('favorites');
-    else                         setTab('home');
+    goTab(id);
   };
   const confirmNavLeave = () => {
     const id = pendingNav;
     setShowNavGuard(false); setPendingNav(null); formDirtyRef.current = false;
-    if (id === 'add') setTab('add');
-    else if (id === 'favorites') setTab('favorites');
-    else setTab('home');
+    goTab(id);
   };
+
+  // ── Back-gesture support ─────────────────────────────────
+  // Every overlay / non-home tab is mirrored as a browser history entry, so
+  // the Android back gesture (and the hardware back button) pops one layer
+  // instead of closing the app.
+  const layers = [];
+  if (tab !== 'home')      layers.push('tab');
+  if (openRecipeId)        layers.push('recipe');
+  if (bookRecipeId)        layers.push('bookpage');
+  if (editingRecipeId)     layers.push('edit');
+  if (cookRecipeId)        layers.push('cook');
+  if (sharingRecipe)       layers.push('share');
+  if (showAccountPanel)    layers.push('account');
+  if (showManageCategories)layers.push('managecats');
+  if (showAddCategory)     layers.push('addcat');
+  if (showPrintSheet)      layers.push('printsheet');
+  if (deletingRecipeId)    layers.push('delete');
+  if (showNavGuard)        layers.push('navguard');
+
+  const layersRef = $R(layers);
+  layersRef.current = layers;
+  const pushedRef = $R(0);
+  const ignorePopRef = $R(0);
+
+  const closeTopLayer = () => {
+    const ls = layersRef.current;
+    const top = ls[ls.length - 1];
+    switch (top) {
+      case 'navguard':   setShowNavGuard(false); setPendingNav(null); break;
+      case 'delete':     setDeletingRecipeId(null); break;
+      case 'printsheet': setShowPrintSheet(false); break;
+      case 'addcat':     setShowAddCategory(false); break;
+      case 'managecats': setShowManageCategories(false); break;
+      case 'account':    setShowAccountPanel(false); break;
+      case 'share':      setSharingRecipe(null); break;
+      case 'cook':       setCookRecipeId(null); break;
+      case 'edit':       setEditingRecipeId(null); break;
+      case 'bookpage':   setBookRecipeId(null); break;
+      case 'recipe':     setOpenRecipeId(null); break;
+      case 'tab':        navTo('home'); break;
+      default: break;
+    }
+  };
+
+  $E(() => {
+    try { history.replaceState({ maites: 0 }, ''); } catch {}
+    const onPop = () => {
+      // Entries we popped ourselves (when a layer was closed from the UI).
+      if (ignorePopRef.current > 0) { ignorePopRef.current--; return; }
+      if (layersRef.current.length === 0) return;  // at root → let the app close
+      pushedRef.current = Math.max(0, pushedRef.current - 1);
+      closeTopLayer();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const layerKey = layers.join('|');
+  $E(() => {
+    const next = layers.length;
+    const prev = pushedRef.current;
+    if (next > prev) {
+      for (let i = prev; i < next; i++) {
+        try { history.pushState({ maites: i + 1 }, ''); } catch {}
+      }
+      pushedRef.current = next;
+    } else if (next < prev) {
+      const diff = prev - next;
+      pushedRef.current = next;
+      ignorePopRef.current += diff;
+      try { history.go(-diff); } catch { ignorePopRef.current -= diff; }
+    }
+  }, [layerKey]);
 
   const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
   const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe);
@@ -331,8 +412,9 @@ function App() {
               density={density}
               onDensity={(d) => { setDensity(d); setTweak('density', d); try { localStorage.setItem('maites.density', d); } catch {} }}
               variant={t.cardVariant}
-              category={category}
-              onCategory={setCategory}
+              category={catFilter}
+              onCategory={toggleCatFilter}
+              onClearCategory={() => setCatFilter([])}
               sharedKey={`${t.cardVariant}-${density}`}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
@@ -345,6 +427,17 @@ function App() {
                 await db_removeSharedRecipe(shareId).catch(() => {});
                 setSharedWithMe(s => s.filter(r => r._shareId !== shareId));
               }}
+            />
+          )}
+          {tab === 'book' && (
+            <BookScreen
+              recipes={recipes}
+              categories={categories}
+              openId={bookRecipeId}
+              onOpenPage={(id) => setBookRecipeId(id)}
+              onClosePage={() => setBookRecipeId(null)}
+              onPrint={(list) => { setShowPrintSheet(false); setPrintJob(list); }}
+              onSelectPrint={() => setShowPrintSheet(true)}
             />
           )}
           {tab === 'favorites' && (
@@ -403,7 +496,7 @@ function App() {
 
         {/* Overlay: edit recipe */}
         {editingRecipe && (
-          <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 10 }}>
+          <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 24 }}>
             <EditRecipeScreen
               recipe={editingRecipe}
               onSave={updateRecipe}
@@ -515,6 +608,14 @@ function App() {
             }}
           />
         )}
+        {showPrintSheet && (
+          <PrintSelectSheet
+            recipes={recipes}
+            categories={categories}
+            onPrint={(list) => { setShowPrintSheet(false); setPrintJob(list); }}
+            onClose={() => setShowPrintSheet(false)}
+          />
+        )}
         {showNavGuard && (
           <UnsavedChangesDialog
             onStay={() => { setShowNavGuard(false); setPendingNav(null); }}
@@ -583,6 +684,14 @@ function App() {
           @keyframes toastIn{0%{opacity:0;transform:translate(-50%,12px)}100%{opacity:1;transform:translate(-50%,0)}}
         `}</style>
       </div>
+
+      {printJob && (
+        <PrintBook
+          recipes={printJob}
+          categories={categories}
+          onDone={() => setPrintJob(null)}
+        />
+      )}
 
       {/* Tweaks panel — position:fixed, floats above the app */}
       <TweaksPanel title="Tweaks">

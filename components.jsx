@@ -186,7 +186,8 @@ function FoodArt({ id, size = 200 }) {
 // FoodImage — circular slot the user can drag a real photo into.
 // Falls back to FoodArt SVG when empty.
 // ───────────────────────────────────────────────────────────
-function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }) {
+function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false,
+                    shape = 'circle', radius = 20, fit = 'contain', width, height }) {
   const slotRef = useRef(null);
   useEffect(() => {
     const el = slotRef.current;
@@ -211,22 +212,47 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }
     inject();
     const t = setTimeout(inject, 80);
     return () => clearTimeout(t);
-  }, [readonly]);
+  }, [readonly, shape, fit]);
 
+  const w = width || size, h = height || size;
   return (
     <div style={{
-      position: 'relative', width: size, height: size, flexShrink: 0,
+      position: 'relative', width: w, height: h, flexShrink: 0,
       ...(readonly ? { pointerEvents: 'none', touchAction: 'pan-y' } : {}),
     }}>
       <image-slot ref={slotRef}
         id={`food-${recipeId}${slotIdSuffix}`}
-        shape="circle"
-        fit="contain"
+        shape={shape}
+        radius={radius}
+        fit={fit}
         placeholder=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       ></image-slot>
     </div>
   );
+}
+
+// Returns the stored data-URL for a recipe's main photo, or null.
+// Used by the recipe book / print views, which need a plain <img>.
+function getRecipePhoto(recipe, slot) {
+  if (!recipe || !window.__getImageSlot) return null;
+  const s = slot || recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main';
+  const d = window.__getImageSlot(`food-${recipe.id}-${s}`);
+  return d && d.u ? d.u : null;
+}
+
+// Same, but re-checks a few times after mount because the image store
+// hydrates asynchronously from Firestore.
+function useRecipePhoto(recipe, slot) {
+  const [url, setUrl] = useState(() => getRecipePhoto(recipe, slot));
+  useEffect(() => {
+    let alive = true;
+    const check = () => { if (alive) setUrl(getRecipePhoto(recipe, slot)); };
+    check();
+    const ts = [200, 700, 1800].map(ms => setTimeout(check, ms));
+    return () => { alive = false; ts.forEach(clearTimeout); };
+  }, [recipe && recipe.id, slot]);
+  return url;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -342,13 +368,17 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   // Card geometry — comfy: tall, the circle pokes out hard.
   // compact: thinner row, smaller protruding circle.
   const isCompact = density === 'compact';
+  // Per-recipe choice: 'inside' keeps the photo within the card bounds,
+  // anything else (default) lets the circle poke out past the edge.
+  const inside   = recipe.imageMode === 'inside';
   const cardH    = isCompact ? 116 : 168;
-  const imgSize  = isCompact ? 132 : 198;
+  const padY     = isCompact ? 14 : 18;
+  const imgSize  = inside ? cardH - padY * 2 : (isCompact ? 132 : 198);
   const titleSize= isCompact ? 19 : 26;
   const descClamp= isCompact ? 1 : 2;
   const padX     = isCompact ? 20 : 24;
   // How far the circle reaches past the card's start edge (RTL = right).
-  const imgPokeOut = Math.round(imgSize * (isCompact ? 0.18 : 0.22));
+  const imgPokeOut = inside ? 0 : Math.round(imgSize * (isCompact ? 0.18 : 0.22));
 
   const wrapperStyle = {
     position: 'relative',
@@ -390,7 +420,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
         {/* RTL row: text on right, big circle photo on left poking out */}
         <div style={{
           position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${isCompact ? 14 : 18}px ${padX}px`, gap: 8, alignItems: 'center',
+          padding: `${padY}px ${padX}px`, gap: inside ? 14 : 8, alignItems: 'center',
         }}>
           {/* text */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -407,8 +437,9 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
             )}
           </div>
 
-          {/* circle photo — sits on the inline-START side (RTL → right) of
-             the card and pokes OUT past that edge. */}
+          {/* photo — 'inside' keeps a rounded thumbnail within the card,
+             otherwise the circle sits on the inline-START side (RTL → right)
+             and pokes OUT past that edge. */}
           <div style={{
             position: 'relative',
             width: imgSize - imgPokeOut, // space the row reserves
@@ -419,8 +450,22 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               position: 'absolute',
               top: '50%', insetInlineStart: -imgPokeOut,
               transform: 'translateY(-50%)',
+              ...(inside ? {
+                borderRadius: 20, overflow: 'hidden',
+                boxShadow: '0 8px 20px -8px rgba(0,0,0,.35), 0 0 0 3px rgba(255,255,255,.55)',
+                background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
+                display: 'grid', placeItems: 'center',
+              } : {}),
             }}>
-              <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
+              {inside && (
+                <span style={{
+                  position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+                  fontSize: Math.round(imgSize * .34), opacity: .35,
+                }}>🍽️</span>
+              )}
+              <FoodImage recipeId={recipe.id} size={imgSize}
+                shape={inside ? 'rounded' : 'circle'} radius={20} fit={inside ? 'cover' : 'contain'}
+                slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
             </div>
           </div>
         </div>
@@ -605,6 +650,7 @@ function FavHeart({ filled }) {
 function BottomNav({ active, onChange, accent = '#e34466' }) {
   const items = [
     { id: 'home',      icon: IconHome,     label: 'בית' },
+    { id: 'book',      icon: IconBook,     label: 'ספר' },
     { id: 'favorites', icon: IconHeart,    label: 'מועדפים' },
     { id: 'add',       icon: IconPlus,     label: 'הוספה' },
   ];
@@ -625,8 +671,8 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
           <button key={it.id} onClick={() => onChange(it.id)} aria-label={it.label}
             style={{
               flex: 1, height: 46, border: 'none', cursor: 'pointer', background: 'transparent',
-              borderRadius: 999, position: 'relative',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              borderRadius: 999, position: 'relative', minWidth: 0, padding: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               color: isActive ? '#fff' : 'var(--ink)',
               fontWeight: 700, fontSize: 13,
               transition: 'color .2s',
@@ -639,7 +685,7 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
               }} />
             )}
             <I size={20} strokeWidth={isActive ? 2.4 : 2}/>
-            {isActive && <span>{it.label}</span>}
+            {isActive && <span style={{ whiteSpace: 'nowrap' }}>{it.label}</span>}
           </button>
         );
       })}
@@ -649,52 +695,141 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// CategoryStrip — horizontally scrolling pills
+// CategoryDropdown — multi-select filter menu.
+// `selected` is an array of category ids; an empty array means
+// "all". Opens a styled popover with checkable rows.
 // ───────────────────────────────────────────────────────────
-function CategoryStrip({ active, onChange, categories: catsProp, onAdd, onManage }) {
-  const cats = catsProp || CATEGORIES;
-  const btnBase = {
-    flex: '0 0 auto', border: 'none', cursor: 'pointer',
-    width: 40, height: 40, borderRadius: 999, fontFamily: 'inherit',
-    background: 'rgba(255,255,255,.7)', color: 'var(--ink-soft)',
-    boxShadow: '0 2px 6px rgba(0,0,0,.07)',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all .2s', fontSize: 17,
-  };
+function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsProp, counts = {}, onAdd, onManage, total = 0 }) {
+  const cats = (catsProp || CATEGORIES).filter(c => c.id !== 'all');
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const chosen = cats.filter(c => selected.includes(c.id));
+  const label = chosen.length === 0
+    ? 'כל הקטגוריות'
+    : chosen.length === 1
+      ? chosen[0].label
+      : `${chosen[0].label} +${chosen.length - 1}`;
+  const emojis = chosen.length ? chosen.slice(0, 3).map(c => c.emoji).join(' ') : '🍽️';
+
   return (
-    <div className="scroll-y" style={{
-      display: 'flex', flexDirection: 'row-reverse', gap: 10,
-      padding: '4px 22px 18px', overflowX: 'auto', overflowY: 'hidden',
-      scrollbarWidth: 'none',
-    }}>
-      {cats.map(c => {
-        const isActive = active === c.id;
-        return (
-          <button key={c.id} onClick={() => onChange(c.id)}
-            style={{
-              flex: '0 0 auto', border: 'none', cursor: 'pointer',
-              padding: '10px 16px', borderRadius: 999,
-              fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-              background: isActive ? 'var(--ink)' : 'rgba(255,255,255,.7)',
-              color: isActive ? '#fff' : 'var(--ink)',
-              boxShadow: isActive ? '0 8px 18px -6px rgba(0,0,0,.4)' : '0 2px 6px rgba(0,0,0,.07)',
-              transition: 'all .2s',
-              display: 'inline-flex', alignItems: 'center', gap: 6,
+    <div ref={wrapRef} style={{ position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
+      <button onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox" aria-expanded={open}
+        style={{
+          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 9,
+          padding: '0 14px 0 12px', height: 44, borderRadius: 999,
+          background: open || chosen.length ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+          color: open || chosen.length ? '#fff' : 'var(--ink)',
+          boxShadow: open ? '0 10px 26px -8px rgba(64,33,50,.45)' : '0 6px 18px -6px rgba(64,33,50,.2)',
+          transition: 'background .2s, color .2s, box-shadow .2s',
+        }}>
+        <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{emojis}</span>
+        <span style={{
+          fontSize: 14.5, fontWeight: 700, flex: 1, textAlign: 'start',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>{label}</span>
+        {chosen.length > 1 && (
+          <span style={{
+            fontSize: 11, fontWeight: 800, borderRadius: 999, padding: '2px 7px',
+            background: 'rgba(255,255,255,.25)', flexShrink: 0,
+          }}>{chosen.length}</span>
+        )}
+        <span style={{
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+          transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .22s',
+        }}><IconChevronDown size={16} strokeWidth={2.4}/></span>
+      </button>
+
+      {open && (
+        <div role="listbox" style={{
+          position: 'absolute', top: 52, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
+          background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(18px) saturate(160%)',
+          borderRadius: 22, zIndex: 40, overflow: 'hidden',
+          boxShadow: '0 24px 60px -14px rgba(64,33,50,.4), 0 2px 0 rgba(255,255,255,.8) inset',
+          animation: 'ddIn .2s cubic-bezier(.2,1.1,.4,1)', transformOrigin: 'top center',
+        }}>
+          <div className="scroll-y" style={{ maxHeight: 300, padding: 6 }}>
+            <DropRow emoji="🍽️" label="הכל" count={total} checked={selected.length === 0}
+              onClick={() => { onClear(); }} />
+            <div style={{ height: 1, background: 'rgba(0,0,0,.07)', margin: '5px 12px' }}/>
+            {cats.map(c => (
+              <DropRow key={c.id} emoji={c.emoji} label={c.label} count={counts[c.id] || 0}
+                checked={selected.includes(c.id)} onClick={() => onToggle(c.id)}/>
+            ))}
+            {cats.length === 0 && (
+              <div style={{ padding: '14px 14px', fontSize: 13, color: 'var(--ink-soft)', textAlign: 'center' }}>
+                אין עדיין קטגוריות
+              </div>
+            )}
+          </div>
+          {(onAdd || onManage) && (
+            <div style={{
+              display: 'flex', gap: 8, padding: 10, borderTop: '1px solid rgba(0,0,0,.07)',
+              background: 'rgba(247,168,184,.10)',
             }}>
-            <span style={{ fontSize: 16 }}>{c.emoji}</span>{c.label}
-          </button>
-        );
-      })}
-      {onAdd && <button onClick={onAdd} style={btnBase}>+</button>}
-      {onManage && (
-        <button onClick={onManage} style={btnBase} title="ניהול קטגוריות">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </button>
+              {onAdd && (
+                <button onClick={() => { setOpen(false); onAdd(); }} style={ddFootBtn}>
+                  <IconPlus size={14} strokeWidth={2.6}/> קטגוריה
+                </button>
+              )}
+              {onManage && (
+                <button onClick={() => { setOpen(false); onManage(); }} style={ddFootBtn}>
+                  <IconEdit size={13} strokeWidth={2.4}/> ניהול
+                </button>
+              )}
+            </div>
+          )}
+          <style>{`@keyframes ddIn{0%{opacity:0;transform:translateY(-8px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+        </div>
       )}
     </div>
+  );
+}
+
+const ddFootBtn = {
+  flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  padding: '9px 10px', borderRadius: 999, background: 'rgba(255,255,255,.9)',
+  color: 'var(--ink)', fontSize: 12.5, fontWeight: 700,
+  boxShadow: '0 3px 8px rgba(0,0,0,.08)',
+};
+
+function DropRow({ emoji, label, count, checked, onClick }) {
+  return (
+    <button role="option" aria-selected={checked} onClick={onClick}
+      style={{
+        width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        display: 'flex', alignItems: 'center', gap: 10, textAlign: 'start',
+        padding: '9px 10px', borderRadius: 14, background: checked ? 'rgba(247,168,184,.22)' : 'transparent',
+        color: 'var(--ink)', transition: 'background .15s',
+      }}>
+      <span style={{
+        width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+        display: 'grid', placeItems: 'center', fontSize: 16,
+        background: checked ? 'rgba(255,255,255,.9)' : 'rgba(0,0,0,.04)',
+      }}>{emoji}</span>
+      <span style={{ flex: 1, fontSize: 14.5, fontWeight: checked ? 800 : 600, minWidth: 0,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+      <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-soft)', flexShrink: 0 }}>{count}</span>
+      <span style={{
+        width: 20, height: 20, borderRadius: 7, flexShrink: 0,
+        display: 'grid', placeItems: 'center',
+        background: checked ? 'var(--ink)' : 'transparent',
+        boxShadow: checked ? 'none' : 'inset 0 0 0 2px rgba(0,0,0,.16)',
+        color: '#fff', transition: 'background .15s',
+      }}>{checked && <IconCheck size={12} strokeWidth={3}/>}</span>
+    </button>
   );
 }
 
@@ -1030,7 +1165,60 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   }, []);
   useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
 
+  const inside = recipe.imageMode === 'inside';
   const imgSize = 110;
+  const bannerH = 118;
+  const slotSuffix = `-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`;
+
+  const favBtn = (
+    <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
+      aria-label="מועדפים"
+      style={{
+        position: 'absolute', top: 7, insetInlineEnd: 7,
+        width: 28, height: 28, borderRadius: 999,
+        background: 'rgba(255,255,255,.78)', border: 'none', backdropFilter: 'blur(6px)',
+        cursor: 'pointer', display: 'grid', placeItems: 'center',
+        color: recipe.favorite ? '#e34466' : p.ink,
+        boxShadow: '0 2px 8px rgba(0,0,0,.12)', zIndex: 3,
+      }}>
+      <FavHeart filled={recipe.favorite}/>
+    </button>
+  );
+
+  // Photo contained in the card — banner on top, title underneath.
+  if (inside) {
+    return (
+      <div style={{
+        position: 'relative',
+        opacity: mounted ? 1 : 0,
+        transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
+        transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
+      }}>
+        <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
+          borderRadius: 22, overflow: 'hidden', cursor: 'pointer', position: 'relative',
+          boxShadow: 'var(--shadow-card)',
+          background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
+          transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
+        }}>
+          <div style={{
+            position: 'relative', width: '100%', height: bannerH,
+            background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
+            display: 'grid', placeItems: 'center',
+          }}>
+            <span style={{ position: 'absolute', fontSize: 34, opacity: .35 }}>🍽️</span>
+            <FoodImage recipeId={recipe.id} width="100%" height={bannerH}
+              shape="rounded" radius={0} fit="cover" slotIdSuffix={slotSuffix} readonly />
+          </div>
+          <div style={{
+            padding: '10px 10px 14px', textAlign: 'center',
+            fontWeight: 700, fontSize: 14, lineHeight: 1.25, color: p.ink,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>{recipe.title}</div>
+          {favBtn}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -1045,11 +1233,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
         position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
         zIndex: 2, pointerEvents: 'none',
       }}>
-        <FoodImage
-          recipeId={recipe.id} size={imgSize}
-          slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`}
-          readonly
-        />
+        <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={slotSuffix} readonly />
       </div>
 
       {/* card body */}
@@ -1071,19 +1255,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>{recipe.title}</div>
-        {/* fav button */}
-        <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
-          aria-label="מועדפים"
-          style={{
-            position: 'absolute', top: 7, insetInlineEnd: 7,
-            width: 28, height: 28, borderRadius: 999,
-            background: 'rgba(255,255,255,.78)', border: 'none',
-            cursor: 'pointer', display: 'grid', placeItems: 'center',
-            color: recipe.favorite ? '#e34466' : p.ink,
-            boxShadow: '0 2px 8px rgba(0,0,0,.12)',
-          }}>
-          <FavHeart filled={recipe.favorite}/>
-        </button>
+        {favBtn}
       </div>
     </div>
   );
@@ -1146,8 +1318,8 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
+  Tilt, FoodArt, FoodImage, getRecipePhoto, useRecipePhoto, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, Pill, FavHeart,
-  BottomNav, CategoryStrip, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
+  BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
   ConfirmDialog,
 });

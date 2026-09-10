@@ -287,6 +287,25 @@ const ING_ICONS = {
   nuts:       { emoji:'🥜',  label:'אגוזים' },
 };
 
+const IconBook = (p) => (
+  <Icon {...p}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></Icon>
+);
+const IconChevronDown = (p) => (
+  <Icon {...p}><path d="M6 9l6 6 6-6"/></Icon>
+);
+const IconPrinter = (p) => (
+  <Icon {...p}><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></Icon>
+);
+const IconFilePdf = (p) => (
+  <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 0 0 0-3H9v6"/><path d="M14 18h1.5a1.5 1.5 0 0 0 1.5-1.5v-2A1.5 1.5 0 0 0 15.5 13H14z"/></Icon>
+);
+const IconSliders = (p) => (
+  <Icon {...p}><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></Icon>
+);
+const IconMore = (p) => (
+  <Icon {...p} fill="currentColor" stroke="none"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></Icon>
+);
+
 function IngredientIcon({ kind = '🍽️', size = 20 }) {
   const emoji = ING_KEY_EMOJI[kind] || kind || '🍽️';
   return <span style={{ fontSize: Math.round(size * 0.95), lineHeight: 1, display: 'inline-block' }}>{emoji}</span>;
@@ -298,6 +317,7 @@ Object.assign(window, {
   IconCheck, IconShare, IconBookmark, IconDots, IconExcel, IconWord,
   IconEdit, IconNote, IconChevronLeft, IconChevronRight, IconImage, IconTrash,
   IconGrid, IconRows, IconColumns2,
+  IconBook, IconChevronDown, IconPrinter, IconFilePdf, IconSliders, IconMore,
   IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,

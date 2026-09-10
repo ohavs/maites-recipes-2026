@@ -7,86 +7,103 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
-function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
+function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
+  const selectedCats = Array.isArray(category) ? category : (category && category !== 'all' ? [category] : []);
 
   const filtered = uM(() => {
     const qq = q.trim().toLowerCase();
     let r = recipes;
-    if (category !== 'all') r = r.filter(x => x.category === category);
+    if (selectedCats.length) r = r.filter(x => selectedCats.includes(x.category));
     if (!qq) return r;
     return r.filter(x =>
       x.title.toLowerCase().includes(qq)
       || (x.description || '').toLowerCase().includes(qq)
       || (x.ingredients || []).some(i => (i.name || '').toLowerCase().includes(qq))
     );
-  }, [recipes, category, q]);
+  }, [recipes, selectedCats.join(','), q]);
 
-  // Only show categories that have at least one recipe
-  const activeCats = uM(() => {
-    const used = new Set(recipes.map(r => r.category).filter(Boolean));
+  // Only show categories that have at least one recipe, with per-category counts
+  const { activeCats, counts } = uM(() => {
+    const counts = {};
+    recipes.forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
     const all = categories || CATEGORIES;
-    return [
-      all.find(c => c.id === 'all') || { id: 'all', label: 'הכל', emoji: '🍽️' },
-      ...all.filter(c => c.id !== 'all' && used.has(c.id)),
-    ];
+    return {
+      counts,
+      activeCats: all.filter(c => c.id !== 'all' && counts[c.id] > 0),
+    };
   }, [recipes, categories]);
 
   return (
     <div className="scroll-y" style={{ height: '100%', position: 'relative' }}>
       {/* Brand bar */}
       <div style={{
-        padding: '14px 22px 4px',
+        padding: '14px 22px 0',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
       }}>
         <h1 className="display" data-comment-anchor="home-brand" style={{
           margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.01em',
           color: 'var(--ink)', fontFamily: 'var(--font-display)',
         }}>Maites</h1>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
-            aria-label="פריסת תצוגה" title="פריסה"
+        {currentUser && (
+          <button onClick={onOpenAccount} aria-label="חשבון"
             style={{
               width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: density !== 'comfy' ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-              color: density !== 'comfy' ? '#fff' : 'var(--ink)',
-              display: 'grid', placeItems: 'center',
+              background: 'rgba(255,255,255,.85)', padding: 0, overflow: 'hidden',
               boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
-              transition: 'all .2s',
+              display: 'grid', placeItems: 'center', flexShrink: 0,
             }}>
-            {density === 'comfy' ? <IconRows size={18} strokeWidth={2.2}/>
-              : density === 'compact' ? <IconGrid size={18} strokeWidth={2.2}/>
-              : <IconColumns2 size={18} strokeWidth={2.2}/>}
+            {currentUser.photoURL
+              ? <img src={currentUser.photoURL} style={{ width: 40, height: 40, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
+              : <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>
+                  {(currentUser.displayName || currentUser.email || '?')[0].toUpperCase()}
+                </span>
+            }
           </button>
-          <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
-            style={{
-              width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: searching ? 'var(--ink)' : 'rgba(255,255,255,.85)',
-              color: searching ? '#fff' : 'var(--ink)',
-              display: 'grid', placeItems: 'center',
-              boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
-              transition: 'all .2s',
-            }}>
-            <IconSearch size={18} strokeWidth={2.2}/>
-          </button>
-          {currentUser && (
-            <button onClick={onOpenAccount} aria-label="חשבון"
-              style={{
-                width: 40, height: 40, borderRadius: 999, border: 'none', cursor: 'pointer',
-                background: 'rgba(255,255,255,.85)', padding: 0, overflow: 'hidden',
-                boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
-                display: 'grid', placeItems: 'center', flexShrink: 0,
-              }}>
-              {currentUser.photoURL
-                ? <img src={currentUser.photoURL} style={{ width: 40, height: 40, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-                : <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>
-                    {(currentUser.displayName || currentUser.email || '?')[0].toUpperCase()}
-                  </span>
-              }
-            </button>
-          )}
-        </div>
+        )}
+      </div>
+
+      {/* Filter toolbar — dropdown (start) + layout & search (end) */}
+      <div style={{
+        padding: '12px 22px 0', display: 'flex', alignItems: 'center', gap: 8,
+        position: 'relative', zIndex: 4,
+      }}>
+        <CategoryDropdown
+          selected={selectedCats}
+          onToggle={onCategory}
+          onClear={onClearCategory}
+          categories={activeCats}
+          counts={counts}
+          total={recipes.length}
+          onAdd={onAddCategory}
+          onManage={onManageCategories}
+        />
+        <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
+          aria-label="פריסת תצוגה" title="פריסה"
+          style={{
+            width: 44, height: 44, borderRadius: 999, border: 'none', cursor: 'pointer', flexShrink: 0,
+            background: density !== 'comfy' ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+            color: density !== 'comfy' ? '#fff' : 'var(--ink)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+            transition: 'all .2s',
+          }}>
+          {density === 'comfy' ? <IconRows size={18} strokeWidth={2.2}/>
+            : density === 'compact' ? <IconGrid size={18} strokeWidth={2.2}/>
+            : <IconColumns2 size={18} strokeWidth={2.2}/>}
+        </button>
+        <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
+          style={{
+            width: 44, height: 44, borderRadius: 999, border: 'none', cursor: 'pointer', flexShrink: 0,
+            background: searching || q ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+            color: searching || q ? '#fff' : 'var(--ink)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 6px 18px -6px rgba(64,33,50,.2)',
+            transition: 'all .2s',
+          }}>
+          <IconSearch size={18} strokeWidth={2.2}/>
+        </button>
       </div>
 
       {/* Inline search input — expands when search is on */}
@@ -119,9 +136,39 @@ function HomeScreen({ recipes, recipesLoaded = true, onOpen, onToggleFav, densit
         </div>
       </div>
 
-      <div style={{ padding: '12px 0 4px' }}>
-        <CategoryStrip active={category} onChange={onCategory} categories={activeCats} onAdd={onAddCategory} onManage={onManageCategories}/>
-      </div>
+      {/* Active filter chips — quick removal without opening the menu */}
+      {selectedCats.length > 0 && (
+        <div className="scroll-y" style={{
+          display: 'flex', gap: 8, padding: '12px 22px 0', overflowX: 'auto',
+        }}>
+          {selectedCats.map(id => {
+            const c = (categories || []).find(x => x.id === id);
+            if (!c) return null;
+            return (
+              <button key={id} onClick={() => onCategory(id)} style={{
+                flex: '0 0 auto', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '6px 10px 6px 8px', borderRadius: 999,
+                background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+                fontSize: 12.5, fontWeight: 700, boxShadow: '0 3px 10px -3px rgba(64,33,50,.25)',
+              }}>
+                <span>{c.emoji}</span>{c.label}
+                <span style={{
+                  width: 16, height: 16, borderRadius: 999, background: 'rgba(0,0,0,.08)',
+                  display: 'grid', placeItems: 'center',
+                }}><IconClose size={9} strokeWidth={3}/></span>
+              </button>
+            );
+          })}
+          <button onClick={onClearCategory} style={{
+            flex: '0 0 auto', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            padding: '6px 12px', borderRadius: 999, background: 'transparent',
+            color: 'var(--ink-soft)', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline',
+          }}>ניקוי</button>
+        </div>
+      )}
+
+      <div style={{ height: 14 }}/>
 
       {sharedWithMe && sharedWithMe.length > 0 && !q && (
         <SharedRecipesSection items={sharedWithMe} onOpen={onOpenShared} onRemove={onRemoveShared}/>
@@ -170,8 +217,8 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
 
   const onScroll = (e) => setScrollY(e.target.scrollTop);
 
-  const HERO_H = 360;          // hero panel height
-  const BODY_OVERLAP = 32;     // how much body covers the hero by default
+  const HERO_H = 258;          // hero panel height (compact — body sits higher)
+  const BODY_OVERLAP = 30;     // how much body covers the hero by default
 
   // Parallax: as user scrolls up, the image translates up faster than the
   // hero (which is sticky), so the image appears to slide BEHIND the body.
@@ -181,7 +228,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: '#fbeef2',
+      position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 20,
       transform: mounted ? 'translateY(0)' : 'translateY(40px)',
       opacity: mounted ? 1 : 0,
       transition: `transform ${openMs}ms cubic-bezier(.2,.9,.25,1.1), opacity ${Math.round(openMs*.6)}ms ease-out`,
@@ -203,14 +250,14 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             <DecorScatter palette={p}/>
           </div>
           <div style={{
-            position: 'absolute', left: 0, right: 0, top: 40,
+            position: 'absolute', left: 0, right: 0, top: 58,
             transform: `translateY(${-imgTranslate}px)`,
             transition: 'transform .05s linear',
             opacity: imgOpacity,
           }}>
             <ImageGallery recipeId={recipe.id}
               slots={recipe.gallery && recipe.gallery.length ? recipe.gallery : ['main']}
-              size={250}
+              size={168}
             />
           </div>
         </div>
@@ -320,51 +367,76 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
         </div>
       </div>
 
-      {/* Top bar — back / fav / share / edit / delete */}
+      {/* Top bar — back on the start edge (RTL: right), actions grouped
+          in one capsule on the end edge so they read as a single control. */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        padding: '14px 18px', display: 'flex', justifyContent: 'space-between',
+        padding: '14px 16px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', gap: 10,
         zIndex: 5, pointerEvents: 'none',
       }}>
-        <div style={{ display: 'flex', gap: 8, marginInlineStart: 'auto', pointerEvents: 'auto' }}>
-          {!readOnly && (
-            <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" color="#fff" ink={recipe.favorite ? '#e34466' : p.ink}>
-              <FavHeart filled={recipe.favorite}/>
-            </RoundBtn>
-          )}
-          {!readOnly && onShare && (
-            <RoundBtn onClick={() => onShare(recipe)} title="שיתוף" color="#fff" ink={p.ink}>
-              <IconShare size={18} strokeWidth={2.2}/>
-            </RoundBtn>
-          )}
-          {!readOnly && (
-            <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" color="#fff" ink={p.ink}>
-              <IconEdit size={18} strokeWidth={2.2}/>
-            </RoundBtn>
-          )}
-          {!readOnly && (
-            <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" color="#fff" ink="#e34466">
-              <IconTrash size={18} strokeWidth={2.2}/>
-            </RoundBtn>
-          )}
-          {readOnly && recipe._sharedBy && (
+        <div style={{ pointerEvents: 'auto' }}>
+          <RoundBtn onClick={onClose} title="חזרה" color="#1c1620" ink="#fff" size={42}>
+            <IconForward size={19} strokeWidth={2.4}/>
+          </RoundBtn>
+        </div>
+
+        {readOnly ? (
+          recipe._sharedBy ? (
             <div style={{
-              background: 'rgba(255,255,255,.88)', borderRadius: 20, padding: '6px 14px',
+              pointerEvents: 'auto',
+              background: 'rgba(255,255,255,.9)', borderRadius: 999, padding: '8px 14px',
               fontSize: 12.5, fontWeight: 700, color: 'var(--ink)',
               display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+              boxShadow: '0 6px 16px -6px rgba(0,0,0,.3)',
             }}>
               <span>👤</span> שותף ע״י {recipe._sharedBy}
             </div>
-          )}
-        </div>
-        <div style={{ pointerEvents: 'auto' }}>
-          <RoundBtn onClick={onClose} title="חזרה" color="#1c1620" ink="#fff">
-            <IconForward size={18} strokeWidth={2.4}/>
-          </RoundBtn>
-        </div>
+          ) : <div/>
+        ) : (
+          <div style={{
+            pointerEvents: 'auto',
+            display: 'flex', alignItems: 'center', gap: 2, padding: 4,
+            borderRadius: 999, background: 'rgba(255,255,255,.92)',
+            backdropFilter: 'blur(14px) saturate(160%)',
+            boxShadow: '0 10px 24px -8px rgba(64,33,50,.4), 0 1px 0 rgba(255,255,255,.8) inset',
+          }}>
+            <BarBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים"
+              ink={recipe.favorite ? '#e34466' : p.ink}>
+              <FavHeart filled={recipe.favorite}/>
+            </BarBtn>
+            {onShare && (
+              <BarBtn onClick={() => onShare(recipe)} title="שיתוף" ink={p.ink}>
+                <IconShare size={18} strokeWidth={2.2}/>
+              </BarBtn>
+            )}
+            <BarBtn onClick={() => onEdit(recipe)} title="עריכה" ink={p.ink}>
+              <IconEdit size={18} strokeWidth={2.2}/>
+            </BarBtn>
+            <span style={{ width: 1, height: 20, background: 'rgba(0,0,0,.12)', margin: '0 3px' }}/>
+            <BarBtn onClick={() => onDelete(recipe)} title="מחיקה" ink="#e34466">
+              <IconTrash size={18} strokeWidth={2.2}/>
+            </BarBtn>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+// A single action inside the detail-screen capsule bar.
+function BarBtn({ children, onClick, title, ink = '#000' }) {
+  return (
+    <button onClick={onClick} title={title} aria-label={title}
+      style={{
+        width: 38, height: 38, borderRadius: 999, border: 'none', cursor: 'pointer',
+        background: 'transparent', color: ink,
+        display: 'grid', placeItems: 'center', transition: 'background .18s, transform .18s',
+      }}
+      onPointerDown={e => { e.currentTarget.style.background = 'rgba(0,0,0,.07)'; e.currentTarget.style.transform = 'scale(.9)'; }}
+      onPointerUp={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
+      onPointerLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
+    >{children}</button>
   );
 }
 
@@ -501,7 +573,7 @@ function StepsScreen({ recipe, onClose }) {
 
   if (showPlainText) {
     return (
-      <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 22, display: 'flex', flexDirection: 'column' }}>
         <div style={{ background: p.bg, padding: '18px 22px 26px', borderRadius: '0 0 32px 32px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: p.ink, opacity: .8 }}>הוראות הכנה</div>
@@ -521,7 +593,7 @@ function StepsScreen({ recipe, onClose }) {
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 22, display: 'flex', flexDirection: 'column' }}>
       {/* header */}
       <div style={{
         background: p.bg, padding: '18px 22px 22px',
@@ -623,6 +695,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [cookTime, setCookTime] = uS(existing?.cookTime ?? 15);
   const [servings, setServings] = uS(existing?.servings ?? 4);
   const [paletteKey, setPaletteKey] = uS(existing?.palette || 'peach');
+  // 'pop' = photo circle pokes out of the card, 'inside' = photo contained in it
+  const [imageMode, setImageMode] = uS(existing?.imageMode || 'pop');
   const [category, setCategory] = uS(existing?.category || 'mains');
   const [notes, setNotes] = uS(existing?.notes || '');
   const [ings, setIngs] = uS(existing?.ingredients?.length ? existing.ingredients : [{ qty: '', name: '', icon: 'chef' }]);
@@ -639,7 +713,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   uE(() => {
     if (!mountedRef.current) { mountedRef.current = true; return; }
     setIsDirty(true);
-  }, [title, desc, cuisine, category, paletteKey, notes, prepTime, cookTime, servings, ingsKey, stepsKey]);
+  }, [title, desc, cuisine, category, paletteKey, imageMode, notes, prepTime, cookTime, servings, ingsKey, stepsKey]);
   uE(() => { if (onDirtyChange) onDirtyChange(isDirty); }, [isDirty]);
   const tryCancel = () => {
     if (isDirty) { setShowLeaveConfirm(true); }
@@ -667,7 +741,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
       id, title: title.trim(),
       description: desc.trim(),
       cuisine: cuisine.trim(),
-      palette: paletteKey, category,
+      palette: paletteKey, category, imageMode,
       prepTime: +prepTime || 0,
       cookTime: +cookTime || 0,
       time: total || (existing?.time || 0),
@@ -779,6 +853,54 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
                   transition: 'all .18s',
                 }}/>
             ))}
+          </div>
+        </Field>
+
+        <Field label="סגנון התמונה בכרטיס">
+          <div style={{ display: 'flex', gap: 10, flexDirection: 'row-reverse' }}>
+            {[
+              { id: 'pop',    label: 'בולטת מהכרטיס', hint: 'עיגול שיוצא מהמסגרת' },
+              { id: 'inside', label: 'בתוך הכרטיס',   hint: 'תמונה מלבנית בתוך המסגרת' },
+            ].map(opt => {
+              const on = imageMode === opt.id;
+              return (
+                <button key={opt.id} onClick={() => setImageMode(opt.id)} style={{
+                  flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  borderRadius: 18, padding: '12px 10px 11px', textAlign: 'center',
+                  background: on ? 'var(--ink)' : 'rgba(255,255,255,.85)',
+                  color: on ? '#fff' : 'var(--ink)',
+                  boxShadow: on ? '0 10px 22px -8px rgba(64,33,50,.5)' : '0 4px 10px rgba(0,0,0,.07)',
+                  transition: 'all .18s',
+                }}>
+                  {/* mini preview of the card layout */}
+                  <div style={{
+                    position: 'relative', height: 40, borderRadius: 10,
+                    background: on ? 'rgba(255,255,255,.16)' : p.bg,
+                    marginBottom: 8, overflow: opt.id === 'inside' ? 'hidden' : 'visible',
+                  }}>
+                    <div style={{
+                      position: 'absolute', top: opt.id === 'inside' ? 6 : '50%',
+                      insetInlineStart: opt.id === 'inside' ? 6 : -9,
+                      transform: opt.id === 'inside' ? 'none' : 'translateY(-50%)',
+                      width: 28, height: 28,
+                      borderRadius: opt.id === 'inside' ? 8 : 999,
+                      background: on ? '#fff' : 'rgba(255,255,255,.9)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,.2)',
+                    }}/>
+                    <div style={{
+                      position: 'absolute', insetInlineEnd: 8, top: 12, width: '45%', height: 5,
+                      borderRadius: 99, background: on ? 'rgba(255,255,255,.55)' : 'rgba(0,0,0,.22)',
+                    }}/>
+                    <div style={{
+                      position: 'absolute', insetInlineEnd: 8, top: 22, width: '32%', height: 4,
+                      borderRadius: 99, background: on ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.13)',
+                    }}/>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800 }}>{opt.label}</div>
+                  <div style={{ fontSize: 10.5, opacity: .7, marginTop: 2 }}>{opt.hint}</div>
+                </button>
+              );
+            })}
           </div>
         </Field>
 
