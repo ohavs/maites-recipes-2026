@@ -1562,7 +1562,9 @@ function LoginScreen({ onSignIn }) {
     <div style={{
       position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      background: 'radial-gradient(900px 600px at 30% 20%, #ffe5d3 0%, transparent 60%), radial-gradient(800px 600px at 70% 80%, #e0d3f5 0%, transparent 55%), linear-gradient(180deg,#f5e7ef 0%,#efe1ec 100%)',
+      background: `radial-gradient(900px 600px at 30% 20%, var(--bg-grad-1) 0%, transparent 60%),
+                   radial-gradient(800px 600px at 70% 80%, var(--bg-grad-2) 0%, transparent 55%),
+                   linear-gradient(180deg, var(--bg-grad-3) 0%, var(--bg-grad-4) 100%)`,
       fontFamily: 'var(--font-body)', padding: 32,
     }}>
       <div style={{ textAlign: 'center', maxWidth: 320 }}>

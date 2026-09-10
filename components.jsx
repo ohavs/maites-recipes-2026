@@ -962,6 +962,12 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
 // RecipeCardGrid — 2-column square card with image poking out
 // from the top center. Used in 'grid' density mode.
 // ───────────────────────────────────────────────────────────
+// Every tile in the grid is the same size, whether or not the recipe has a
+// photo and whatever shape that photo is — a grid of different-sized cards
+// reads as clutter.
+const GRID_TILE_H = 178;
+const GRID_CAPTION_H = 56;
+
 function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   const p = paletteOf(recipe.palette);
   const enabled = useAnimEnabled();
@@ -977,103 +983,59 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
-  const inside = recipe.imageMode === 'inside';
-  const imgSize = 110;
-  const bannerH = 118;
   const slotSuffix = `-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`;
-
-  const favBtn = (floating) => (
-    <button type="button" onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
-      aria-label="מועדפים"
-      style={{
-        ...(floating ? { position: 'absolute', top: 8, insetInlineEnd: 8, zIndex: 3 } : { flexShrink: 0 }),
-        width: 32, height: 32, borderRadius: 'var(--r-pill)', padding: 0, lineHeight: 0,
-        background: 'var(--glass)', border: 'none', backdropFilter: 'blur(6px)',
-        cursor: 'pointer', display: 'grid', placeItems: 'center',
-        color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
-        boxShadow: 'var(--e1)',
-      }}>
-      <FavHeart filled={recipe.favorite}/>
-    </button>
-  );
-
-  // Photo contained in the card — banner on top, title underneath.
-  if (inside && hasPhoto) {
-    return (
-      <div style={{
-        position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
-        opacity: mounted ? 1 : 0,
-        transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
-        transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
-      }}>
-        <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-          borderRadius: 'var(--r-lg)', overflow: 'hidden', cursor: 'pointer', position: 'relative',
-          flex: 1, display: 'flex', flexDirection: 'column',
-          boxShadow: 'var(--shadow-card)',
-          background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
-          transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
-        }}>
-          <div style={{
-            position: 'relative', width: '100%', height: bannerH,
-            background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
-            display: 'grid', placeItems: 'center',
-          }}>
-            <FoodImage recipeId={recipe.id} width="100%" height={bannerH}
-              shape="rounded" radius={0} fit="cover" slotIdSuffix={slotSuffix} readonly />
-          </div>
-          <div style={{
-            padding: '10px 10px 14px', textAlign: 'center',
-            fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.25, color: p.ink,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          }}>{recipe.title}</div>
-          {favBtn(true)}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{
-      position: 'relative', height: '100%',
-      display: 'flex', flexDirection: 'column',
-      paddingTop: hasPhoto ? imgSize / 2 : 0,
+      height: GRID_TILE_H,
       opacity: mounted ? 1 : 0,
       transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
       transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
-      {/* image circle — centered at the top edge of the card */}
-      {hasPhoto && (
-        <div style={{
-          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 2, pointerEvents: 'none',
-        }}>
-          <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={slotSuffix} readonly />
-        </div>
-      )}
-
-      {/* card body */}
       <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-        borderRadius: 'var(--r-lg)',
-        paddingTop: hasPhoto ? imgSize / 2 + 10 : 14,
-        paddingBottom: hasPhoto ? 16 : 14,
-        paddingInline: 12,
+        height: '100%', position: 'relative', cursor: 'pointer',
+        borderRadius: 'var(--r-lg)', overflow: 'hidden',
         boxShadow: 'var(--e2)',
-        cursor: 'pointer',
-        position: 'relative',
-        flex: 1,
-        display: 'flex', flexDirection: hasPhoto ? 'column' : 'row',
-        alignItems: 'center', gap: 8,
         background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
+        display: 'flex', flexDirection: 'column',
         transition: 'transform var(--dur-fast) cubic-bezier(.2,.8,.2,1.05)',
       }}>
+        {hasPhoto && (
+          <div style={{
+            flex: 1, minHeight: 0, position: 'relative',
+            background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
+          }}>
+            <FoodImage recipeId={recipe.id} width="100%" height="100%"
+              shape="rounded" radius={0} fit="cover" slotIdSuffix={slotSuffix} readonly />
+          </div>
+        )}
+
         <div style={{
-          flex: 1, minWidth: 0, alignSelf: 'center',
-          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.3,
-          color: p.ink, textAlign: hasPhoto ? 'center' : 'start',
-          display: '-webkit-box', WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>{recipe.title}</div>
-        {favBtn(hasPhoto)}
+          height: hasPhoto ? GRID_CAPTION_H : '100%',
+          flexShrink: 0, display: 'flex', alignItems: 'center',
+          padding: hasPhoto ? '0 12px' : '0 14px',
+          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.28, color: p.ink,
+        }}>
+          <span style={{
+            display: '-webkit-box', WebkitLineClamp: hasPhoto ? 2 : 4,
+            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            textAlign: hasPhoto ? 'center' : 'start', width: '100%',
+            paddingInlineEnd: hasPhoto ? 0 : 34,
+          }}>{recipe.title}</span>
+        </div>
+
+        <button type="button" onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
+          aria-label="מועדפים"
+          style={{
+            position: 'absolute', top: 8, insetInlineEnd: 8, zIndex: 3,
+            width: 32, height: 32, borderRadius: 'var(--r-pill)', padding: 0, lineHeight: 0,
+            background: 'var(--glass)', border: 'none', backdropFilter: 'blur(6px)',
+            cursor: 'pointer', display: 'grid', placeItems: 'center',
+            color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
+            boxShadow: 'var(--e1)',
+          }}>
+          <FavHeart filled={recipe.favorite}/>
+        </button>
       </div>
     </div>
   );

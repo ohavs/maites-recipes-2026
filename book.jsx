@@ -526,7 +526,7 @@ function PrintSelectSheet({ recipes, categories, onPrint, onClose }) {
                 <span style={{
                   width: 22, height: 22, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center',
                   background: on ? 'var(--ink)' : 'transparent', color: 'var(--bg)',
-                  boxShadow: on ? 'none' : 'inset 0 0 0 2px rgba(0,0,0,.15)',
+                  boxShadow: on ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
                 }}>{on && <IconCheck size={13} strokeWidth={3}/>}</span>
               </button>
             );
@@ -593,7 +593,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
         <div style={{
           position: 'sticky', top: 0, zIndex: 10, padding: '12px 18px',
           display: 'flex', alignItems: 'center', gap: 8,
-          background: 'linear-gradient(180deg, rgba(251,238,242,.97) 60%, rgba(251,238,242,0))',
+          background: 'linear-gradient(180deg, var(--bg) 62%, transparent)',
         }}>
           <button onClick={onClosePage} aria-label="חזרה לתוכן העניינים" style={roundBarBtn}>
             <IconForward size={18} strokeWidth={2.4}/>
@@ -643,7 +643,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
       <div style={{ padding: '0 18px' }}>
         <div style={{
           position: 'relative', overflow: 'hidden', borderRadius: 28, padding: '30px 24px 26px',
-          background: 'linear-gradient(150deg,#ffe9d8 0%,#fbeef2 48%,#e9e0f8 100%)',
+          background: 'linear-gradient(150deg, var(--cover-1) 0%, var(--cover-2) 48%, var(--cover-3) 100%)',
           boxShadow: 'var(--shadow-card)', textAlign: 'center',
         }}>
           {[['8%', '12%', 54, '#f7a8b8'], ['84%', '18%', 34, '#ffd255'], ['80%', '74%', 46, '#b3e4c3']]
@@ -674,7 +674,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
               <button onClick={onSelectPrint} disabled={!ordered.length} style={{
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '12px 18px', borderRadius: 'var(--r-pill)', background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+                padding: '12px 18px', borderRadius: 'var(--r-pill)', background: 'var(--glass)', color: 'var(--ink)',
                 fontSize: 13.5, fontWeight: 700, boxShadow: 'var(--e1)',
                 opacity: ordered.length ? 1 : .5,
               }}>
@@ -723,7 +723,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
                   width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', gap: 10, textAlign: 'start',
                   padding: '12px 14px', background: 'transparent',
-                  borderTop: i ? '1px solid rgba(0,0,0,.06)' : 'none',
+                  borderTop: i ? '1px solid var(--line)' : 'none',
                 }}>
                   <span style={{
                     width: 10, height: 10, borderRadius: 'var(--r-pill)', background: p.bg, flexShrink: 0,
@@ -734,7 +734,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%',
                   }}>{it.recipe.title}</span>
                   <span style={{
-                    flex: 1, borderBottom: '2px dotted rgba(44,29,39,.22)', transform: 'translateY(-3px)',
+                    flex: 1, borderBottom: '2px dotted var(--line-strong)', transform: 'translateY(-3px)',
                   }}/>
                   <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-soft)' }}>{it.pageNo}</span>
                 </button>
@@ -749,14 +749,14 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
 
 const roundBarBtn = {
   width: 40, height: 40, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
-  background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+  background: 'var(--glass)', color: 'var(--ink)',
   display: 'grid', placeItems: 'center', boxShadow: 'var(--e1)',
 };
 
 const pagerBtn = {
   flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-  padding: '14px 0', borderRadius: 18, background: 'rgba(255,255,255,.9)', color: 'var(--ink)',
+  padding: '14px 0', borderRadius: 18, background: 'var(--glass)', color: 'var(--ink)',
   fontSize: 14, fontWeight: 700, boxShadow: 'var(--e1)',
 };
 
