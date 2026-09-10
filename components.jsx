@@ -89,18 +89,47 @@ function getRecipePhoto(recipe, slot) {
   return d && d.u ? d.u : null;
 }
 
-// Same, but re-checks a few times after mount because the image store
-// hydrates asynchronously from Firestore.
+// Live view of a recipe's photo. The store hydrates asynchronously, so this
+// subscribes to it rather than guessing when it has arrived — a card that
+// hides itself when there is no photo must never be the reason the store
+// was never read.
 function useRecipePhoto(recipe, slot) {
   const [url, setUrl] = useState(() => getRecipePhoto(recipe, slot));
   useEffect(() => {
     let alive = true;
-    const check = () => { if (alive) setUrl(getRecipePhoto(recipe, slot)); };
-    check();
-    const ts = [200, 700, 1800].map(ms => setTimeout(check, ms));
+    const read = () => { if (alive) setUrl(getRecipePhoto(recipe, slot)); };
+    if (window.__loadImageSlots) window.__loadImageSlots().then(read).catch(read);
+    read();
+    if (window.__onImageSlots) return () => { alive = false; };
+    // Older image-slot.js without a subscription: fall back to a few probes.
+    const ts = [200, 700, 1800, 4000].map(ms => setTimeout(read, ms));
     return () => { alive = false; ts.forEach(clearTimeout); };
   }, [recipe && recipe.id, slot]);
+
+  useEffect(() => {
+    if (!window.__onImageSlots) return undefined;
+    return window.__onImageSlots(() => setUrl(getRecipePhoto(recipe, slot)));
+  }, [recipe && recipe.id, slot]);
+
   return url;
+}
+
+// True once the photo store has been read, so a view can tell "no photo"
+// apart from "not loaded yet".
+function useImageSlotsReady() {
+  const [ready, setReady] = useState(() => !!(window.__imageSlotsReady && window.__imageSlotsReady()));
+  useEffect(() => {
+    if (ready) return undefined;
+    let alive = true;
+    const check = () => {
+      if (alive && window.__imageSlotsReady && window.__imageSlotsReady()) setReady(true);
+    };
+    if (window.__loadImageSlots) window.__loadImageSlots().then(check).catch(check);
+    const off = window.__onImageSlots ? window.__onImageSlots(check) : null;
+    const t = setTimeout(check, 2500);
+    return () => { alive = false; clearTimeout(t); if (off) off(); };
+  }, [ready]);
+  return ready;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -218,8 +247,12 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   const isCompact = density === 'compact';
   // Per-recipe choice: 'inside' keeps the photo within the card bounds,
   // anything else (default) lets the circle poke out past the edge.
-  // With no photo at all we simply leave the space to the text.
-  const hasPhoto = !!useRecipePhoto(recipe);
+  // With no photo at all we simply leave the space to the text — but only
+  // once the photo store has actually been read, so a slow load can never
+  // masquerade as "this recipe has no picture".
+  const photo = useRecipePhoto(recipe);
+  const slotsReady = useImageSlotsReady();
+  const hasPhoto = !!photo || !slotsReady;
   const inside   = recipe.imageMode === 'inside';
   const cardH    = isCompact ? 116 : 168;
   const padY     = isCompact ? 14 : 18;
@@ -941,7 +974,9 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   }, []);
   useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
 
-  const hasPhoto = !!useRecipePhoto(recipe);
+  const photo = useRecipePhoto(recipe);
+  const slotsReady = useImageSlotsReady();
+  const hasPhoto = !!photo || !slotsReady;
   const inside = recipe.imageMode === 'inside';
   const imgSize = 110;
   const bannerH = 118;
@@ -1096,7 +1131,7 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  FoodImage, getRecipePhoto, useRecipePhoto, ImageGallery, RecipeCardSkeleton,
+  FoodImage, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
   BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet,
   ConfirmDialog,

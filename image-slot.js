@@ -645,4 +645,14 @@
   // Expose setSlot/getSlot so React components can inject/read images directly
   window.__setImageSlot = setSlot;
   window.__getImageSlot = getSlot;
+
+  // Hydration used to start only when an <image-slot> element connected. A
+  // view that decides whether to render one *based on* the store would then
+  // wait forever, so the store is also startable and observable directly.
+  // The read is memoised, so whoever asks first wins — which is why it is
+  // NOT started here: the Firestore bridge is installed by a later script,
+  // and reading before it exists would cache an empty store forever.
+  window.__loadImageSlots = load;
+  window.__imageSlotsReady = () => loaded;
+  window.__onImageSlots = (fn) => { subs.add(fn); return () => subs.delete(fn); };
 })();

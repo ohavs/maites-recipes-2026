@@ -238,7 +238,11 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
   const onScroll = (e) => setScrollY(e.target.scrollTop);
 
   // No photo → no empty hero: the colour band shrinks to just the top bar.
-  const heroPhoto = useRecipePhoto(recipe);
+  // Until the photo store has been read we assume there is one, so a slow
+  // load never hides a picture that exists.
+  const heroPhotoUrl = useRecipePhoto(recipe);
+  const slotsReady = useImageSlotsReady();
+  const heroPhoto = !!heroPhotoUrl || !slotsReady;
   const HERO_H = heroPhoto ? 258 : 116;
   const BODY_OVERLAP = 30;     // how much body covers the hero by default
 
