@@ -1010,17 +1010,20 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
           </div>
         )}
 
+        {/* With a photo the title is a caption strip under it; with no photo
+            it is the whole tile, so it gets to be large and centred. */}
         <div style={{
           height: hasPhoto ? GRID_CAPTION_H : '100%',
-          flexShrink: 0, display: 'flex', alignItems: 'center',
-          padding: hasPhoto ? '0 12px' : '0 14px',
-          fontWeight: 700, fontSize: 'var(--t-small)', lineHeight: 1.28, color: p.ink,
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: hasPhoto ? '0 12px' : '36px 14px',
+          fontWeight: 700, color: p.ink,
+          fontSize: hasPhoto ? 'var(--t-small)' : 'var(--t-heading)',
+          lineHeight: hasPhoto ? 1.28 : 1.3,
         }}>
           <span style={{
             display: '-webkit-box', WebkitLineClamp: hasPhoto ? 2 : 4,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
-            textAlign: hasPhoto ? 'center' : 'start', width: '100%',
-            paddingInlineEnd: hasPhoto ? 0 : 34,
+            textAlign: 'center', width: '100%', textWrap: 'balance',
           }}>{recipe.title}</span>
         </div>
 
