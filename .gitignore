@@ -1,1 +1,7 @@
 .firebase/
+
+# Local dev harness: runs the app against a stubbed backend for screenshots
+# and smoke tests. Never deployed.
+__test.html
+__stub.jsx
+__vendor/
