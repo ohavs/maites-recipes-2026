@@ -13,10 +13,9 @@
 <link rel="apple-touch-icon" href="/maites-icon.png?v=2" />
 <link rel="icon" type="image/png" href="/maites-icon.png?v=2" />
 
-<!-- Fonts: Quicksand display + Heebo for Hebrew -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Heebo:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Fonts: Rubik (display) + Heebo (body), self-hosted so the app looks
+     the same with no network. -->
+<link rel="stylesheet" href="/vendor/fonts/fonts.css">
 
 <style>
   /* ═══════════════════════════════════════════════════════════
@@ -262,12 +261,29 @@
   }
   @keyframes delPop{0%{transform:scale(.82);opacity:0}100%{transform:scale(1);opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Boot fallback — shown only if the app never mounts. [hidden] must win,
+     otherwise an invisible full-screen layer would swallow every tap. */
+  #boot-fallback[hidden]{ display: none !important; }
+  #boot-fallback{
+    position: fixed; inset: 0; z-index: 999; display: grid; place-items: center;
+    padding: 24px; text-align: center; background: var(--bg); color: var(--ink);
+  }
+  #boot-fallback .bf-emoji{ font-size: 52px; margin-bottom: 12px; }
+  #boot-fallback h1{ margin: 0 0 8px; font-size: 22px; font-weight: 800; }
+  #boot-fallback p{ margin: 0 0 20px; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
+  #boot-fallback button{
+    width: 100%; border: none; border-radius: var(--r-md); padding: 15px 0;
+    background: var(--ink); color: var(--bg);
+    font-family: inherit; font-weight: 700; font-size: 16px; cursor: pointer;
+  }
 </style>
 
-<!-- React + Babel -->
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- React + Babel — bundled locally: the app must boot with no network.
+     Production React builds; Babel compiles the .jsx files in the browser. -->
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
 
 <!-- Capture beforeinstallprompt early, before React loads -->
 <script>
@@ -277,12 +293,11 @@
     window.__deferredInstall = e;
   });
 </script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/vendor/firebase-app-compat.js"></script>
+<script src="/vendor/firebase-firestore-compat.js"></script>
+<script src="/vendor/firebase-auth-compat.js"></script>
 <script src="image-slot.js"></script>
-<!-- SheetJS (xlsx) for Excel import/export -->
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<!-- SheetJS (xlsx) is loaded on demand by exporter.jsx, not at startup. -->
 </head>
 <body>
   <div id="root"></div>
@@ -299,12 +314,60 @@
   <script type="text/babel" src="cooking.jsx"></script>
   <script type="text/babel" src="book.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
+  <!-- A blank screen is never an acceptable answer: if the app has not
+       mounted a few seconds after load, say what happened and offer a way out. -->
+  <div id="boot-fallback" hidden>
+    <div style="max-width:320px">
+      <div class="bf-emoji">🍳</div>
+      <h1>Maites לא הצליחה לעלות</h1>
+      <p id="boot-reason">נראה שחלק מהקבצים לא נטענו.</p>
+      <button type="button" onclick="location.reload()">נסו שוב</button>
+    </div>
+  </div>
+
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js');
-      });
-    }
+    (function () {
+      // Watchdog — React mounts into #root; if nothing is there, show the
+      // fallback instead of an empty page.
+      var t = setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          var reason = document.getElementById('boot-reason');
+          if (reason && !navigator.onLine) {
+            reason.textContent = 'אין חיבור לאינטרנט, והאפליקציה עוד לא נשמרה במכשיר. התחברי לרשת פעם אחת וזה יעבוד גם בלי חיבור.';
+          }
+          document.getElementById('boot-fallback').hidden = false;
+        }
+      }, 9000);
+      window.addEventListener('maites-ready', function () { clearTimeout(t); });
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            // Look for a newer version on every launch, so a deploy reaches
+            // the phone on the next open rather than days later.
+            if (navigator.onLine) reg.update().catch(function () {});
+            // Ask the worker to keep the Excel / PDF engines around too.
+            var warm = function () {
+              if (navigator.serviceWorker.controller && navigator.onLine) {
+                navigator.serviceWorker.controller.postMessage('warm-optional');
+              }
+            };
+            setTimeout(warm, 4000);
+            reg.addEventListener('updatefound', function () {
+              var sw = reg.installing;
+              if (!sw) return;
+              sw.addEventListener('statechange', function () {
+                // A new version is ready; it takes over on the next launch.
+                if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.__maitesUpdateReady = true;
+                }
+              });
+            });
+          }).catch(function () {});
+        });
+      }
+    })();
   </script>
 </body>
 </html>

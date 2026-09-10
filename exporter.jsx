@@ -13,6 +13,22 @@
 // ──────────────────────────────────────────────
 // Generic helpers
 // ──────────────────────────────────────────────
+
+// SheetJS is ~860KB and only Excel import/export needs it, so it is loaded
+// the first time one of those runs — from the local copy, so it works offline.
+function ensureXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!window.__xlsxLoading) {
+    window.__xlsxLoading = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = '/vendor/xlsx.full.min.js';
+      el.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX missing')));
+      el.onerror = () => reject(new Error('XLSX failed to load'));
+      document.head.appendChild(el);
+    });
+  }
+  return window.__xlsxLoading;
+}
 function saveBlob(filename, blob) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -386,7 +402,11 @@ function sheetToRecipe(sheetName, rows) {
 }
 
 function importFromFile(file, onDone) {
-  if (!window.XLSX) { onDone(new Error('SheetJS not loaded'), null); return; }
+  ensureXLSX().then(() => importFromFileWithXLSX(file, onDone))
+    .catch(() => onDone(new Error('לא ניתן לטעון את מנוע ה-Excel'), null));
+}
+
+function importFromFileWithXLSX(file, onDone) {
   const isCSV = /\.csv$/i.test(file.name) || file.type === 'text/csv';
 
   const fr = new FileReader();
@@ -442,10 +462,10 @@ function importFromFile(file, onDone) {
 // Cells with multiple lines (ingredients/steps) are joined by \n.
 // ──────────────────────────────────────────────
 function exportExcel(recipes) {
-  if (!window.XLSX) {
-    alert('Excel library not loaded');
-    return;
-  }
+  return ensureXLSX().then(() => exportExcelWithXLSX(recipes));
+}
+
+function exportExcelWithXLSX(recipes) {
   const headers = [
     'שם המתכון','סוג מטבח','זמן הכנה','זמן בישול','מנות','קטגוריה',
     'תיאור','מרכיבים','הוראות הכנה','הערות','צבע',
@@ -583,5 +603,5 @@ function exportWord(recipes) {
 }
 
 Object.assign(window, {
-  exportExcel, exportWord, importFromFile, stripHTML,
+  exportExcel, exportWord, importFromFile, stripHTML, ensureXLSX,
 });

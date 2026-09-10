@@ -53,6 +53,9 @@ function App() {
   const [showPrintSheet, setShowPrintSheet] = $S(false);
   const [printJob, setPrintJob] = $S(null);   // array of recipes being exported
   const [loadError, setLoadError] = $S(null);
+  const [online, setOnline] = $S(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [syncMeta, setSyncMeta] = $S({ fromCache: false, hasPendingWrites: false });
+  const recipesUnsubRef = $R(null);
   const [themeMode, setThemeMode] = useTheme();
   const saveState = useSaveState();
   const retryLastSave = $R(null);
@@ -122,10 +125,17 @@ function App() {
       // Load recipes shared with me individually
       const shared = await db_getSharedWithMe(user.email);
       setSharedWithMe(shared);
-      // Load recipes (own + shared accounts)
-      const recs = await db_loadRecipes(user.uid, ownerUids);
-      setRecipes(recs || []);
-      setRecipesLoaded(true);
+      // Live recipes (own + shared accounts). Emits from the local cache
+      // first, so the list is on screen with no connection at all.
+      if (recipesUnsubRef.current) recipesUnsubRef.current();
+      recipesUnsubRef.current = db_watchRecipes(user.uid, ownerUids,
+        (recs, meta) => {
+          setRecipes(recs || []);
+          setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites });
+          setRecipesLoaded(true);
+          setLoadError(null);
+        },
+        (err) => { reportError('watch-recipes', err); setLoadError(err); setRecipesLoaded(true); });
       // Claim prompt (one-time migration)
       const claimedKey = `maites.claimed.${user.uid}`;
       if (!localStorage.getItem(claimedKey)) {
@@ -143,8 +153,19 @@ function App() {
         setCategories(cats);
         try { localStorage.setItem('maites.cats', JSON.stringify(cats)); } catch {}
       }
-    }).catch(err => reportError('load-categories', err));
+    }).catch(() => { /* offline with a cold cache — the localStorage copy stands */ });
   };
+
+  // Connection state — drives the offline banner and the sync copy.
+  $E(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+
+  $E(() => () => { if (recipesUnsubRef.current) recipesUnsubRef.current(); }, []);
 
   // Auth state listener
   $E(() => {
@@ -157,7 +178,10 @@ function App() {
       setAuthLoading(false);
       if (user) loadUserData(user);
     });
-    return () => unsub();
+    // Never spin forever: with no connection and no stored session the
+    // sign-in screen is the honest answer.
+    const bail = setTimeout(() => setAuthLoading(false), 6000);
+    return () => { clearTimeout(bail); unsub(); };
   }, []);
 
   const addCategory = (cat) => {
@@ -386,8 +410,6 @@ function App() {
     setClaiming(true);
     try {
       const count = await db_claimUnownedRecipes(currentUser.uid);
-      const recs = await db_loadRecipes(currentUser.uid);
-      setRecipes(recs || []);
       localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
       setShowClaimPrompt(false);
       if (count > 0) showToast(`${count} מתכונים שויכו לחשבון שלך ✓`);
@@ -408,7 +430,7 @@ function App() {
       }}>
         <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
           <img src="/maites-logo.png" alt="Maites" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }}/>
-          <div style={{ fontSize: 15 }}>טוענת…</div>
+          <div style={{ fontSize: 'var(--t-body)' }}>טוענת…</div>
         </div>
       </div>
     );
@@ -546,18 +568,13 @@ function App() {
           />
         )}
 
-        {/* Toast */}
-        {toast && (
-          <div style={{
-            position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(28,22,32,.95)', color: '#fff',
-            padding: '12px 18px', borderRadius: 'var(--r-pill)',
-            fontSize: 13.5, fontWeight: 600, zIndex: 50,
-            boxShadow: 'var(--e1)',
-            animation: 'toastIn .3s cubic-bezier(.2,1.3,.4,1)',
-            whiteSpace: 'nowrap', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>{toast}</div>
-        )}
+        {/* Transient message, the save indicator, and the offline notice */}
+        {toast && <Toast message={toast.msg} tone={toast.tone} onDismiss={() => setToast(null)} />}
+        <SaveState
+          state={!online && (syncMeta.hasPendingWrites || saveState.pending) ? 'offline' : saveState.state}
+          pending={saveState.pending}
+          onRetry={() => { if (retryLastSave.current) retryLastSave.current(); }} />
+        {!online && <OfflineBanner pending={syncMeta.hasPendingWrites} />}
 
         {showAddCategory && (
           <AddCategorySheet
@@ -628,8 +645,10 @@ function App() {
                 setSharesInfo(shares);
                 const ownerUids = shares.asGuest.map(s => s.ownerUid);
                 setSharedOwnerUids(ownerUids);
-                const recs = await db_loadRecipes(currentUser.uid, ownerUids);
-                setRecipes(recs || []);
+                if (recipesUnsubRef.current) recipesUnsubRef.current();
+                recipesUnsubRef.current = db_watchRecipes(currentUser.uid, ownerUids,
+                  (recs, meta) => { setRecipes(recs || []); setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites }); },
+                  (err) => reportError('watch-recipes', err));
                 showToast('השיתוף בוטל');
               } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
             }}
@@ -850,3 +869,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App/>
   </AppErrorBoundary>
 );
+// Tells the boot watchdog in index.html that the app is up.
+window.dispatchEvent(new Event('maites-ready'));

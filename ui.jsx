@@ -398,6 +398,31 @@ function SaveState({ state, pending = 0, onRetry }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// OfflineBanner — says plainly that working offline is fine.
+// ───────────────────────────────────────────────────────────
+function OfflineBanner({ pending }) {
+  return (
+    <div role="status" aria-live="polite" style={{
+      position: 'absolute', insetInlineStart: 12, insetInlineEnd: 12,
+      bottom: 'calc(86px + env(safe-area-inset-bottom, 0px))', zIndex: 65,
+      display: 'flex', alignItems: 'center', gap: 9,
+      padding: '10px 14px', borderRadius: 'var(--r-pill)',
+      background: 'var(--glass-strong)', backdropFilter: 'blur(16px)',
+      boxShadow: 'var(--e2)', color: 'var(--ink)',
+      animation: 'toastIn var(--dur) var(--ease-out)',
+    }}>
+      <span aria-hidden="true" style={{ fontSize: 15 }}>☁️</span>
+      <span style={{ ...TYPE.caption, flex: 1, minWidth: 0 }}>
+        {pending
+          ? 'אין חיבור — השינויים שמורים במכשיר ויסונכרנו אוטומטית'
+          : 'אין חיבור — אפשר להמשיך לעבוד, הכל יסונכרן כשהרשת תחזור'}
+      </span>
+      <style>{`@keyframes toastIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // Switch — accessible on/off control.
 // ───────────────────────────────────────────────────────────
 function Switch({ checked, onChange, label }) {
@@ -451,6 +476,6 @@ function SegmentedControl({ value, options, onChange, label }) {
 Object.assign(window, {
   TYPE, useTheme, applyTheme, readTheme,
   Card, IconButton, Button, Chip, SectionLabel, Field, inputStyle,
-  ListRow, Sheet, EmptyState, ErrorState, Spinner, Toast, SaveState,
+  ListRow, Sheet, EmptyState, ErrorState, Spinner, Toast, SaveState, OfflineBanner,
   Switch, SegmentedControl,
 });

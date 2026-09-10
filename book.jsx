@@ -343,9 +343,10 @@ function PageScaler({ children, pad = 0 }) {
 // and writes a real .pdf file the browser downloads. No print
 // dialog, no printer picker.
 // ───────────────────────────────────────────────────────────
+// Bundled locally so exporting a PDF works with no connection.
 const PDF_LIBS = [
-  ['html2canvas', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'],
-  ['jspdf',       'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js'],
+  ['html2canvas', '/vendor/html2canvas.min.js'],
+  ['jspdf',       '/vendor/jspdf.umd.min.js'],
 ];
 
 function loadScriptOnce(src) {

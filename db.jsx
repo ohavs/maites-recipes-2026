@@ -137,6 +137,51 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
 })();
 
 // ── Recipe CRUD ───────────────────────────────────────────────
+// Live view of the recipes. The first callback fires immediately from the
+// local cache (so the list is there with no connection), and again whenever
+// the server or another device changes something. Writes made offline show
+// up straight away and are replayed on reconnect.
+function db_watchRecipes(userId, sharedOwnerUids = [], onData, onError) {
+  const allUids = [...new Set([userId, ...sharedOwnerUids].filter(Boolean))];
+  const byUid = new Map();
+  const meta = new Map();
+
+  const emit = () => {
+    const seen = new Set();
+    const all = [];
+    for (const uid of allUids) {
+      for (const doc of (byUid.get(uid) || [])) {
+        if (seen.has(doc.id)) continue;
+        seen.add(doc.id);
+        all.push(doc);
+      }
+    }
+    all.sort((a, b) => {
+      const at = a.createdAt?.seconds ?? (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0);
+      const bt = b.createdAt?.seconds ?? (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0);
+      return bt - at;
+    });
+    const states = [...meta.values()];
+    onData(all, {
+      fromCache: states.some(m => m.fromCache),
+      hasPendingWrites: states.some(m => m.hasPendingWrites),
+      ready: byUid.size === allUids.length,
+    });
+  };
+
+  const unsubs = allUids.map(uid =>
+    _db.collection('recipes').where('userId', '==', uid)
+      .onSnapshot({ includeMetadataChanges: true },
+        (snap) => {
+          byUid.set(uid, snap.docs.map(d => ({ ...d.data(), id: d.id })));
+          meta.set(uid, { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites });
+          emit();
+        },
+        (err) => { if (onError) onError(err); })
+  );
+  return () => unsubs.forEach(u => { try { u(); } catch {} });
+}
+
 async function db_loadRecipes(userId, sharedOwnerUids = []) {
   const allUids = [...new Set([userId, ...sharedOwnerUids].filter(Boolean))];
   const snapshots = await Promise.all(
@@ -206,6 +251,8 @@ async function db_seedRecipes(recipes) {
 
 // ── Category CRUD ─────────────────────────────────────────────
 async function db_loadCategories() {
+  // Offline this resolves from the local cache; only a cold cache fails,
+  // and the caller falls back to the copy in localStorage.
   const snap = await _db.collection('categories').orderBy('order', 'asc').get();
   if (snap.empty) return null;
   return snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -341,7 +388,7 @@ async function db_removeSharedRecipe(shareId) {
 
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
-  db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
+  db_loadRecipes, db_watchRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
   db_seedRecipes, db_loadCategories, db_saveCategories,
   db_claimUnownedRecipes, db_hasUnownedRecipes,
   db_createInvite, db_cancelInvite, db_getMyInvites,
