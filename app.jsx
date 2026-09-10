@@ -89,7 +89,10 @@ function App() {
   }, []);
 
   const openRecipe     = recipes.find(r => r.id === openRecipeId)     || null;
-  const cookRecipe     = recipes.find(r => r.id === cookRecipeId)     || null;
+  // Steps can be opened from a shared recipe too, which never lives in `recipes`.
+  const cookRecipe     = recipes.find(r => r.id === cookRecipeId)
+                      || sharedWithMe.find(r => r.id === cookRecipeId)
+                      || null;
   const editingRecipe  = recipes.find(r => r.id === editingRecipeId)  || null;
   const deletingRecipe = recipes.find(r => r.id === deletingRecipeId) || null;
 
@@ -293,7 +296,7 @@ function App() {
   if (openRecipeId)        layers.push('recipe');
   if (bookRecipeId)        layers.push('bookpage');
   if (editingRecipeId)     layers.push('edit');
-  if (cookRecipeId)        layers.push('cook');
+  if (cookRecipe)          layers.push('cook');
   if (sharingRecipe)       layers.push('share');
   if (showAccountPanel)    layers.push('account');
   if (showManageCategories)layers.push('managecats');
