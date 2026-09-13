@@ -627,7 +627,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
   const [prepTime, setPrepTime] = uS(existing?.prepTime ?? 15);
   const [cookTime, setCookTime] = uS(existing?.cookTime ?? 15);
-  const [servings, setServings] = uS(existing?.servings || 1);
+  const [servings, setServings] = uS(existing?.servings > 0 ? String(existing.servings) : '');
   const [paletteKey, setPaletteKey] = uS(existing?.palette || 'peach');
   // 'pop' = photo circle pokes out of the card, 'inside' = photo contained in it
   const [imageMode, setImageMode] = uS(existing?.imageMode || 'pop');
@@ -679,7 +679,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
       prepTime: +prepTime || 0,
       cookTime: +cookTime || 0,
       time: total || (existing?.time || 0),
-      servings: Math.max(1, +servings || 1),
+      servings: Math.max(0, parseInt(servings, 10) || 0),   // 0 = not stated
       level: existing?.level || 'קל',
       favorite: existing?.favorite || false,
       notes: notes,
@@ -719,7 +719,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
-          <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>
+          {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
           {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
         </div>
       </div>
@@ -745,9 +745,9 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           <Field label="בישול (דק׳)" style={{ flex: 1 }}>
             <input type="number" min="0" value={cookTime} onChange={e => setCookTime(e.target.value)} style={inputStyle}/>
           </Field>
-          <Field label="מנות" hint="הכמויות למטה מתייחסות למספר הזה" style={{ flex: 1 }}>
-            <input type="number" min="1" max="99" value={servings}
-              onChange={e => setServings(e.target.value)} style={inputStyle}/>
+          <Field label="מנות" hint="לכמה אנשים הכמויות? אפשר להשאיר ריק" style={{ flex: 1 }}>
+            <input type="number" min="1" max="99" inputMode="numeric" placeholder="—"
+              value={servings} onChange={e => setServings(e.target.value)} style={inputStyle}/>
           </Field>
         </div>
 
