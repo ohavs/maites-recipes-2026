@@ -228,10 +228,12 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
   const [scrollY, setScrollY] = uS(0);
   const [mounted, setMounted] = uS(false);
   // How many people are we cooking for right now — scales the quantities.
-  const baseServings = +recipe.servings || 0;
+  // The recipe says how many people its quantities are written for; a
+  // recipe that never said gets one portion, so scaling still works.
+  const baseServings = Math.max(1, +recipe.servings || 1);
   const [servings, setServings] = uS(baseServings);
-  uE(() => { setServings(+recipe.servings || 0); }, [recipe.id, recipe.servings]);
-  const factor = baseServings > 0 && servings > 0 ? servings / baseServings : 1;
+  uE(() => { setServings(Math.max(1, +recipe.servings || 1)); }, [recipe.id, recipe.servings]);
+  const factor = servings > 0 ? servings / baseServings : 1;
 
   uE(() => { setMounted(true); }, []);
 
@@ -322,7 +324,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           {/* Ingredients */}
           <div style={{ marginTop: 26 }}>
             <SectionLabel ink={p.accent}>מצרכים</SectionLabel>
-            {baseServings > 0 && (recipe.ingredients || []).length > 0 && (
+            {(recipe.ingredients || []).length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <ServingScaler base={baseServings} servings={servings} onChange={setServings} palette={p}/>
               </div>
@@ -625,7 +627,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
   const [prepTime, setPrepTime] = uS(existing?.prepTime ?? 15);
   const [cookTime, setCookTime] = uS(existing?.cookTime ?? 15);
-  const [servings, setServings] = uS(existing?.servings ?? 4);
+  const [servings, setServings] = uS(existing?.servings || 1);
   const [paletteKey, setPaletteKey] = uS(existing?.palette || 'peach');
   // 'pop' = photo circle pokes out of the card, 'inside' = photo contained in it
   const [imageMode, setImageMode] = uS(existing?.imageMode || 'pop');
@@ -677,7 +679,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
       prepTime: +prepTime || 0,
       cookTime: +cookTime || 0,
       time: total || (existing?.time || 0),
-      servings: +servings || 0,
+      servings: Math.max(1, +servings || 1),
       level: existing?.level || 'קל',
       favorite: existing?.favorite || false,
       notes: notes,
@@ -743,8 +745,9 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
           <Field label="בישול (דק׳)" style={{ flex: 1 }}>
             <input type="number" min="0" value={cookTime} onChange={e => setCookTime(e.target.value)} style={inputStyle}/>
           </Field>
-          <Field label="מנות" style={{ flex: 1 }}>
-            <input type="number" min="1" value={servings} onChange={e => setServings(e.target.value)} style={inputStyle}/>
+          <Field label="מנות" hint="הכמויות למטה מתייחסות למספר הזה" style={{ flex: 1 }}>
+            <input type="number" min="1" max="99" value={servings}
+              onChange={e => setServings(e.target.value)} style={inputStyle}/>
           </Field>
         </div>
 
@@ -1606,7 +1609,9 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange, onResetServings }) {
+  const [confirmReset, setConfirmReset] = uS(false);
+  const withServings = recipes.filter(r => +r.servings > 0).length;
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
   const [mutual, setMutual] = uS(false);
@@ -1724,6 +1729,25 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   ]}
                 />
               </div>
+
+              {/* Quantities */}
+              {onResetServings && withServings > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>כמויות</SectionLabel>
+                  <div style={{
+                    background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)', padding: '12px 14px',
+                    display: 'grid', gap: 10,
+                  }}>
+                    <div style={{ ...TYPE.caption, color: 'var(--ink-soft)', fontWeight: 500, lineHeight: 1.5 }}>
+                      מתכונים שיובאו מאקסל קיבלו בעבר "4 מנות" אוטומטית, גם אם הקובץ לא אמר כלום.
+                      אפשר לאפס את המספר בכל המתכונים ולהגדיר אותו מחדש רק היכן שהוא באמת ידוע.
+                    </div>
+                    <Button size="sm" tone="glass" onClick={() => setConfirmReset(true)}>
+                      איפוס מספר המנות ({withServings} מתכונים)
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Diagnostics */}
               <DiagnosticsBlock/>
@@ -1890,6 +1914,18 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
           )}
         </div>
       </div>
+      {confirmReset && (
+        <ConfirmDialog
+          emoji="👥"
+          title="איפוס מספר המנות"
+          body={`המספר יימחק מ-${withServings} מתכונים, וכל מתכון יתחיל ממנה אחת עד שתגדירו לו מספר. הכמויות עצמן לא משתנות.`}
+          confirmLabel="איפוס"
+          cancelLabel="ביטול"
+          confirmColor="var(--ink)"
+          onConfirm={() => { setConfirmReset(false); onResetServings(); }}
+          onCancel={() => setConfirmReset(false)}
+        />
+      )}
       <style>{`@keyframes slideUp{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );

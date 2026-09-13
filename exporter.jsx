@@ -194,6 +194,7 @@ const COL_ALIASES = {
   desc:       ['תיאור','description','desc','about'],
   ingredients:['מרכיבים','מצרכים','חומרים','ingredients','ingredient'],
   steps:      ['הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה','ביצוע','דרך הכנה','הכנת המנה','instructions','steps','directions','method','preparation'],
+  servings:   ['מנות','כמות מנות','מספר מנות','למנות','servings','serves','portions','yield'],
   notes:      ['הערות','הערה','notes','remarks','tips'],
   mainImage:  ['תמונות ראשיות','תמונה ראשית','תמונה','main image','image','photo'],
   gallery:    ['גלריית תמונות','גלריה','gallery','images'],
@@ -271,7 +272,9 @@ function rowToRecipe(row, map) {
     _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
-    servings: 4,
+    // 0 means "not stated" — the app treats that as a single portion
+    // rather than inventing a number the recipe never had.
+    servings: parseTime(get('servings')),
     level: 'קל',
     favorite: false,
     notes,
@@ -342,6 +345,7 @@ function sheetToRecipe(sheetName, rows) {
   const catRaw     = get('קטגוריה','סוג מנה','סוג','category','type');
   const catInfo    = catRaw ? parseCategoryLabel(catRaw) : parseCategoryLabel(guessCategory(cuisine));
   const level      = get('רמת קושי','רמת קשיים','רמת קשיות') || 'קל';
+  const servings   = parseTime(get('מנות','כמות מנות','מספר מנות','servings','serves'));
   const prepTime   = parseTime(get('זמן הכנה','prep','זמן'));
   const cookTime   = parseTime(get('זמן בישול','cook','בישול'));
   const desc       = get('תיאור','description','desc','about','הסבר');
@@ -393,7 +397,7 @@ function sheetToRecipe(sheetName, rows) {
     _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
-    servings: 4, level,
+    servings, level,
     favorite: false, notes,
     gallery, ingredients,
     steps: [],

@@ -276,8 +276,8 @@ function CookScreen({ recipe, onClose, servings }) {
   const [alert, setAlert] = cS(null);
   useWakeLock(true);
 
-  const baseServings = +recipe.servings || 0;
-  const factor = baseServings > 0 && servings ? servings / baseServings : 1;
+  const baseServings = Math.max(1, +recipe.servings || 1);
+  const factor = servings ? servings / baseServings : 1;
 
   const step = steps[i];
   const durations = cM(() => (step ? parseDurations(`${step.title} ${step.body}`) : []), [step]);
