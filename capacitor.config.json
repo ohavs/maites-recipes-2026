@@ -15,7 +15,8 @@
       "showSpinner": false
     },
     "FirebaseAuthentication": {
-      "skipNativeAuth": false,
+      "_comment": "skipNativeAuth belongs on when the app drives Firebase through the JavaScript SDK, which this one does: with it off the plugin signs in on the native layer instead and the JS SDK — the one the whole app watches — never learns about it.",
+      "skipNativeAuth": true,
       "providers": ["google.com"]
     }
   }

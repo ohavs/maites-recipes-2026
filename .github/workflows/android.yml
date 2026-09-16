@@ -92,6 +92,13 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))" \
             || { echo "::error::google-services.json is not valid JSON"; exit 1; }
 
+      # Whether the file can support Google sign-in at all. Sign-in failing
+      # on a device tells you nothing about which half is wrong, and this
+      # answers it before the build even starts. Shapes and counts only —
+      # no values are printed.
+      - name: Can it sign in?
+        run: node tools/check-google-services.js
+
       - name: Copy the web layer into the app
         run: npx cap sync android
 

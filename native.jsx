@@ -73,10 +73,19 @@ async function pickPhotoNative(source) {
 // sheet and hands back a credential, which Firebase then accepts.
 async function signInWithGoogleNative() {
   const plugin = nativePlugin('FirebaseAuthentication');
-  if (!plugin) throw new Error('native sign-in is unavailable');
+  if (!plugin) {
+    throw new Error('native-sign-in-missing: the FirebaseAuthentication plugin is not registered');
+  }
   const res = await plugin.signInWithGoogle({ scopes: ['email', 'profile'] });
-  const idToken = res && res.credential && res.credential.idToken;
-  if (!idToken) throw new Error('no credential from Google');
+  if (!res || !res.credential) {
+    // Almost always skipNativeAuth being off: the plugin then signs in on
+    // the native layer and keeps the credential, and there is nothing to
+    // hand the JavaScript SDK.
+    throw new Error('no-credential: Google returned no credential to pass on'
+      + (res && res.user ? ' (a native session was created instead)' : ''));
+  }
+  const idToken = res.credential.idToken;
+  if (!idToken) throw new Error('no-id-token: the credential carried no ID token');
   const cred = firebase.auth.GoogleAuthProvider.credential(idToken);
   return firebase.auth().signInWithCredential(cred);
 }
