@@ -3,18 +3,11 @@
     "rules": "firestore.rules"
   },
   "hosting": {
-    "public": ".",
+    "public": "dist",
     "ignore": [
-      "firebase.json",
-      ".firebaserc",
       "**/.*",
-      "README.md",
-      "chats/**",
-      "project/**",
-      "firebase-debug.log",
       "__test.html",
-      "__stub.jsx",
-      "__vendor/**"
+      "stub.js"
     ],
     "headers": [
       {

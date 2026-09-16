@@ -1,3 +1,43 @@
+# Maites
+
+A Hebrew recipe app: a PWA today, an Android app in progress.
+
+## Running it
+
+The sources at the root are plain files — no install, no watcher. Serve the
+folder and open it:
+
+    python3 -m http.server 8899
+
+In development the browser compiles the `.jsx` files itself (Babel is loaded
+from `vendor/`), so a change is live on reload.
+
+## Building and deploying
+
+What ships is compiled ahead of time, because a 2.4 MB Babel download and a
+compile pause on every cold start is the whole first impression on a phone:
+
+    node build.js            # → dist/
+    node build.js --test     # → dist/, including the smoke-test harness
+
+`dist/` is generated and never committed. Firebase Hosting serves it:
+
+    node build.js
+    firebase deploy --only hosting
+
+The service worker's cache name is a hash of what was built, so every deploy
+invalidates the old cache on its own — there is no version number to remember.
+
+`build.js` reads the list of sources, and their order, out of `index.html`, so
+a new file is added in one place.
+
+## The test harness
+
+`__test.html` and `__stub.jsx` run the app against a stubbed backend, for
+screenshots and smoke tests. They are gitignored and never deployed.
+
+---
+
 # CODING AGENTS: READ THIS FIRST
 
 This is a **handoff bundle** from Claude Design (claude.ai/design).
