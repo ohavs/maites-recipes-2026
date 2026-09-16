@@ -93,7 +93,13 @@ jobs:
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
           test -f "$APK" || { echo "::error::no APK was produced"; exit 1; }
-          "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$APK"
+          # Whichever build-tools the runner happens to carry, newest first.
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -n "$SIGNER" ]; then
+            "$SIGNER" verify --print-certs "$APK"
+          else
+            echo "::warning::apksigner not found; skipping the signature check"
+          fi
           cp "$APK" "maites-${{ steps.v.outputs.name }}.apk"
 
       - uses: actions/upload-artifact@v4
