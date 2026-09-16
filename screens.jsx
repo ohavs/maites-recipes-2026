@@ -1749,6 +1749,9 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 </div>
               )}
 
+              {/* Backup */}
+              {typeof BackupBlock === 'function' && <BackupBlock user={user}/>}
+
               {/* Diagnostics */}
               <DiagnosticsBlock/>
 

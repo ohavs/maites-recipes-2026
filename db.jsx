@@ -431,6 +431,127 @@ async function db_removeSharedRecipe(shareId) {
   await _db.collection('recipe_shares').doc(shareId).delete();
 }
 
+// ── Full backup ───────────────────────────────────────────────
+// Everything here reads from the server, never from the local cache: a
+// backup that quietly copies a stale cache is worse than no backup.
+// Nothing in this section deletes or overwrites anything.
+
+const BACKUP_FORMAT  = 'maites-backup';
+const BACKUP_VERSION = 1;
+
+async function _getAll(name, source = 'server') {
+  const snap = await _db.collection(name).get({ source });
+  return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+}
+
+// Reads every collection this account can see and returns one plain object.
+// `onStep` is called with a Hebrew label so the panel can say where it is.
+async function db_exportSnapshot(user, onStep = () => {}) {
+  const step = async (label, fn) => { onStep(label); return fn(); };
+
+  const recipes    = await step('מתכונים',  () => _getAll('recipes'));
+  const imageSlots = await step('תמונות',   () => _getAll('image_slots'));
+  const categories = await step('קטגוריות', () => _getAll('categories').catch(() => []));
+  const invites    = await step('שיתופים',  () => _getAll('invites').catch(() => []));
+  const shares     = await step('שיתופים',  () => _getAll('shares').catch(() => []));
+  const recipeShares = await step('שיתופים', () => _getAll('recipe_shares').catch(() => []));
+
+  onStep('אורז');
+  const slotMap = {};
+  let photoBytes = 0;
+  for (const s of imageSlots) {
+    const { id, ...rest } = s;
+    slotMap[id] = rest;
+    if (rest.u) photoBytes += rest.u.length;
+  }
+
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    user: { uid: user?.uid || null, email: user?.email || null },
+    counts: {
+      recipes: recipes.length,
+      imageSlots: imageSlots.length,
+      photos: Object.values(slotMap).filter(v => v && v.u).length,
+      categories: categories.length,
+      photoBytes,
+    },
+    recipes,
+    imageSlots: slotMap,
+    categories,
+    invites,
+    shares,
+    recipeShares,
+  };
+}
+
+// Compares a backup file against what is live right now. Reads only.
+async function db_inspectAgainstLive(backup) {
+  const liveRecipes = await _getAll('recipes').catch(() => null);
+  const liveSlots   = await _getAll('image_slots').catch(() => null);
+  if (!liveRecipes || !liveSlots) return { offline: true };
+
+  const liveRecipeIds = new Set(liveRecipes.map(r => r.id));
+  const liveSlotIds   = new Set(liveSlots.map(s => s.id));
+  const livePhotoIds  = new Set(liveSlots.filter(s => s.u).map(s => s.id));
+
+  const backupRecipes = backup.recipes || [];
+  const backupSlots   = backup.imageSlots || {};
+
+  const missingRecipes = backupRecipes.filter(r => !liveRecipeIds.has(r.id));
+  const missingPhotos  = Object.keys(backupSlots)
+    .filter(id => backupSlots[id] && backupSlots[id].u)
+    .filter(id => !livePhotoIds.has(id));
+
+  return {
+    offline: false,
+    live:    { recipes: liveRecipes.length, photos: livePhotoIds.size },
+    backup:  { recipes: backupRecipes.length, photos: Object.values(backupSlots).filter(v => v && v.u).length },
+    missingRecipes,
+    missingPhotos,
+    newerLive: backupRecipes.length < liveRecipeIds.size,
+    liveSlotIds,
+  };
+}
+
+// Writes back only what is genuinely absent. Never touches a document that
+// already exists, so running it twice changes nothing the second time.
+async function db_restoreMissing(backup, onStep = () => {}) {
+  const report = await db_inspectAgainstLive(backup);
+  if (report.offline) throw new Error('אין חיבור לשרת');
+
+  let recipesWritten = 0;
+  let photosWritten  = 0;
+
+  if (report.missingRecipes.length) {
+    onStep('מחזיר מתכונים');
+    const batch = _db.batch();
+    for (const r of report.missingRecipes) {
+      const { id, ...data } = r;
+      batch.set(_db.collection('recipes').doc(id), data);
+      recipesWritten++;
+    }
+    await batch.commit();
+  }
+
+  if (report.missingPhotos.length) {
+    onStep('מחזיר תמונות');
+    // Photos are heavy — commit them a few at a time.
+    const ids = report.missingPhotos;
+    for (let i = 0; i < ids.length; i += 4) {
+      const batch = _db.batch();
+      for (const id of ids.slice(i, i + 4)) {
+        batch.set(_db.collection('image_slots').doc(id), backup.imageSlots[id]);
+        photosWritten++;
+      }
+      await batch.commit();
+    }
+  }
+
+  return { recipesWritten, photosWritten };
+}
+
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
   db_loadRecipes, db_watchRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
@@ -440,4 +561,5 @@ Object.assign(window, {
   db_checkAndAcceptInvites, db_getMyShares, db_revokeShare,
   db_shareRecipeWith, db_getSharedWithMe, db_removeSharedRecipe,
   compressDataUrl,
+  db_exportSnapshot, db_inspectAgainstLive, db_restoreMissing,
 });

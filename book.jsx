@@ -408,9 +408,13 @@ function PdfBook({ recipes, categories, onDone, onError }) {
       try {
         const els = stageRef.current ? Array.from(stageRef.current.querySelectorAll('.book-page')) : [];
         if (!els.length) throw new Error('no pages');
-        const name = recipes.length === 1
-          ? `${(recipes[0].title || 'מתכון').replace(/[\\/:*?"<>|]/g, '')}.pdf`
-          : `ספר-המתכונים-${new Date().toISOString().slice(0, 10)}.pdf`;
+        // Chromium throws away a download name that has any non-ASCII in it,
+        // and the file lands as a plain "download" with no extension — so the
+        // name stays ASCII and carries the date instead of the Hebrew title.
+        const st = new Date();
+        const p2 = (x) => String(x).padStart(2, '0');
+        const stamp = `${st.getFullYear()}-${p2(st.getMonth() + 1)}-${p2(st.getDate())}-${p2(st.getHours())}${p2(st.getMinutes())}`;
+        const name = `maites-${recipes.length === 1 ? 'recipe' : 'book'}-${stamp}.pdf`;
         await pagesToPdfFile(els, name, (page, total) => {
           if (!cancelled) setProgress({ page, total });
         });

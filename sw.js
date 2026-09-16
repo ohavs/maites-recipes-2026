@@ -5,7 +5,7 @@
 // photos live in Firestore's own IndexedDB cache, which the SDK keeps in
 // sync and replays writes from when the connection returns.
 
-const VERSION = 'maites-v14';
+const VERSION = 'maites-v15';
 const CORE = 'core-' + VERSION;      // app shell — precached, cache-first
 const RUNTIME = 'run-' + VERSION;    // anything else same-origin
 
@@ -24,6 +24,7 @@ const SHELL = [
   '/components.jsx',
   '/exporter.jsx',
   '/db.jsx',
+  '/backup.jsx',
   '/screens.jsx',
   '/cooking.jsx',
   '/book.jsx',
