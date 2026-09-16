@@ -19,17 +19,33 @@ on:
         default: '1.0.0'
   push:
     tags: [ 'v*' ]
+    # A branch named release/1.2.3 asks for a build of 1.2.3. This is the
+    # one way to start a release that needs nothing but permission to write
+    # to the repository, which is all an assistant working here has.
+    branches: [ 'release/**' ]
+  # Creating that branch through the API fires `create` rather than `push`,
+  # so both are listened for and the job filters on the name.
+  create:
   # Publishing a release from the GitHub page does not always fire a push
-  # event, so that path is listened for on its own.
+  # event either.
   release:
     types: [ published ]
 
 permissions:
   contents: write
 
+# Creating a release branch can fire both `create` and `push`. Rather than
+# guess which, both are listened for and only one build per ref survives.
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'create' ||
+      startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +63,14 @@ jobs:
         id: v
         run: |
           NAME="${{ github.event.inputs.version }}"
-          if [ -z "$NAME" ]; then NAME="${GITHUB_REF_NAME#v}"; fi
+          if [ -z "$NAME" ]; then
+            # v1.2.3 (a tag) and release/1.2.3 (a branch) both mean 1.2.3.
+            NAME="${GITHUB_REF_NAME#release/}"
+            NAME="${NAME#v}"
+          fi
+          case "$NAME" in
+            *[!0-9.]*|'') echo "::error::'$NAME' is not a version number"; exit 1 ;;
+          esac
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           # The build number must only ever go up, so it is the run number.
           echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
@@ -121,3 +144,12 @@ jobs:
             גרסה ${{ steps.v.outputs.name }} · build ${{ steps.v.outputs.code }}
 
             להתקנה: להוריד את הקובץ מלמטה ולפתוח אותו בטלפון.
+
+      - name: Tidy up the release branch
+        if: startsWith(github.ref, 'refs/heads/release/')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The tag holds the commit now; the branch was only a doorbell.
+          gh api -X DELETE "repos/${{ github.repository }}/git/${{ github.ref }}"
