@@ -46,22 +46,20 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
           margin: 0, fontSize: 'var(--t-display)', fontWeight: 800, letterSpacing: '-.01em',
           color: 'var(--ink)', fontFamily: 'var(--font-display)',
         }}>Maites</h1>
-        {currentUser && (
-          <button onClick={onOpenAccount} aria-label="חשבון"
-            style={{
-              width: 40, height: 40, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
-              background: 'var(--glass)', padding: 0, overflow: 'hidden',
-              boxShadow: 'var(--e1)',
-              display: 'grid', placeItems: 'center', flexShrink: 0,
-            }}>
-            {currentUser.photoURL
-              ? <img src={currentUser.photoURL} style={{ width: 40, height: 40, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-              : <span style={{ fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)' }}>
-                  {(currentUser.displayName || currentUser.email || '?')[0].toUpperCase()}
-                </span>
-            }
-          </button>
-        )}
+        <button onClick={onOpenAccount} aria-label="חשבון"
+          style={{
+            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
+            background: 'var(--glass)', padding: 0, overflow: 'hidden',
+            boxShadow: 'var(--e1)',
+            display: 'grid', placeItems: 'center', flexShrink: 0,
+          }}>
+          {currentUser && currentUser.photoURL
+            ? <img src={currentUser.photoURL} style={{ width: 44, height: 44, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
+            : <span style={{ fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)' }}>
+                {currentUser ? (currentUser.displayName || currentUser.email || '?')[0].toUpperCase() : '⚙'}
+              </span>
+          }
+        </button>
       </div>
 
       {/* Filter toolbar — dropdown (start) + layout & search (end) */}
@@ -1511,7 +1509,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange, onResetServings, onExport, onImport }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onResetServings, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
   const [confirmReset, setConfirmReset] = uS(false);
   const withServings = recipes.filter(r => +r.servings > 0).length;
   const [inviteEmail, setInviteEmail] = uS('');
@@ -1560,16 +1558,16 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
             {user?.photoURL
               ? <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
               : <span style={{ fontSize: 'var(--t-title)', fontWeight: 700, color: 'var(--ink)' }}>
-                  {(user?.displayName || user?.email || '?')[0].toUpperCase()}
+                  {user ? (user.displayName || user.email || '?')[0].toUpperCase() : '⚙'}
                 </span>
             }
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 'var(--t-body)', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.displayName || 'משתמש'}
+              {user ? (user.displayName || 'משתמש') : 'ללא חשבון'}
             </div>
             <div style={{ fontSize: 'var(--t-small)', color: 'var(--ink-soft)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email}
+              {user ? user.email : 'המתכונים נשמרים על המכשיר הזה'}
             </div>
           </div>
           <button onClick={onClose} style={{
@@ -1581,7 +1579,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
         {/* Tab bar */}
         <div style={{ display: 'flex', padding: '0 20px 0', gap: 8, borderBottom: '1px solid var(--line)' }}>
-          {[['profile', 'פרופיל'], ['share', 'שיתוף']].map(([id, label]) => (
+          {(user ? [['profile', 'פרופיל'], ['share', 'שיתוף']] : [['profile', 'פרופיל']]).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
               padding: '10px 16px', border: 'none', cursor: 'pointer', background: 'transparent',
               fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
@@ -1616,6 +1614,8 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   </div>
                 ))}
               </div>
+
+              {!user && <SignInBlock onSignIn={onSignIn} localCount={localCount}/>}
 
               {/* Appearance */}
               <div style={{ marginTop: 4 }}>
@@ -1687,12 +1687,19 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
               {/* Diagnostics */}
               <DiagnosticsBlock/>
 
-              {/* Sign out */}
-              <Button tone="quiet" full onClick={onSignOut} style={{
-                background: 'var(--danger-soft)', color: 'var(--danger)', marginTop: 4,
-              }}>
-                <span style={{ fontSize: 'var(--t-heading)' }} aria-hidden="true">🚪</span> יציאה מהחשבון
-              </Button>
+              {/* The account */}
+              {user ? (
+                <Button tone="quiet" full onClick={onSignOut} style={{
+                  background: 'var(--danger-soft)', color: 'var(--danger)', marginTop: 4,
+                }}>
+                  <span style={{ fontSize: 'var(--t-heading)' }} aria-hidden="true">🚪</span> יציאה מהחשבון
+                </Button>
+              ) : null}
+
+              {/* Recipes written before signing in, still on this device */}
+              {user && localCount > 0 && onUploadLocal && (
+                <LocalNotebookBlock count={localCount} onUpload={onUploadLocal}/>
+              )}
             </div>
           )}
 
@@ -1867,6 +1874,107 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 }
 
 // Shows recorded failures so a problem on the phone leaves a trace.
+// ───────────────────────────────────────────────────────────
+// SignInBlock — the account, offered rather than demanded.
+// The app opens without one; this is where you add one.
+// ───────────────────────────────────────────────────────────
+function SignInBlock({ onSignIn, localCount = 0 }) {
+  const [busy, setBusy] = uS(false);
+  const [err, setErr] = uS('');
+  const [detail, setDetail] = uS('');
+  const [showDetail, setShowDetail] = uS(false);
+
+  const go = async () => {
+    setBusy(true); setErr(''); setDetail('');
+    try { await onSignIn(); }
+    catch (e) {
+      const code = (e && e.code) || '';
+      if (code !== 'auth/popup-closed-by-user') {
+        setErr('ההתחברות נכשלה');
+        setDetail([code, (e && e.message) || String(e)].filter(Boolean).join(' · '));
+        if (typeof reportError === 'function') reportError('sign-in', e);
+      }
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>חשבון</SectionLabel>
+      <div style={{
+        background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)',
+        padding: '14px 16px', display: 'grid', gap: 12,
+      }}>
+        <div style={{ ...TYPE.caption, color: 'var(--ink-soft)', fontWeight: 500, lineHeight: 1.55 }}>
+          {localCount > 0
+            ? `${localCount} מתכונים שמורים על המכשיר הזה בלבד. התחברות מעלה אותם לענן, מסנכרנת בין מכשירים, ומאפשרת שיתוף.`
+            : 'התחברות מסנכרנת את המתכונים בין מכשירים, שומרת אותם בענן ומאפשרת שיתוף. בלעדיה הכל נשמר על המכשיר הזה בלבד.'}
+        </div>
+        <Button tone="primary" size="lg" full disabled={busy} onClick={go}>
+          {busy ? 'מתחבר…' : 'התחברות עם Google'}
+        </Button>
+        {err && (
+          <div>
+            <div style={{ ...TYPE.caption, color: 'var(--danger)', fontWeight: 700 }}>{err}</div>
+            {detail && (
+              <>
+                <button type="button" onClick={() => setShowDetail(v => !v)}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                    color: 'var(--ink-soft)', ...TYPE.caption, fontWeight: 700,
+                    padding: '10px 2px', minHeight: 44, textDecoration: 'underline',
+                  }}>{showDetail ? 'הסתרה' : 'מה נכשל?'}</button>
+                {showDetail && (
+                  <div style={{
+                    background: 'var(--surface-raised)', borderRadius: 'var(--r-sm)', padding: '10px 12px',
+                    ...TYPE.caption, color: 'var(--ink)', direction: 'ltr', textAlign: 'start',
+                    wordBreak: 'break-word', lineHeight: 1.5,
+                  }}>
+                    {detail}
+                    <button type="button"
+                      onClick={() => { try { navigator.clipboard.writeText(detail); } catch {} }}
+                      style={{
+                        display: 'block', marginTop: 10, border: 'none', cursor: 'pointer',
+                        background: 'var(--ink)', color: 'var(--bg)', borderRadius: 'var(--r-sm)',
+                        padding: '10px 16px', minHeight: 44, fontFamily: 'inherit',
+                        ...TYPE.caption, fontWeight: 700, direction: 'rtl',
+                      }}>העתקת הפרטים</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// LocalNotebookBlock — recipes written before there was an
+// account. Uploading is offered, never done behind your back.
+// ───────────────────────────────────────────────────────────
+function LocalNotebookBlock({ count, onUpload }) {
+  const [busy, setBusy] = uS(false);
+  return (
+    <div style={{ marginTop: 4 }}>
+      <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>על המכשיר</SectionLabel>
+      <div style={{
+        background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)',
+        padding: '14px 16px', display: 'grid', gap: 12,
+      }}>
+        <div style={{ ...TYPE.caption, color: 'var(--ink-soft)', fontWeight: 500, lineHeight: 1.55 }}>
+          {count} מתכונים נכתבו לפני שהתחברת והם עדיין רק כאן. אפשר להעלות אותם לחשבון —
+          מתכון שכבר קיים בחשבון לא ייגע.
+        </div>
+        <Button tone="glass" full disabled={busy}
+          onClick={async () => { setBusy(true); try { await onUpload(); } finally { setBusy(false); } }}>
+          {busy ? 'מעלה…' : `העלאת ${count} מתכונים לחשבון`}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DiagnosticsBlock() {
   const [log, setLog] = uS(() => (typeof readErrorLog === 'function' ? readErrorLog() : []));
   const [open, setOpen] = uS(false);
@@ -1925,5 +2033,5 @@ Object.assign(window, {
   HomeScreen, DetailScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
   DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
-  SharedRecipesSection, RecipeSelectSheet, DiagnosticsBlock,
+  SharedRecipesSection, RecipeSelectSheet, DiagnosticsBlock, SignInBlock, LocalNotebookBlock,
 });

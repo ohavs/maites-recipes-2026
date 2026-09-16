@@ -182,7 +182,18 @@ function App() {
     const unsub = auth_onAuthStateChanged(user => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (user) loadUserData(user);
+      if (user) {
+        loadUserData(user);
+      } else {
+        // No account: the notebook on this device is the whole library.
+        if (recipesUnsubRef.current) { recipesUnsubRef.current(); recipesUnsubRef.current = null; }
+        setRecipes(typeof guestRead === 'function' ? guestRead() : []);
+        setSharedWithMe([]);
+        setSharesInfo({ asOwner: [], asGuest: [] });
+        setPendingInvites([]);
+        setRecipesLoaded(true);
+        setLoadError(null);
+      }
     });
     // Never spin forever: with no connection and no stored session the
     // sign-in screen is the honest answer.
@@ -225,27 +236,34 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(err => reportError('save-recipe', err));
+      if (changed) persist(changed);
       return updated;
     });
 
-  const addRecipe = (rec) => {
-    ensureCategoryExists(rec.category, categories, rec._catInfo);
-    setRecipes(rs => [rec, ...rs]);
+  // One door for every write. With an account it is Firestore; without
+  // one it is the notebook on this device. Nothing else has to know which.
+  const persist = (rec) => {
+    if (!currentUser) {
+      if (!guestSave(rec)) showToast('השמירה על המכשיר נכשלה', 'danger');
+      return;
+    }
     if (typeof db_saveRecipe !== 'undefined') {
       retryLastSave.current = () => db_saveRecipe(rec);
       db_saveRecipe(rec).catch(err => reportError('save-recipe', err));
     }
+  };
+
+  const addRecipe = (rec) => {
+    ensureCategoryExists(rec.category, categories, rec._catInfo);
+    setRecipes(rs => [rec, ...rs]);
+    persist(rec);
     setTab('home');
     showToast(`"${rec.title}" נוסף לאוסף 🎉`);
   };
 
   const updateRecipe = (rec) => {
     setRecipes(rs => rs.map(r => r.id === rec.id ? { ...r, ...rec } : r));
-    if (typeof db_saveRecipe !== 'undefined') {
-      retryLastSave.current = () => db_saveRecipe(rec);
-      db_saveRecipe(rec).catch(err => reportError('save-recipe', err));
-    }
+    persist(rec);
     setEditingRecipeId(null);
     showToast(`עודכן: "${rec.title}"`);
   };
@@ -254,13 +272,14 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, notes } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(err => reportError('save-recipe', err));
+      if (changed) persist(changed);
       return updated;
     });
 
   const deleteRecipe = (id) => {
     setRecipes(rs => rs.filter(r => r.id !== id));
-    if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
+    if (!currentUser) guestDelete(id);
+    else if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
     setOpenRecipeId(null);
     setDeletingRecipeId(null);
     showToast('המתכון נמחק');
@@ -450,11 +469,6 @@ function App() {
     );
   }
 
-  // Not signed in → show login screen
-  if (!currentUser) {
-    return <LoginScreen onSignIn={auth_signInWithGoogle} />;
-  }
-
   return (
     <AnimSpeedContext.Provider value="normal">
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
@@ -633,6 +647,22 @@ function App() {
             recipes={recipes}
             onExport={handleExport}
             onImport={handleImport}
+            onSignIn={auth_signInWithGoogle}
+            localCount={typeof guestCount === 'function' ? guestCount() : 0}
+            onUploadLocal={async () => {
+              if (!currentUser) return;
+              try {
+                const res = await guestUpload(currentUser.uid, recipes.map(r => r.id));
+                showToast(res.uploaded
+                  ? `${res.uploaded} מתכונים הועלו לחשבון ✓`
+                  : 'הכול כבר נמצא בחשבון');
+                // The device copy stays until it is safely in the account.
+                if (res.uploaded || res.skipped) guestClear();
+              } catch (err) {
+                reportError('guest-upload', err);
+                showToast('ההעלאה נכשלה — המתכונים עדיין על המכשיר', 'danger');
+              }
+            }}
             themeMode={themeMode}
             onThemeChange={setThemeMode}
             onResetServings={async () => {

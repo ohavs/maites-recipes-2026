@@ -76,7 +76,18 @@ async function signInWithGoogleNative() {
   if (!plugin) {
     throw new Error('native-sign-in-missing: the FirebaseAuthentication plugin is not registered');
   }
-  const res = await plugin.signInWithGoogle({ scopes: ['email', 'profile'] });
+  // Android's Credential Manager answers "No credentials available" on
+  // plenty of ordinary phones — a device with no Google account picker it
+  // is willing to use, a work profile, a ROM without the newer services.
+  // The older account chooser still works there, so it is the fallback.
+  let res;
+  try {
+    res = await plugin.signInWithGoogle({ scopes: ['email', 'profile'] });
+  } catch (err) {
+    const msg = String((err && err.message) || err);
+    if (!/no credential|credential manager|GetCredential/i.test(msg)) throw err;
+    res = await plugin.signInWithGoogle({ scopes: ['email', 'profile'], useCredentialManager: false });
+  }
   if (!res || !res.credential) {
     // Almost always skipNativeAuth being off: the plugin then signs in on
     // the native layer and keeps the credential, and there is nothing to
