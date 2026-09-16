@@ -32,4 +32,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Maites is not on the Play Store, so it updates itself: it downloads
+         the new APK and hands it to Android's installer. Android still asks
+         you to confirm, which is exactly as it should be. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

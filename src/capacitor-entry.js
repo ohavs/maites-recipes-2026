@@ -16,8 +16,11 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { FileOpener } from '@capacitor-community/file-opener';
 
 window.Cap = {
   Capacitor, App, Camera, CameraResultType, CameraSource,
   Haptics, ImpactStyle, NotificationType, SplashScreen, StatusBar, Style,
+  Filesystem, Directory, FileOpener,
 };

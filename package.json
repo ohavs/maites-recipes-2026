@@ -11,11 +11,13 @@
     "deploy": "node build.js && firebase deploy --only hosting"
   },
   "dependencies": {
+    "@capacitor-community/file-opener": "^7.0.1",
     "@capacitor-firebase/authentication": "^7.0.0",
     "@capacitor/android": "^7.0.0",
     "@capacitor/app": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
     "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.1.8",
     "@capacitor/haptics": "^7.0.0",
     "@capacitor/splash-screen": "^7.0.0",
     "@capacitor/status-bar": "^7.0.0"

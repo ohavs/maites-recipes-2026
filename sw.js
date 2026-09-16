@@ -27,6 +27,7 @@ const SHELL = [
   '/exporter.jsx',
   '/db.jsx',
   '/guest.jsx',
+  '/updates.jsx',
   '/backup.jsx',
   '/screens.jsx',
   '/cooking.jsx',
