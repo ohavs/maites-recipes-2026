@@ -26,14 +26,18 @@ console.log('oauth clients:      ' + (types.length ? types.map(t => t === 1 ? 'a
 console.log('android client:     ' + (hasAndroid ? 'present' : 'MISSING'));
 console.log('web client:         ' + (hasWeb ? 'present' : 'MISSING'));
 
+// Both of these produce DEVELOPER_ERROR (status 10) on the device, which
+// is a dead end with nothing on screen to explain it. Better to stop here.
 if (!hasAndroid) {
-  console.log('::warning::No android OAuth client. This means no SHA-1 fingerprint is '
-    + 'registered for ' + WANT + ', or the file was downloaded before it was added. '
-    + 'Google sign-in cannot work until it is there.');
+  console.log('::error::No android OAuth client for ' + WANT + '. Either no SHA-1 '
+    + 'fingerprint is registered, or google-services.json was downloaded before it '
+    + 'was added — adding the fingerprint does not update a file already downloaded. '
+    + 'Download it again and update the GOOGLE_SERVICES_JSON secret.');
 }
 if (!hasWeb) {
-  console.log('::warning::No web OAuth client, so default_web_client_id will not exist '
-    + 'and the sign-in plugin has no server client ID to use. Enable Google as a '
-    + 'sign-in provider in Firebase Authentication, then download the file again.');
+  console.log('::error::No web OAuth client, so default_web_client_id will not exist '
+    + 'and the sign-in plugin has no server client ID. Enable Google as a sign-in '
+    + 'provider in Firebase Authentication, then download the file again.');
 }
-if (hasAndroid && hasWeb) console.log('Google sign-in is configured correctly.');
+if (!hasAndroid || !hasWeb) process.exit(1);
+console.log('Google sign-in is configured correctly.');
