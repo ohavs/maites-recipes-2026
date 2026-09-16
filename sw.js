@@ -14,6 +14,7 @@ const RUNTIME = 'run-' + VERSION;    // anything else same-origin
 const SHELL = [
   '/',
   '/index.html',
+  '/theme.css',
   '/manifest.json',
   '/image-slot.js',
   '/errors.jsx',
@@ -21,6 +22,7 @@ const SHELL = [
   '/icons.jsx',
   '/ui.jsx',
   '/components.jsx',
+  '/forms.jsx',
   '/exporter.jsx',
   '/db.jsx',
   '/backup.jsx',

@@ -93,8 +93,12 @@ function build({ withHarness = false } = {}) {
   if (withHarness) buildPage('__test.html');
 
   // ── sw.js ───────────────────────────────────────────────────
-  // The cache name carries a hash of what was actually built, so a deploy
-  // can never be served half-old: any change at all is a new cache.
+  // The cache name carries a hash of everything that was built — the
+  // compiled sources, the page and the stylesheet — so a deploy can never
+  // be served half-old, and a change to the theme alone still busts it.
+  for (const f of ['index.html', 'theme.css']) {
+    hash.update(fs.readFileSync(path.join(ROOT, f), 'utf8'));
+  }
   const stamp = hash.digest('hex').slice(0, 10);
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8')
     .replace(/const VERSION = '[^']*';/, `const VERSION = 'maites-${stamp}';`)
@@ -104,7 +108,7 @@ function build({ withHarness = false } = {}) {
 
   // ── everything else ─────────────────────────────────────────
   copy('vendor', { skip: (rel) => rel.endsWith('babel.min.js') });
-  for (const f of ['image-slot.js', 'manifest.json', 'icon.svg',
+  for (const f of ['theme.css', 'image-slot.js', 'manifest.json', 'icon.svg',
                    'maites-icon.png', 'maites-logo.png']) copy(f);
 
   const files = [...compiled.values()];

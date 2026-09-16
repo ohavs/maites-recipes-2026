@@ -249,6 +249,19 @@ const IconBook = (p) => (
 const IconChevronDown = (p) => (
   <Icon {...p}><path d="M6 9l6 6 6-6"/></Icon>
 );
+const IconCamera = (p) => (
+  <Icon {...p}>
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </Icon>
+);
+const IconImage = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <path d="M21 15l-5-5L5 21"/>
+  </Icon>
+);
 const IconFilePdf = (p) => (
   <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 0 0 0-3H9v6"/><path d="M14 18h1.5a1.5 1.5 0 0 0 1.5-1.5v-2A1.5 1.5 0 0 0 15.5 13H14z"/></Icon>
 );
@@ -261,7 +274,7 @@ function IngredientIcon({ kind = '🍽️', size = 20 }) {
 Object.assign(window, {
   Icon, IconBack, IconForward, IconHome, IconSearch, IconHeart, IconPlus, IconClose,
   IconClock, IconUsers, IconUpload,
-  IconCheck, IconShare, IconExcel, IconWord,
+  IconCheck, IconShare, IconExcel, IconWord, IconCamera, IconImage,
   IconEdit, IconNote, IconTrash,
   IconGrid, IconRows, IconColumns2,
   IconBook, IconChevronDown, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,

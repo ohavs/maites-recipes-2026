@@ -619,14 +619,19 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 // ───────────────────────────────────────────────────────────
 // RecipeFormScreen — writing a recipe down, in four passes.
 //
-// It used to be one page with thirteen fields on it, which is a wall to
-// look at and impossible to fill in on a phone without losing your place.
-// The same thirteen fields are here, grouped the way you actually think
-// about a recipe: what it is, what goes in, what you do, how it looks.
+// It used to be one page with thirteen fields on it: a wall to look at,
+// impossible to fill in on a phone without losing your place, and built
+// out of white cards with drop shadows floating on a gradient — which is
+// what a web page looks like, not an app.
 //
-// Nothing is gated. You can move between the four in any order, from the
-// rail at the top, and save from anywhere the moment it has a name —
-// which matters, because most recipes get written down in a hurry.
+// The same thirteen fields are here, grouped the way you think about a
+// recipe: what it is, what goes in, what you do, how it looks. They are
+// made of the controls in forms.jsx: filled fields with the label inside
+// them, rows that open a sheet, a stepper for a count, a photo area the
+// size of the photo.
+//
+// Nothing is gated. The tabs move between the four in any order, and you
+// can save from anywhere the moment the recipe has a name.
 // ───────────────────────────────────────────────────────────
 const FORM_STEPS = [
   { id: 'what',  label: 'המתכון',  hint: 'שם, תיאור, קטגוריה' },
@@ -634,49 +639,6 @@ const FORM_STEPS = [
   { id: 'how',   label: 'הכנה',    hint: 'זמנים ושלבים' },
   { id: 'look',  label: 'מראה',    hint: 'תמונות, צבע, הערות' },
 ];
-
-function StepRail({ step, onStep, filled }) {
-  return (
-    <div style={{ padding: '0 18px', marginTop: 18 }}>
-      <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 6 }}>
-        {FORM_STEPS.map((s, i) => {
-          const on = i === step;
-          const done = filled[i] && !on;
-          return (
-            <button key={s.id} type="button" onClick={() => onStep(i)}
-              aria-label={s.label} aria-current={on ? 'step' : undefined}
-              style={{
-                flex: on ? 2.2 : 1, minWidth: 0, minHeight: 'var(--tap)',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                borderRadius: 'var(--r-pill)', padding: on ? '0 16px' : 0,
-                background: on ? 'var(--ink)' : done ? 'var(--glass-strong)' : 'var(--surface-sunken)',
-                color: on ? 'var(--bg)' : 'var(--ink-soft)',
-                boxShadow: on ? 'var(--e2)' : 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                transition: 'flex var(--dur) var(--ease-out), background var(--dur-fast)',
-                overflow: 'hidden',
-              }}>
-              <span style={{
-                ...TYPE.caption, fontWeight: 800,
-                opacity: on ? 1 : done ? .9 : .55,
-              }}>{done ? '✓' : i + 1}</span>
-              {on && (
-                <span style={{
-                  ...TYPE.small, fontWeight: 700, whiteSpace: 'nowrap',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>{s.label}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      <div style={{
-        ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600,
-        marginTop: 10, paddingInlineStart: 6,
-      }}>{FORM_STEPS[step].hint}</div>
-    </div>
-  );
-}
 
 function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
   const [title, setTitle] = uS(existing?.title || '');
@@ -698,6 +660,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   const [recipeId] = uS(existing?.id || `new-${Date.now().toString(36)}`);
   const [isDirty, setIsDirty] = uS(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = uS(false);
+  const [catSheet, setCatSheet] = uS(false);
   // The step lives in App when it is mounted there, so the phone's back
   // gesture walks back through the four instead of throwing the form away.
   const [ownStep, setOwnStep] = uS(0);
@@ -729,14 +692,13 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   const updateStep = (i, k, v) => setStepsArr(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
   const addStep = () => setStepsArr(arr => [...arr, { title: '', body: '' }]);
   const removeStep = (i) => setStepsArr(arr => arr.filter((_,idx) => idx !== i));
-  const addGallerySlot = () => setGallery(arr => [...arr, `g${Date.now().toString(36)}`]);
-  const removeGallerySlot = (slot) => setGallery(arr => arr.length > 1 ? arr.filter(s => s !== slot) : arr);
 
   const p = paletteOf(paletteKey);
   const canSave = !!title.trim();
+  const cats = (catsProp || []).filter(c => c.id !== 'all');
+  const currentCat = cats.find(c => c.id === category);
 
-  // What the rail marks as done — enough of a pass to be worth a tick.
-  const filled = [
+  const done = [
     !!title.trim(),
     ings.some(i => (i.name || '').trim()),
     stepsArr.some(s => (s.title || '').trim() || (s.body || '').trim()),
@@ -769,249 +731,180 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     });
   };
 
-  const pane = { display: 'flex', flexDirection: 'column', gap: 24, padding: '0 18px' };
+  const pane  = { display: 'flex', flexDirection: 'column', gap: 16, padding: '20px 16px 8px' };
+  const group = { ...TYPE.label, color: 'var(--ink-faint)', paddingInline: 6, marginTop: 8 };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      height: '100%', display: 'flex', flexDirection: 'column',
+      // A form sits on a calm surface, not on the app's gradient: the
+      // fields are what you are looking at.
+      background: 'var(--surface)',
+    }}>
 
-      {/* ── header ─────────────────────────────────────── */}
-      <div style={{ flexShrink: 0, paddingTop: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', gap: 12 }}>
-          <h1 className="display" style={{ margin: 0, ...TYPE.display, whiteSpace: 'nowrap' }}>
-            {mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
-          </h1>
-          {onCancel && (
-            <IconButton size="md" tone="glass" label="ביטול" onClick={tryCancel}>
-              <IconClose size={18} strokeWidth={2.2}/>
-            </IconButton>
-          )}
-        </div>
-        <StepRail step={step} onStep={setStep} filled={filled}/>
+      <div style={{ flexShrink: 0 }}>
+        <NAppBar
+          title={mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
+          subtitle={FORM_STEPS[step].hint}
+          onClose={onCancel ? tryCancel : null}
+          closeLabel="ביטול"
+        />
+        <NTabs tabs={FORM_STEPS} index={step} onIndex={setStep} done={done}/>
       </div>
 
-      {/* ── the pass you are on ────────────────────────── */}
-      <div ref={scrollRef} className="scroll-y" style={{ flex: 1, minHeight: 0, padding: '24px 0 32px' }}>
+      <div ref={scrollRef} className="scroll-y" style={{ flex: 1, minHeight: 0 }}>
 
         {step === 0 && (
           <div style={pane}>
+            <NField label="שם המתכון" value={title} onChange={setTitle}
+              placeholder="עוגת אגוזים של סבתא" autoFocus={mode === 'add'}/>
+            <NField label="תיאור" value={desc} onChange={setDesc} multiline rows={3}
+              placeholder="במה זה מיוחד?" hint="שורה אחת שתופיע על הכרטיס"/>
+            <NRow label="קטגוריה"
+              value={currentCat ? `${currentCat.emoji || ''} ${currentCat.label}`.trim() : '—'}
+              onClick={() => setCatSheet(true)}/>
+            <NField label="סוג מטבח" value={cuisine} onChange={setCuisine}
+              placeholder="איטלקית, אסייתית…" hint="לא חובה"/>
             <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
               servings={servings} cuisine={cuisine}/>
-            <Field label="שם המתכון">
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="לדוגמה: עוגת אגוזים של סבתא"
-                style={inputStyle}/>
-            </Field>
-            <Field label="תיאור" hint="שורה אחת שתופיע על הכרטיס">
-              <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="במה זה מיוחד?"
-                style={{ ...inputStyle, resize: 'vertical', minHeight: 96 }}/>
-            </Field>
-            <Field label="קטגוריה">
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-                {(catsProp || []).filter(c => c.id !== 'all').map(c => (
-                  <Chip key={c.id} tone="glass" active={category === c.id} onClick={() => setCategory(c.id)}>
-                    {c.emoji} {c.label}
-                  </Chip>
-                ))}
-                {onAddCategory && (
-                  <button onClick={onAddCategory} style={{
-                    border: '1.5px dashed var(--line-strong)', cursor: 'pointer',
-                    padding: '8px 14px', minHeight: 44, borderRadius: 'var(--r-pill)', background: 'transparent',
-                    fontFamily: 'inherit', ...TYPE.caption, color: 'var(--ink-soft)',
-                  }}>+ קטגוריה חדשה</button>
-                )}
-              </div>
-            </Field>
-            <Field label="סוג מטבח" hint="לא חובה">
-              <input value={cuisine} onChange={e => setCuisine(e.target.value)} placeholder="לדוגמה: איטלקית, אסייתית"
-                style={inputStyle}/>
-            </Field>
           </div>
         )}
 
         {step === 1 && (
           <div style={pane}>
-            <Field label="לכמה אנשים הכמויות?" hint="זו נקודת ההתחלה לחישוב. אפשר להשאיר ריק אם לא ידוע.">
-              <ServingsPicker value={servings} onChange={setServings}/>
-            </Field>
-            <Field label="מצרכים">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {ings.map((ing, i) => (
-                  <IngredientFormRow key={i} ing={ing}
-                    onChange={(k, v) => updateIng(i, k, v)}
-                    onRemove={() => removeIng(i)}
-                    canRemove={ings.length > 1}
-                  />
-                ))}
-                <button onClick={addIng} style={addRowBtn}>
-                  <IconPlus size={18}/> הוספת מצרך
-                </button>
-              </div>
-            </Field>
+            <NStepper label="לכמה אנשים" value={servings} onChange={setServings}
+              hint="זו נקודת ההתחלה לחישוב הכמויות. אפשר להשאיר ריק אם לא ידוע."/>
+            <div style={group}>מצרכים</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {ings.map((ing, i) => (
+                <IngredientFormRow key={i} ing={ing}
+                  onChange={(k, v) => updateIng(i, k, v)}
+                  onRemove={() => removeIng(i)}
+                  canRemove={ings.length > 1}
+                />
+              ))}
+              <button onClick={addIng} style={addRowBtn}>
+                <IconPlus size={18}/> הוספת מצרך
+              </button>
+            </div>
           </div>
         )}
 
         {step === 2 && (
           <div style={pane}>
             <div style={{ display: 'flex', gap: 12 }}>
-              <Field label="הכנה (דק׳)" style={{ flex: 1 }}>
-                <input type="number" min="0" inputMode="numeric" value={prepTime}
-                  onChange={e => setPrepTime(e.target.value)} style={inputStyle}/>
-              </Field>
-              <Field label="בישול (דק׳)" style={{ flex: 1 }}>
-                <input type="number" min="0" inputMode="numeric" value={cookTime}
-                  onChange={e => setCookTime(e.target.value)} style={inputStyle}/>
-              </Field>
+              <NField label="הכנה (דק׳)" value={prepTime} onChange={setPrepTime}
+                type="number" inputMode="numeric" style={{ flex: 1 }}/>
+              <NField label="בישול (דק׳)" value={cookTime} onChange={setCookTime}
+                type="number" inputMode="numeric" style={{ flex: 1 }}/>
             </div>
-            <Field label="שלבי הכנה">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {stepsArr.map((s, i) => (
-                  <div key={i} style={{
-                    background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: 14,
-                    boxShadow: 'var(--e1)', position: 'relative',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                      <span style={{
-                        width: 30, height: 30, borderRadius: 'var(--r-pill)', flexShrink: 0,
-                        background: p.bg, color: p.ink, display: 'grid', placeItems: 'center',
-                        ...TYPE.caption, fontWeight: 800,
-                      }}>{i + 1}</span>
-                      <input value={s.title} onChange={e => updateStep(i, 'title', e.target.value)}
-                        placeholder="כותרת השלב" style={{ ...inputStyle, boxShadow: 'none', background: 'var(--surface-sunken)' }}/>
-                      {stepsArr.length > 1 && (
-                        <IconButton size="sm" tone="ghost" label="מחיקת שלב" onClick={() => removeStep(i)}>
-                          <IconTrash size={16}/>
-                        </IconButton>
-                      )}
+            <div style={group}>שלבי הכנה</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {stepsArr.map((s, i) => (
+                <div key={i} style={{
+                  background: 'var(--field-fill)', borderRadius: 'var(--r-lg)', padding: 14,
+                  position: 'relative',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <span style={{
+                      width: 32, height: 32, borderRadius: 999, flexShrink: 0,
+                      background: p.bg, color: p.ink, display: 'grid', placeItems: 'center',
+                      ...TYPE.small, fontWeight: 800,
+                    }}>{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0, ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)' }}>
+                      שלב {i + 1}
                     </div>
-                    <textarea value={s.body} onChange={e => updateStep(i, 'body', e.target.value)} rows={3}
-                      placeholder="מה עושים בשלב הזה?"
-                      style={{ ...inputStyle, boxShadow: 'none', background: 'var(--surface-sunken)', resize: 'vertical', minHeight: 84 }}/>
+                    {stepsArr.length > 1 && (
+                      <button type="button" onClick={() => removeStep(i)} aria-label="מחיקת שלב"
+                        style={{
+                          width: 44, height: 44, borderRadius: 999, border: 'none', flexShrink: 0,
+                          background: 'transparent', color: 'var(--ink-faint)', cursor: 'pointer',
+                          display: 'grid', placeItems: 'center',
+                        }}><IconTrash size={18}/></button>
+                    )}
                   </div>
-                ))}
-                <button onClick={addStep} style={addRowBtn}>
-                  <IconPlus size={18}/> הוספת שלב
-                </button>
-              </div>
-            </Field>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <NField label="כותרת השלב" value={s.title} onChange={v => updateStep(i, 'title', v)}/>
+                    <NField label="מה עושים" value={s.body} onChange={v => updateStep(i, 'body', v)}
+                      multiline rows={3}/>
+                  </div>
+                </div>
+              ))}
+              <button onClick={addStep} style={addRowBtn}>
+                <IconPlus size={18}/> הוספת שלב
+              </button>
+            </div>
           </div>
         )}
 
         {step === 3 && (
           <div style={pane}>
+            <PhotoStage
+              recipeId={recipeId}
+              gallery={gallery}
+              setGallery={setGallery}
+              mainSlot={mainSlot}
+              setMainSlot={setMainSlot}
+              palette={p}
+            />
+            <div style={group}>צבע הכרטיס</div>
+            <NSwatches keys={Object.keys(PALETTES)} palettes={PALETTES} value={paletteKey} onChange={setPaletteKey}/>
+            <div style={group}>איך התמונה יושבת בכרטיס</div>
+            <NCards value={imageMode} onChange={setImageMode} options={[
+              { value: 'pop',    label: 'בולטת',  hint: 'עיגול שיוצא מהמסגרת', preview: <CardShapePreview mode="pop" p={p}/> },
+              { value: 'inside', label: 'בפנים',  hint: 'מלבן בתוך המסגרת',    preview: <CardShapePreview mode="inside" p={p}/> },
+            ]}/>
+            <NField label="הערות אישיות" value={notes} onChange={setNotes} multiline rows={3}
+              placeholder="טיפים, שדרוגים, תזכורות לפעם הבאה…"
+              hint="רק בשבילך — לא מופיע על הכרטיס"/>
             <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
               servings={servings} cuisine={cuisine}/>
-            <Field label="תמונות המתכון">
-              <PhotoManager
-                recipeId={recipeId}
-                gallery={gallery}
-                setGallery={setGallery}
-                mainSlot={mainSlot}
-                setMainSlot={setMainSlot}
-                palette={p}
-              />
-            </Field>
-            <Field label="צבע הכרטיס">
-              <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
-                {Object.keys(PALETTES).map(k => (
-                  <button key={k} onClick={() => setPaletteKey(k)} aria-label={k}
-                    style={{
-                      flex: 1, height: 48, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
-                      background: PALETTES[k].bg,
-                      boxShadow: paletteKey === k ? '0 0 0 3px var(--ink), var(--e1)' : 'var(--e1)',
-                      transform: paletteKey === k ? 'scale(1.04)' : 'scale(1)',
-                      transition: 'all .18s',
-                    }}/>
-                ))}
-              </div>
-            </Field>
-            <Field label="סגנון התמונה בכרטיס">
-              <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
-                {[
-                  { id: 'pop',    label: 'בולטת מהכרטיס', hint: 'עיגול שיוצא מהמסגרת' },
-                  { id: 'inside', label: 'בתוך הכרטיס',   hint: 'תמונה מלבנית בתוך המסגרת' },
-                ].map(opt => {
-                  const on = imageMode === opt.id;
-                  return (
-                    <button key={opt.id} onClick={() => setImageMode(opt.id)} style={{
-                      flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                      borderRadius: 'var(--r-lg)', padding: '14px 12px 13px', textAlign: 'center',
-                      background: on ? 'var(--ink)' : 'var(--glass)',
-                      color: on ? 'var(--bg)' : 'var(--ink)',
-                      boxShadow: 'var(--e1)', transition: 'all .18s',
-                    }}>
-                      {/* mini preview of the card layout */}
-                      <div style={{
-                        position: 'relative', height: 44, borderRadius: 'var(--r-sm)',
-                        background: on ? 'rgba(255,255,255,.14)' : p.bg2,
-                        marginBottom: 10, overflow: opt.id === 'inside' ? 'hidden' : 'visible',
-                      }}>
-                        <div style={{
-                          position: 'absolute', top: opt.id === 'inside' ? 6 : '50%',
-                          insetInlineStart: opt.id === 'inside' ? 6 : -9,
-                          transform: opt.id === 'inside' ? 'none' : 'translateY(-50%)',
-                          width: 30, height: 30,
-                          borderRadius: opt.id === 'inside' ? 8 : 999,
-                          background: on ? 'var(--bg)' : 'var(--surface-raised)',
-                          boxShadow: 'var(--e1)',
-                        }}/>
-                        <div style={{
-                          position: 'absolute', insetInlineEnd: 8, top: 13, width: '45%', height: 5,
-                          borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.55)' : 'var(--line-strong)',
-                        }}/>
-                        <div style={{
-                          position: 'absolute', insetInlineEnd: 8, top: 24, width: '32%', height: 4,
-                          borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.35)' : 'var(--line)',
-                        }}/>
-                      </div>
-                      <div style={{ ...TYPE.small, fontWeight: 800 }}>{opt.label}</div>
-                      <div style={{ ...TYPE.caption, opacity: .7, marginTop: 3, fontWeight: 500 }}>{opt.hint}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            <Field label="הערות אישיות" hint="רק בשבילך — טיפים ותזכורות לפעם הבאה">
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                placeholder="טיפים, שדרוגים, תזכורות לפעם הבאה…"
-                style={{ ...inputStyle, resize: 'vertical', minHeight: 96 }}/>
-            </Field>
           </div>
         )}
       </div>
 
       {/* ── the bar that moves you along ───────────────── */}
       <div style={{
-        flexShrink: 0, padding: '12px 18px calc(12px + env(safe-area-inset-bottom))',
-        background: 'var(--glass-strong)', backdropFilter: 'blur(14px)',
-        boxShadow: '0 -1px 0 var(--line)', display: 'flex', alignItems: 'center', gap: 10,
+        flexShrink: 0, padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
+        background: 'var(--surface)', borderTop: '1px solid var(--line)',
+        display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <Button tone="quiet" size="lg" onClick={() => (step === 0 ? tryCancel() : setStep(step - 1))}
-          style={{ flexShrink: 0, paddingInline: 22 }}>
+        <BarButton tone="quiet" onClick={() => (step === 0 ? tryCancel() : setStep(step - 1))}>
           {step === 0 ? 'ביטול' : 'חזרה'}
-        </Button>
-
+        </BarButton>
         {step < FORM_STEPS.length - 1 ? (
           <>
-            {canSave && (
-              <Button tone="glass" size="lg" onClick={save} style={{ flexShrink: 0, paddingInline: 18 }}>
-                שמירה
-              </Button>
-            )}
-            <Button tone="primary" size="lg" full onClick={() => setStep(step + 1)}>
-              {FORM_STEPS[step + 1].label} ←
-            </Button>
+            {canSave && <BarButton tone="quiet" onClick={save}>שמירה</BarButton>}
+            <BarButton tone="primary" grow onClick={() => setStep(step + 1)}>
+              {FORM_STEPS[step + 1].label}
+            </BarButton>
           </>
         ) : (
-          <Button tone="primary" size="lg" full disabled={!canSave} onClick={save}>
+          <BarButton tone="primary" grow disabled={!canSave} onClick={save}>
             {mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}
-          </Button>
+          </BarButton>
         )}
       </div>
 
-      {!canSave && step === FORM_STEPS.length - 1 && (
-        <div style={{
-          position: 'absolute', insetInline: 18, bottom: 96,
-          ...TYPE.caption, color: 'var(--danger)', fontWeight: 700, textAlign: 'center',
-        }}>למתכון עוד אין שם — הוא נמצא בצעד הראשון</div>
+      {catSheet && (
+        <NPickSheet
+          title="קטגוריה"
+          value={category}
+          options={cats.map(c => ({ value: c.id, label: c.label, emoji: c.emoji }))}
+          onPick={setCategory}
+          onClose={() => setCatSheet(false)}
+          footer={onAddCategory ? (
+            <button type="button" onClick={() => { setCatSheet(false); onAddCategory(); }}
+              style={{
+                border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+                padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
+              }}>
+              <IconPlus size={22} strokeWidth={2.2}/>
+              <span style={{ ...TYPE.body, fontWeight: 700 }}>קטגוריה חדשה</span>
+            </button>
+          ) : null}
+        />
       )}
 
       {showLeaveConfirm && (
@@ -1024,13 +917,59 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   );
 }
 
-// The card as it will look on the home screen, kept next to the two passes
-// where what you type changes it.
+// A button for the bar at the bottom of the form. Square-ish, flat, and
+// as tall as a thumb — the form has no floating pills in it.
+function BarButton({ tone = 'quiet', grow, disabled, onClick, children }) {
+  const tones = {
+    primary: { background: disabled ? 'var(--field-fill)' : 'var(--ink)', color: disabled ? 'var(--ink-faint)' : 'var(--bg)' },
+    quiet:   { background: 'var(--field-fill)', color: 'var(--ink)' },
+  };
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      style={{
+        border: 'none', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+        borderRadius: 'var(--r-md)', minHeight: 'var(--field-h)',
+        padding: '0 24px', flex: grow ? 1 : '0 0 auto',
+        ...TYPE.body, fontWeight: 700,
+        transition: 'background var(--dur-fast)',
+        ...tones[tone],
+      }}>{children}</button>
+  );
+}
+
+// The little diagram on the two "how the photo sits" choices.
+function CardShapePreview({ mode, p }) {
+  const inside = mode === 'inside';
+  return (
+    <div style={{
+      position: 'relative', height: 52, borderRadius: 'var(--r-sm)',
+      background: p.bg2, overflow: inside ? 'hidden' : 'visible',
+    }}>
+      <div style={{
+        position: 'absolute', top: inside ? 7 : '50%',
+        insetInlineStart: inside ? 7 : -10,
+        transform: inside ? 'none' : 'translateY(-50%)',
+        width: 34, height: 34, borderRadius: inside ? 9 : 999,
+        background: p.bg, boxShadow: '0 0 0 2px var(--surface)',
+      }}/>
+      <div style={{
+        position: 'absolute', insetInlineEnd: 9, top: 15, width: '44%', height: 6,
+        borderRadius: 99, background: 'var(--line-strong)',
+      }}/>
+      <div style={{
+        position: 'absolute', insetInlineEnd: 9, top: 28, width: '30%', height: 5,
+        borderRadius: 99, background: 'var(--line)',
+      }}/>
+    </div>
+  );
+}
+
+// The card as it will look on the home screen.
 function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) {
   return (
     <div style={{
       padding: 22, borderRadius: 'var(--r-lg)', background: p.bg, color: p.ink,
-      boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden',
+      position: 'relative', overflow: 'hidden', marginTop: 8,
     }}>
       <div style={{ ...TYPE.label, opacity: .6 }}>תצוגה מקדימה</div>
       <div className="display" style={{ ...TYPE.title, marginTop: 8 }}>
@@ -1043,200 +982,6 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
         <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
         {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
         {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
-      </div>
-    </div>
-  );
-}
-
-// How many people the written quantities are for. Typing a number on a
-// phone is a keyboard and a mis-tap; the common answers are one tap.
-function ServingsPicker({ value, onChange }) {
-  const n = parseInt(value, 10) || 0;
-  const bump = (d) => onChange(String(Math.min(99, Math.max(0, n + d)) || ''));
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'var(--surface-raised)', borderRadius: 'var(--r-md)',
-        boxShadow: 'var(--e1)', padding: 4,
-      }}>
-        <IconButton size="md" tone="ghost" label="פחות" onClick={() => bump(-1)} disabled={n <= 0}>
-          <span style={{ ...TYPE.heading, fontWeight: 700, lineHeight: 1 }}>−</span>
-        </IconButton>
-        <div style={{
-          minWidth: 52, textAlign: 'center', fontFamily: 'var(--font-display)',
-          fontSize: 'var(--t-display)', fontWeight: 800, lineHeight: 1,
-          color: n > 0 ? 'var(--ink)' : 'var(--ink-faint)',
-        }}>{n > 0 ? n : '·'}</div>
-        <IconButton size="md" tone="ghost" label="עוד" onClick={() => bump(1)}>
-          <span style={{ ...TYPE.heading, fontWeight: 700, lineHeight: 1 }}>+</span>
-        </IconButton>
-      </div>
-      <div style={{ display: 'flex', gap: 8, flex: 1, flexDirection: 'row-reverse' }}>
-        {[2, 4, 6].map(k => (
-          <Chip key={k} tone="glass" active={n === k} onClick={() => onChange(String(k))}
-            style={{ flex: 1, justifyContent: 'center' }}>{k}</Chip>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// PhotoManager — simple grid of upload slots for the form
-// ───────────────────────────────────────────────────────────
-function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, palette }) {
-  const [previews, setPreviews] = uS({});
-  const inputRef = uR(null);
-  const [pickingSlot, setPickingSlot] = uS(null);
-  const [confirmRemoveSlot, setConfirmRemoveSlot] = uS(null);
-  const p = palette;
-
-  // Load existing images from bridge on mount (may already be loaded if card was rendered)
-  uE(() => {
-    const tryLoad = () => {
-      if (!window.__getImageSlot) return;
-      const next = {};
-      let any = false;
-      gallery.forEach(slot => {
-        const data = window.__getImageSlot(`food-${recipeId}-${slot}`);
-        if (data && data.u) { next[slot] = data.u; any = true; }
-      });
-      if (any) setPreviews(prev => ({ ...prev, ...next }));
-    };
-    tryLoad();
-    const t = setTimeout(tryLoad, 700);
-    return () => clearTimeout(t);
-  }, [recipeId]);
-
-  const openPicker = (slot) => {
-    setPickingSlot(slot);
-    setTimeout(() => inputRef.current?.click(), 0);
-  };
-
-  const onFile = (e) => {
-    const file = e.target.files?.[0];
-    const slot = pickingSlot;
-    e.target.value = '';
-    setPickingSlot(null);
-    if (!file || !slot) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX = 900;
-        let { width: w, height: h } = img;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-          else { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL('image/webp', 0.85);
-        if (window.__setImageSlot) window.__setImageSlot(`food-${recipeId}-${slot}`, { u: dataUrl, s: 1, x: 0, y: 0 });
-        setPreviews(prev => {
-          if (!Object.values(prev).some(Boolean)) setMainSlot(slot);
-          return { ...prev, [slot]: dataUrl };
-        });
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const addSlot = () => setGallery(g => [...g, `g${Date.now().toString(36)}`]);
-
-  const removeSlot = (slot) => {
-    if (gallery.length <= 1) return;
-    const next = gallery.filter(s => s !== slot);
-    setGallery(next);
-    if (mainSlot === slot) setMainSlot(next[0]);
-    setPreviews(prev => { const n = { ...prev }; delete n[slot]; return n; });
-    // Delete from Firestore image_slots
-    const slotId = `food-${recipeId}-${slot}`;
-    if (typeof db_deleteImageSlot !== 'undefined') db_deleteImageSlot(slotId);
-    if (window.__setImageSlot) window.__setImageSlot(slotId, null);
-  };
-
-  return (
-    <div>
-      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onFile} />
-      {confirmRemoveSlot && (
-        <ConfirmDialog
-          emoji="🖼️"
-          title="הסרת תמונה"
-          body="בטוח להסיר את התמונה הזו?"
-          confirmLabel="הסר תמונה"
-          cancelLabel="ביטול"
-          confirmColor="#e34466"
-          onConfirm={() => { removeSlot(confirmRemoveSlot); setConfirmRemoveSlot(null); }}
-          onCancel={() => setConfirmRemoveSlot(null)}
-        />
-      )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, flexDirection: 'row-reverse' }}>
-        {gallery.map(slot => {
-          const isMain = slot === mainSlot;
-          const preview = previews[slot];
-          return (
-            <div key={slot} style={{ position: 'relative' }}>
-              <button type="button" onClick={() => openPicker(slot)} style={{
-                width: 84, height: 84, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
-                background: preview ? 'transparent' : 'var(--surface-sunken)',
-                overflow: 'hidden', padding: 0,
-                boxShadow: isMain ? `0 0 0 3px ${p.accent}` : 'var(--e1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'box-shadow .2s',
-              }}>
-                {preview
-                  ? <img src={preview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
-                  : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: 'var(--ink-soft)' }}>
-                      <IconPlus size={22} strokeWidth={2} />
-                      <span style={{ fontSize: 10, fontWeight: 700 }}>תמונה</span>
-                    </div>
-                }
-              </button>
-              {isMain && (
-                <div style={{
-                  position: 'absolute', top: -7, insetInlineStart: -7,
-                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
-                  background: p.accent, color: 'var(--surface-raised)',
-                  display: 'grid', placeItems: 'center', fontSize: 'var(--t-caption)',
-                  pointerEvents: 'none', boxShadow: 'var(--e1)',
-                }}>★</div>
-              )}
-              {!isMain && preview && (
-                <button type="button" onClick={() => setMainSlot(slot)} title="הגדר כתמונה ראשית" style={{
-                  position: 'absolute', top: -7, insetInlineStart: -7,
-                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
-                  background: 'var(--glass-strong)', color: 'var(--ink-soft)',
-                  border: 'none', cursor: 'pointer', fontSize: 'var(--t-caption)',
-                  display: 'grid', placeItems: 'center',
-                  boxShadow: 'var(--e1)',
-                }}>☆</button>
-              )}
-              {gallery.length > 1 && (
-                <button type="button" onClick={() => setConfirmRemoveSlot(slot)} style={{
-                  position: 'absolute', top: -7, insetInlineEnd: -7,
-                  width: 22, height: 22, borderRadius: 'var(--r-pill)',
-                  background: 'var(--glass-strong)', color: 'var(--brand-strong)',
-                  border: 'none', cursor: 'pointer', fontSize: 'var(--t-body)', lineHeight: 1,
-                  display: 'grid', placeItems: 'center',
-                  boxShadow: 'var(--e1)',
-                }}>×</button>
-              )}
-            </div>
-          );
-        })}
-        <button type="button" onClick={addSlot} style={{
-          width: 84, height: 84, borderRadius: 'var(--r-md)',
-          border: '1.5px dashed var(--line-strong)', background: 'transparent',
-          cursor: 'pointer', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 4, color: 'var(--ink-soft)',
-        }}>
-          <IconPlus size={18} strokeWidth={2} />
-          <span style={{ fontSize: 10, fontWeight: 700 }}>הוסיפי</span>
-        </button>
       </div>
     </div>
   );
@@ -1261,15 +1006,14 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'stretch' }}>
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => setPickerOpen(o => !o)}
-          aria-label="בחר אמוג׳י"
+    <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
+      <div style={{ flexShrink: 0 }}>
+        <button type="button" onClick={() => setPickerOpen(o => !o)}
+          aria-label="בחירת סמל"
           style={{
-            width: 44, height: '100%', minHeight: 44, borderRadius: 'var(--r-sm)', border: 'none',
-            background: 'var(--glass)', color: 'var(--ink)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 'var(--t-title)',
-            boxShadow: 'var(--e1)',
+            width: 56, height: 56, borderRadius: 'var(--r-md)', border: 'none',
+            background: 'var(--field-fill)', color: 'var(--ink)',
+            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 26,
           }}>{emoji}</button>
         {pickerOpen && (
           <EmojiPickerPopover current={emoji}
@@ -1278,16 +1022,16 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
           />
         )}
       </div>
-      <input value={ing.qty || ''} onChange={e => onChange('qty', e.target.value)}
-        placeholder="כמות" style={{ ...inputStyle, width: 100, flex: 'none' }}/>
-      <input value={ing.name || ''} onChange={e => onChange('name', e.target.value)}
-        placeholder="מצרך" style={{ ...inputStyle, flex: 1 }}/>
+      <NField label="כמות" value={ing.qty || ''} onChange={v => onChange('qty', v)}
+        style={{ width: 104, flex: 'none' }}/>
+      <NField label="מצרך" value={ing.name || ''} onChange={v => onChange('name', v)}
+        style={{ flex: 1, minWidth: 0 }}/>
       {canRemove && (
-        <button onClick={onRemove} aria-label="מחיקה" style={{
-          width: 36, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-          background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+        <button type="button" onClick={onRemove} aria-label="מחיקת מצרך" style={{
+          width: 44, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+          background: 'transparent', color: 'var(--ink-faint)', flexShrink: 0,
           display: 'grid', placeItems: 'center',
-        }}><IconTrash size={14}/></button>
+        }}><IconTrash size={18}/></button>
       )}
     </div>
   );
@@ -1302,54 +1046,43 @@ const FOOD_EMOJIS = [
 
 function EmojiPickerPopover({ current, onPick, onClose }) {
   const [custom, setCustom] = uS('');
-  uE(() => {
-    const onDown = (e) => {
-      if (!e.target.closest?.('[data-emoji-pop]')) onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, []);
   return (
-    <div data-emoji-pop="1" style={{
-      position: 'absolute', top: '100%', insetInlineEnd: 0, marginTop: 6,
-      background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 10,
-      boxShadow: 'var(--e2)',
-      width: 260, zIndex: 20,
-    }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+    <Sheet title="סמל המצרך" onClose={onClose}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8,
+        padding: '4px 4px 16px',
+      }}>
         {FOOD_EMOJIS.map(e => (
-          <button key={e} onClick={() => onPick(e)}
+          <button key={e} type="button" onClick={() => onPick(e)}
             style={{
-              height: 36, border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 'var(--t-heading)',
-              background: e === current ? 'var(--ink)' : 'var(--surface-sunken)',
-              transition: 'all .12s',
+              height: 56, border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer', fontSize: 26,
+              background: e === current ? 'var(--field-fill-focus)' : 'var(--field-fill)',
+              boxShadow: e === current ? '0 0 0 2px var(--brand-strong) inset' : 'none',
+              transition: 'box-shadow var(--dur-fast)',
             }}>{e}</button>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <input value={custom} onChange={e => setCustom(e.target.value)}
-          placeholder="הקלד/י אמוג׳י…"
-          style={{
-            flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '8px 10px', fontSize: 'var(--t-body)',
-            background: 'var(--surface-sunken)', fontFamily: 'inherit', outline: 'none', textAlign: 'right',
-          }}/>
-        <button onClick={() => { if (custom.trim()) onPick(custom.trim()); }}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingBottom: 8 }}>
+        <NField label="סמל משלך" value={custom} onChange={setCustom} style={{ flex: 1 }}/>
+        <button type="button" onClick={() => { if (custom.trim()) onPick(custom.trim()); }}
           disabled={!custom.trim()}
           style={{
-            border: 'none', borderRadius: 'var(--r-sm)', padding: '8px 12px', cursor: 'pointer',
-            background: custom.trim() ? 'var(--ink)' : 'var(--line)',
-            color: custom.trim() ? 'var(--bg)' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
-          }}>בחר</button>
+            border: 'none', borderRadius: 'var(--r-md)', padding: '0 22px', minHeight: 'var(--field-h)',
+            cursor: custom.trim() ? 'pointer' : 'default', flexShrink: 0,
+            background: custom.trim() ? 'var(--ink)' : 'var(--field-fill)',
+            color: custom.trim() ? 'var(--bg)' : 'var(--ink-faint)',
+            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
+          }}>בחירה</button>
       </div>
-    </div>
+    </Sheet>
   );
 }
 
 const addRowBtn = {
-  border: '1.5px dashed var(--line-strong)', background: 'transparent',
-  borderRadius: 'var(--r-sm)', padding: '10px', cursor: 'pointer',
-  fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 600, color: 'var(--ink-soft)',
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  border: 'none', background: 'var(--field-fill)',
+  borderRadius: 'var(--r-md)', padding: '0 18px', minHeight: 'var(--field-h)', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
 };
 
 
@@ -2147,6 +1880,6 @@ function DiagnosticsBlock() {
 Object.assign(window, {
   HomeScreen, DetailScreen, FavoritesScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
-  PhotoManager, DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
+  DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
   SharedRecipesSection, RecipeSelectSheet, DiagnosticsBlock,
 });

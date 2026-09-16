@@ -1,0 +1,547 @@
+// forms.jsx — form controls that behave like an app's, not a web page's.
+//
+// What made the old form feel like a site on a phone was not the fields
+// it asked for, it was what they were made of: white rounded cards with
+// drop shadows, floating on a gradient, each with a tiny caption hovering
+// above it, and every choice offered as a scatter of pills.
+//
+// These are built the other way round. A field is a filled container with
+// a line under it and its label living inside it, rising out of the way
+// when you type. A choice is a row you tap, which opens a sheet from the
+// bottom of the screen. Nothing floats and nothing casts a shadow.
+
+const { useState: fS, useRef: fR, useEffect: fE, useId: fId } = React;
+
+// ───────────────────────────────────────────────────────────
+// NField — one line of text, with its label inside it.
+// ───────────────────────────────────────────────────────────
+function NField({ value, onChange, label, hint, type = 'text', inputMode, placeholder,
+                  multiline = false, rows = 3, autoFocus, style }) {
+  const [focused, setFocused] = fS(false);
+  const up = focused || String(value ?? '').length > 0;
+  const Tag = multiline ? 'textarea' : 'input';
+
+  return (
+    <div style={style}>
+      <label style={{
+        display: 'block', position: 'relative',
+        background: focused ? 'var(--field-fill-focus)' : 'var(--field-fill)',
+        borderRadius: '16px 16px 6px 6px',
+        borderBottom: `${focused ? 2 : 1}px solid ${focused ? 'var(--brand-strong)' : 'var(--field-line)'}`,
+        paddingBottom: focused ? 0 : 1,
+        transition: 'background var(--dur-fast)',
+      }}>
+        <span style={{
+          position: 'absolute', insetInlineStart: 18, pointerEvents: 'none',
+          top: up ? 9 : 'calc(50% - .62em)',
+          fontSize: up ? 'var(--t-caption)' : 'var(--t-body)',
+          fontWeight: up ? 700 : 500,
+          color: focused ? 'var(--brand-strong)' : 'var(--ink-faint)',
+          transition: 'top var(--dur-fast) var(--ease-out), font-size var(--dur-fast), color var(--dur-fast)',
+          ...(multiline && !up ? { top: 18 } : {}),
+        }}>{label}</span>
+        <Tag
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoFocus={autoFocus}
+          {...(multiline ? { rows } : { type, inputMode })}
+          placeholder={up ? placeholder : ''}
+          style={{
+            width: '100%', border: 'none', outline: 'none', background: 'transparent',
+            color: 'var(--ink)', fontFamily: 'inherit', fontSize: 'var(--t-body)',
+            fontWeight: 500, textAlign: 'right', direction: 'rtl',
+            padding: multiline ? '30px 18px 14px' : '26px 18px 10px',
+            minHeight: multiline ? 96 : 'var(--field-h)',
+            resize: 'none',
+            lineHeight: multiline ? 1.6 : 1.3,
+            display: 'block',
+          }}/>
+      </label>
+      {hint && (
+        <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500,
+                      marginTop: 7, paddingInline: 18 }}>{hint}</div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NRow — a setting you tap. The value sits where you read it,
+// and a sheet comes up from the bottom to change it.
+// ───────────────────────────────────────────────────────────
+function NRow({ label, value, hint, onClick, leading }) {
+  const [down, setDown] = fS(false);
+  return (
+    <button type="button" onClick={onClick}
+      onPointerDown={() => setDown(true)}
+      onPointerUp={() => setDown(false)}
+      onPointerLeave={() => setDown(false)}
+      style={{
+        width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        background: down ? 'var(--field-fill-focus)' : 'var(--field-fill)',
+        borderRadius: 'var(--r-md)', padding: '14px 18px', minHeight: 68,
+        display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+        transition: 'background var(--dur-fast)',
+      }}>
+      {leading}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 700 }}>{label}</div>
+        <div style={{ ...TYPE.body, fontWeight: 600, color: 'var(--ink)', marginTop: 2 }}>
+          {value || '—'}
+        </div>
+        {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', marginTop: 3, fontWeight: 500 }}>{hint}</div>}
+      </div>
+      <span style={{ color: 'var(--ink-faint)', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+        <IconBack size={20} strokeWidth={2.2}/>
+      </span>
+    </button>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NPickSheet — the list that a row opens. One tap picks and
+// closes; there is no confirm button to hunt for.
+// ───────────────────────────────────────────────────────────
+function NPickSheet({ title, options, value, onPick, onClose, footer }) {
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {options.map(opt => {
+          const on = opt.value === value;
+          return (
+            <button key={opt.value} type="button"
+              onClick={() => { onPick(opt.value); onClose(); }}
+              style={{
+                border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
+                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+              }}>
+              <Radio on={on}/>
+              {opt.emoji && <span style={{ fontSize: 22, lineHeight: 1 }} aria-hidden="true">{opt.emoji}</span>}
+              <span style={{ ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1 }}>
+                {opt.label}
+              </span>
+            </button>
+          );
+        })}
+        {footer}
+      </div>
+    </Sheet>
+  );
+}
+
+function Radio({ on }) {
+  return (
+    <span style={{
+      width: 22, height: 22, borderRadius: 999, flexShrink: 0,
+      border: `2px solid ${on ? 'var(--brand-strong)' : 'var(--field-line)'}`,
+      display: 'grid', placeItems: 'center',
+      transition: 'border-color var(--dur-fast)',
+    }}>
+      <span style={{
+        width: 11, height: 11, borderRadius: 999,
+        background: on ? 'var(--brand-strong)' : 'transparent',
+        transform: on ? 'scale(1)' : 'scale(.3)',
+        transition: 'transform var(--dur-fast) var(--ease-out), background var(--dur-fast)',
+      }}/>
+    </span>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NStepper — a count. Two big targets and the number between
+// them, on one row with its label.
+// ───────────────────────────────────────────────────────────
+function NStepper({ label, hint, value, onChange, min = 0, max = 99, empty = 'לא צוין' }) {
+  const n = parseInt(value, 10) || 0;
+  const set = (v) => onChange(v <= 0 ? '' : String(Math.min(max, Math.max(min, v))));
+  const btn = (dis) => ({
+    width: 52, height: 52, borderRadius: 'var(--r-md)', border: 'none', flexShrink: 0,
+    background: 'var(--surface-raised)', color: dis ? 'var(--ink-faint)' : 'var(--ink)',
+    cursor: dis ? 'default' : 'pointer', opacity: dis ? .4 : 1,
+    display: 'grid', placeItems: 'center', fontFamily: 'inherit',
+    fontSize: 26, fontWeight: 500, lineHeight: 1,
+  });
+  return (
+    <div style={{
+      background: 'var(--field-fill)', borderRadius: 'var(--r-md)', padding: '14px 18px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...TYPE.body, fontWeight: 600, color: 'var(--ink)' }}>{label}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <button type="button" aria-label="פחות" onClick={() => set(n - 1)} disabled={n <= min} style={btn(n <= min)}>−</button>
+          <div style={{
+            minWidth: 72, textAlign: 'center', fontFamily: 'var(--font-display)',
+            fontSize: n > 0 ? 'var(--t-title)' : 'var(--t-caption)',
+            fontWeight: n > 0 ? 800 : 600,
+            color: n > 0 ? 'var(--ink)' : 'var(--ink-faint)',
+          }}>{n > 0 ? n : empty}</div>
+          <button type="button" aria-label="עוד" onClick={() => set(n + 1)} disabled={n >= max} style={btn(n >= max)}>+</button>
+        </div>
+      </div>
+      {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 8, lineHeight: 1.5 }}>{hint}</div>}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NCards — two or three choices you can see. Picked is marked
+// by a ring and a filled radio, not by turning black.
+// ───────────────────────────────────────────────────────────
+function NCards({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
+      {options.map(opt => {
+        const on = opt.value === value;
+        return (
+          <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
+            style={{
+              flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              borderRadius: 'var(--r-lg)', padding: 14, textAlign: 'center',
+              background: 'var(--field-fill)',
+              boxShadow: on ? '0 0 0 2px var(--brand-strong) inset' : '0 0 0 1px var(--line) inset',
+              transition: 'box-shadow var(--dur-fast)',
+            }}>
+            {opt.preview}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+              <Radio on={on}/>
+              <span style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink)' }}>{opt.label}</span>
+            </div>
+            {opt.hint && (
+              <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', marginTop: 4, fontWeight: 500 }}>{opt.hint}</div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NSwatches — the card's colour. Circles, with a tick on the
+// one in use.
+// ───────────────────────────────────────────────────────────
+function NSwatches({ keys, palettes, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
+      {keys.map(k => {
+        const on = k === value;
+        return (
+          <button key={k} type="button" onClick={() => onChange(k)} aria-label={k}
+            aria-pressed={on}
+            style={{
+              width: 52, height: 52, borderRadius: 999, border: 'none', cursor: 'pointer',
+              background: palettes[k].bg, display: 'grid', placeItems: 'center',
+              boxShadow: on ? '0 0 0 3px var(--ink)' : '0 0 0 1px var(--line)',
+              transition: 'box-shadow var(--dur-fast)',
+            }}>
+            {on && <IconCheck size={22} strokeWidth={3} style={{ color: palettes[k].ink }}/>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NTabs — the four passes of the form. A label and an
+// underline, the way a phone marks where you are.
+// ───────────────────────────────────────────────────────────
+function NTabs({ tabs, index, onIndex, done = [] }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row-reverse', borderBottom: '1px solid var(--line)' }}>
+      {tabs.map((t, i) => {
+        const on = i === index;
+        return (
+          <button key={t.id} type="button" onClick={() => onIndex(i)}
+            aria-current={on ? 'step' : undefined}
+            style={{
+              flex: 1, minWidth: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+              fontFamily: 'inherit', padding: '14px 4px 0', minHeight: 'var(--tap)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+            }}>
+            <span style={{
+              ...TYPE.small, fontWeight: on ? 800 : 600,
+              color: on ? 'var(--ink)' : 'var(--ink-faint)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
+              transition: 'color var(--dur-fast)',
+            }}>
+              {done[i] && !on ? '✓ ' : ''}{t.label}
+            </span>
+            <span style={{
+              height: 3, width: '100%', borderRadius: '3px 3px 0 0',
+              background: on ? 'var(--brand-strong)' : 'transparent',
+              transition: 'background var(--dur-fast)',
+            }}/>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// NAppBar — a title, and one action at the far side. The bar
+// a phone puts at the top of a screen you are inside.
+// ───────────────────────────────────────────────────────────
+function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '10px 8px 10px 14px', minHeight: 64,
+    }}>
+      <div style={{ flex: 1, minWidth: 0, paddingInlineStart: 10 }}>
+        <div className="display" style={{ ...TYPE.title, color: 'var(--ink)' }}>{title}</div>
+        {subtitle && (
+          <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>{subtitle}</div>
+        )}
+      </div>
+      {onClose && (
+        <button type="button" onClick={onClose} aria-label={closeLabel}
+          style={{
+            width: 48, height: 48, borderRadius: 999, border: 'none', flexShrink: 0,
+            background: 'transparent', color: 'var(--ink)', cursor: 'pointer',
+            display: 'grid', placeItems: 'center',
+          }}>
+          <IconClose size={22} strokeWidth={2.2}/>
+        </button>
+      )}
+    </div>
+  );
+}
+
+Object.assign(window, {
+  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio,
+});
+
+// ───────────────────────────────────────────────────────────
+// PhotoStage — the photo area, rebuilt.
+//
+// It was a row of small dashed squares with a plus in them, which is how
+// a website asks you to upload a file. A phone shows you the picture at
+// the size you will see it, and puts the camera one tap away.
+// ───────────────────────────────────────────────────────────
+const PHOTO_MAX_PX = 900;
+
+function readImageToSlot(file, slotId, done) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width: w, height: h } = img;
+      if (w > PHOTO_MAX_PX || h > PHOTO_MAX_PX) {
+        if (w > h) { h = Math.round(h * PHOTO_MAX_PX / w); w = PHOTO_MAX_PX; }
+        else { w = Math.round(w * PHOTO_MAX_PX / h); h = PHOTO_MAX_PX; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/webp', 0.85);
+      if (window.__setImageSlot) window.__setImageSlot(slotId, { u: dataUrl, s: 1, x: 0, y: 0 });
+      done(dataUrl);
+    };
+    img.onerror = () => done(null);
+    img.src = ev.target.result;
+  };
+  reader.onerror = () => done(null);
+  reader.readAsDataURL(file);
+}
+
+function PhotoStage({ recipeId, gallery, setGallery, mainSlot, setMainSlot, palette }) {
+  const [shots, setShots] = fS({});          // slot → data URL
+  const [sheetFor, setSheetFor] = fS(null);  // slot whose sheet is open
+  const [confirmSlot, setConfirmSlot] = fS(null);
+  const camRef = fR(null);
+  const libRef = fR(null);
+  const targetRef = fR(null);
+
+  // Photos already on this recipe, once the store has them.
+  fE(() => {
+    const read = () => {
+      if (!window.__getImageSlot) return;
+      const next = {};
+      let any = false;
+      gallery.forEach(slot => {
+        const d = window.__getImageSlot(`food-${recipeId}-${slot}`);
+        if (d && d.u) { next[slot] = d.u; any = true; }
+      });
+      if (any) setShots(prev => ({ ...prev, ...next }));
+    };
+    read();
+    const t = setTimeout(read, 700);
+    return () => clearTimeout(t);
+  }, [recipeId, gallery.length]);
+
+  const pick = (which, slot) => {
+    targetRef.current = slot;
+    setSheetFor(null);
+    setTimeout(() => (which === 'camera' ? camRef : libRef).current?.click(), 60);
+  };
+
+  const onFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    const slot = targetRef.current;
+    e.target.value = '';
+    if (!file || !slot) return;
+    readImageToSlot(file, `food-${recipeId}-${slot}`, (url) => {
+      if (!url) return;
+      setShots(prev => {
+        if (!Object.values(prev).some(Boolean)) setMainSlot(slot);
+        return { ...prev, [slot]: url };
+      });
+    });
+  };
+
+  const addAndPick = (which) => {
+    const slot = `g${Date.now().toString(36)}`;
+    setGallery(g => [...g, slot]);
+    pick(which, slot);
+  };
+
+  const remove = (slot) => {
+    const slotId = `food-${recipeId}-${slot}`;
+    if (typeof db_deleteImageSlot !== 'undefined') db_deleteImageSlot(slotId);
+    if (window.__setImageSlot) window.__setImageSlot(slotId, null);
+    setShots(prev => { const n = { ...prev }; delete n[slot]; return n; });
+    if (gallery.length > 1) {
+      const next = gallery.filter(s => s !== slot);
+      setGallery(next);
+      if (mainSlot === slot) setMainSlot(next[0]);
+    }
+  };
+
+  const withPhoto = gallery.filter(s => shots[s]);
+  const main = shots[mainSlot] ? mainSlot : withPhoto[0];
+  const hasAny = withPhoto.length > 0;
+
+  return (
+    <div>
+      <input ref={camRef} type="file" accept="image/*" capture="environment"
+        onChange={onFile} style={{ display: 'none' }}/>
+      <input ref={libRef} type="file" accept="image/*"
+        onChange={onFile} style={{ display: 'none' }}/>
+
+      {/* the picture, at the size you will see it */}
+      <button type="button"
+        onClick={() => setSheetFor(hasAny ? main : (gallery[0] || 'main'))}
+        style={{
+          width: '100%', aspectRatio: '4 / 3', border: 'none', cursor: 'pointer', padding: 0,
+          borderRadius: 'var(--r-lg)', overflow: 'hidden', position: 'relative',
+          background: hasAny ? 'var(--surface-sunken)' : 'var(--field-fill)',
+          boxShadow: hasAny ? 'none' : '0 0 0 1px var(--line) inset',
+          display: 'grid', placeItems: 'center', fontFamily: 'inherit',
+        }}>
+        {hasAny ? (
+          <img src={shots[main]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+        ) : (
+          <div style={{ display: 'grid', placeItems: 'center', gap: 10, padding: 24 }}>
+            <span style={{
+              width: 64, height: 64, borderRadius: 999, display: 'grid', placeItems: 'center',
+              background: palette ? palette.bg : 'var(--brand)', color: palette ? palette.ink : 'var(--ink)',
+            }}>
+              <IconCamera size={30} strokeWidth={1.9}/>
+            </span>
+            <span style={{ ...TYPE.body, fontWeight: 700, color: 'var(--ink)' }}>הוספת תמונה</span>
+            <span style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500 }}>
+              צילום עכשיו, או בחירה מהגלריה
+            </span>
+          </div>
+        )}
+      </button>
+
+      {/* the rest of them */}
+      {hasAny && (
+      <div className="scroll-x" style={{
+        display: 'flex', flexDirection: 'row-reverse', gap: 10, marginTop: 12,
+        overflowX: 'auto', paddingBottom: 4,
+      }}>
+        <button type="button" onClick={() => setSheetFor('new')}
+          aria-label="הוספת תמונה"
+          style={{
+            width: 76, height: 76, flexShrink: 0, borderRadius: 'var(--r-md)',
+            border: 'none', cursor: 'pointer', background: 'var(--field-fill)',
+            boxShadow: '0 0 0 1px var(--line) inset',
+            display: 'grid', placeItems: 'center', color: 'var(--ink-soft)',
+          }}>
+          <IconPlus size={24} strokeWidth={2.2}/>
+        </button>
+        {withPhoto.map(slot => {
+          const on = slot === main;
+          return (
+            <button key={slot} type="button" onClick={() => setMainSlot(slot)}
+              aria-label={on ? 'התמונה הראשית' : 'הפיכה לתמונה הראשית'}
+              style={{
+                width: 76, height: 76, flexShrink: 0, borderRadius: 'var(--r-md)',
+                border: 'none', cursor: 'pointer', padding: 0, overflow: 'hidden',
+                position: 'relative', background: 'var(--surface-sunken)',
+                boxShadow: on ? '0 0 0 3px var(--brand-strong)' : '0 0 0 1px var(--line) inset',
+                transition: 'box-shadow var(--dur-fast)',
+              }}>
+              <img src={shots[slot]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/>
+              {on && (
+                <span style={{
+                  position: 'absolute', insetInlineEnd: 4, top: 4,
+                  width: 22, height: 22, borderRadius: 999, background: 'var(--brand-strong)',
+                  color: 'var(--on-brand)', display: 'grid', placeItems: 'center',
+                }}><IconCheck size={14} strokeWidth={3}/></span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      )}
+      <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 10, paddingInline: 4 }}>
+        {hasAny ? 'הקשה על תמונה הופכת אותה לראשית' : 'התמונה הראשונה תהיה זו שמופיעה על הכרטיס'}
+      </div>
+
+      {sheetFor && (
+        <Sheet title="תמונה" onClose={() => setSheetFor(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+            <PhotoAction icon={<IconCamera size={22}/>} label="צילום תמונה"
+              onClick={() => (sheetFor === 'new' ? addAndPick('camera') : pick('camera', sheetFor))}/>
+            <PhotoAction icon={<IconImage size={22}/>} label="בחירה מהגלריה"
+              onClick={() => (sheetFor === 'new' ? addAndPick('library') : pick('library', sheetFor))}/>
+            {sheetFor !== 'new' && shots[sheetFor] && (
+              <PhotoAction icon={<IconTrash size={22}/>} label="הסרת התמונה" danger
+                onClick={() => { const s = sheetFor; setSheetFor(null); setConfirmSlot(s); }}/>
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {confirmSlot && (
+        <ConfirmDialog
+          emoji="🖼️"
+          title="הסרת תמונה"
+          body="התמונה תימחק מהמתכון. אי אפשר לבטל."
+          confirmLabel="הסרה"
+          cancelLabel="ביטול"
+          onConfirm={() => { remove(confirmSlot); setConfirmSlot(null); }}
+          onCancel={() => setConfirmSlot(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PhotoAction({ icon, label, onClick, danger }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{
+        border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+        display: 'flex', alignItems: 'center', gap: 16, textAlign: 'right',
+        padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+        color: danger ? 'var(--danger)' : 'var(--ink)',
+      }}>
+      <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center' }}>{icon}</span>
+      <span style={{ ...TYPE.body, fontWeight: 600 }}>{label}</span>
+    </button>
+  );
+}
+
+Object.assign(window, { PhotoStage, PhotoAction, readImageToSlot });
