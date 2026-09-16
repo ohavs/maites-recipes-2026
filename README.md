@@ -43,7 +43,22 @@ web fallback. Nothing above that file asks which it is running on.
 The APK is built by `.github/workflows/android.yml`, not locally: the
 Android SDK is a few gigabytes, and a release has to be signed by the same
 key every time or it will not install over the copy already on the phone.
-Run the workflow by hand with a version number, or push a `v1.2.3` tag.
+
+Three ways to start a build, all equivalent:
+
+- create a branch named `release/1.2.3`
+- push a tag `v1.2.3`
+- run the workflow from the Actions page with a version number
+
+The branch is the one an assistant working here can do on its own: pushing
+tags and dispatching workflows both need permissions it does not have,
+while creating a branch is a plain write. The branch deletes itself once
+the build has tagged the commit.
+
+A copy of the workflow lives on `main` as well, because GitHub only
+recognises `create` and `workflow_dispatch` for workflows on the default
+branch. The build itself always runs the file at the ref it was started
+from.
 
 Five repository secrets feed it: `GOOGLE_SERVICES_JSON`,
 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
