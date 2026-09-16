@@ -45,7 +45,7 @@ Android SDK is a few gigabytes, and a release has to be signed by the same
 key every time or it will not install over the copy already on the phone.
 Run the workflow by hand with a version number, or push a `v1.2.3` tag.
 
-Four repository secrets feed it: `GOOGLE_SERVICES_JSON`,
+Five repository secrets feed it: `GOOGLE_SERVICES_JSON`,
 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
 and `ANDROID_KEY_PASSWORD`. None of them are in this repository, and the
 build stops with a clear message if one is missing.
