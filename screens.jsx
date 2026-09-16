@@ -79,23 +79,22 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
           onAdd={onAddCategory}
           onManage={onManageCategories}
         />
-        <button onClick={() => onDensity(density === 'comfy' ? 'compact' : density === 'compact' ? 'grid' : 'comfy')}
-          aria-label="פריסת תצוגה" title="פריסה"
+        <button onClick={() => onDensity(density === 'grid' ? 'comfy' : 'grid')}
+          aria-label={density === 'grid' ? 'מעבר לכרטיסים' : 'מעבר לגריד'}
+          title={density === 'grid' ? 'כרטיסים' : 'גריד'}
           style={{
-            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: density !== 'comfy' ? 'var(--ink)' : 'var(--glass)',
-            color: density !== 'comfy' ? 'var(--bg)' : 'var(--ink)',
+            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
+            background: density === 'grid' ? 'var(--ink)' : 'var(--glass)',
+            color: density === 'grid' ? 'var(--bg)' : 'var(--ink)',
             display: 'grid', placeItems: 'center',
             boxShadow: 'var(--e1)',
             transition: 'all .2s',
           }}>
-          {density === 'comfy' ? <IconRows size={18} strokeWidth={2.2}/>
-            : density === 'compact' ? <IconGrid size={18} strokeWidth={2.2}/>
-            : <IconColumns2 size={18} strokeWidth={2.2}/>}
+          {density === 'grid' ? <IconRows size={19} strokeWidth={2.2}/> : <IconGrid size={19} strokeWidth={2.2}/>}
         </button>
         <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
           style={{
-            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
+            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
             background: searching || q ? 'var(--ink)' : 'var(--glass)',
             color: searching || q ? 'var(--bg)' : 'var(--ink)',
             display: 'grid', placeItems: 'center',
@@ -176,10 +175,10 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
 
       <div style={{ padding: '0 18px 130px', ...(density === 'grid'
         ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
-        : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
+        : { display: 'flex', flexDirection: 'column', gap: 22 })
       }}>
         {!recipesLoaded && (
-          [1, 2, 3].map(i => <RecipeCardSkeleton key={i} density={density} />)
+          [1, 2, 3].map(i => <RecipeCardSkeleton key={i} />)
         )}
         {recipesLoaded && loadError && (
           <ErrorState
@@ -599,7 +598,7 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 
       <div style={{ padding: '0 18px', ...(density === 'grid'
         ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
-        : { display: 'flex', flexDirection: 'column', gap: density === 'compact' ? 12 : 22 })
+        : { display: 'flex', flexDirection: 'column', gap: 22 })
       }}>
         {favs.length === 0 && (
           <EmptyState emoji="💝" title="אין עדיין מועדפים"

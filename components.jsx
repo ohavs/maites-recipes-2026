@@ -242,9 +242,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   // Scroll-based physics (tilt / scale / fade / velocity-skew + tap bounce)
   useScrollPhysics(cardRef);
 
-  // Card geometry — comfy: tall, the circle pokes out hard.
-  // compact: thinner row, smaller protruding circle.
-  const isCompact = density === 'compact';
+  // Card geometry — tall, with the circle poking out hard.
   // Per-recipe choice: 'inside' keeps the photo within the card bounds,
   // anything else (default) lets the circle poke out past the edge.
   // With no photo at all we simply leave the space to the text — but only
@@ -254,14 +252,14 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
   const inside   = recipe.imageMode === 'inside';
-  const cardH    = isCompact ? 116 : 168;
-  const padY     = isCompact ? 14 : 18;
-  const imgSize  = inside ? cardH - padY * 2 : (isCompact ? 132 : 198);
-  const titleSize= isCompact ? 19 : 26;
-  const descClamp= isCompact ? 1 : 2;
-  const padX     = isCompact ? 20 : 24;
+  const cardH    = 168;
+  const padY     = 18;
+  const imgSize  = inside ? cardH - padY * 2 : 198;
+  const titleSize= 26;
+  const descClamp= 2;
+  const padX     = 24;
   // How far the circle reaches past the card's start edge (RTL = right).
-  const imgPokeOut = inside ? 0 : Math.round(imgSize * (isCompact ? 0.18 : 0.22));
+  const imgPokeOut = inside ? 0 : Math.round(imgSize * 0.22);
 
   const wrapperStyle = {
     position: 'relative',
@@ -311,7 +309,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               fontWeight: 700, fontSize: titleSize, lineHeight: 1.1, color: p.ink,
               textWrap: 'balance',
             }}>{recipe.title}</div>
-            {!isCompact && (
+            {(
               <div style={{
                 fontSize: 'var(--t-small)', lineHeight: 1.45,
                 color: p.ink, opacity: .75, fontWeight: 400,
@@ -919,10 +917,9 @@ function AddCategorySheet({ onAdd, onCancel }) {
 // ───────────────────────────────────────────────────────────
 // RecipeCardSkeleton — placeholder while recipes load
 // ───────────────────────────────────────────────────────────
-function RecipeCardSkeleton({ density = 'comfy' }) {
-  const isCompact = density === 'compact';
-  const cardH   = isCompact ? 116 : 168;
-  const imgSize = isCompact ? 132 : 198;
+function RecipeCardSkeleton() {
+  const cardH   = 168;
+  const imgSize = 198;
   const imgPoke = Math.round(imgSize * 0.22);
   return (
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
@@ -933,11 +930,11 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
       }}>
         <div style={{
           position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${isCompact ? 14 : 18}px 24px`, gap: 8, alignItems: 'center',
+          padding: '18px 24px', gap: 8, alignItems: 'center',
         }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ height: isCompact ? 18 : 24, width: '55%', borderRadius: 8, background: 'var(--surface-sunken)' }}/>
-            {!isCompact && <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--surface-sunken)' }}/>}
+            <div style={{ height: 24, width: '55%', borderRadius: 8, background: 'var(--surface-sunken)' }}/>
+            <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--surface-sunken)' }}/>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ height: 26, width: 64, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
               <div style={{ height: 26, width: 44, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>

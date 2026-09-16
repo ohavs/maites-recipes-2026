@@ -1,16 +1,12 @@
-// app.jsx — root App, screen routing, tweaks, transitions
+// app.jsx — root App, screen routing, transitions
 
 const { useState: $S, useRef: $R, useEffect: $E, useMemo: $M } = React;
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "density": "comfy",
-  "anim": "normal",
-  "cardVariant": "block",
-  "showHints": true
-}/*EDITMODE-END*/;
+// The card style used to be one of three, switchable from a designer's
+// panel that shipped with the app. There is one now, and it is this one.
+const CARD_VARIANT = 'block';
 
 function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   const [recipes, setRecipes] = $S([]);
   const [recipesLoaded, setRecipesLoaded] = $S(false);
@@ -31,8 +27,10 @@ function App() {
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
   const [density, setDensity] = $S(() => {
-    try { return localStorage.getItem('maites.density') || t.density || 'comfy'; }
-    catch { return t.density || 'comfy'; }
+    // Two layouts: stacked cards, or a grid of tiles. 'compact' was a
+    // third, in between, and anyone still on it lands on the cards.
+    try { return localStorage.getItem('maites.density') === 'grid' ? 'grid' : 'comfy'; }
+    catch { return 'comfy'; }
   });
   const [showNavGuard, setShowNavGuard] = $S(false);
   const [pendingNav, setPendingNav] = $S(null);
@@ -415,7 +413,7 @@ function App() {
 
   $E(() => { if (!formOpen) setFormStep(0); }, [formOpen]);
 
-  const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
+  const openMs = 380;
   // Writing a recipe down takes over the screen: the tab bar would sit on
   // top of the form's own controls, and leaving mid-sentence by tapping a
   // tab is not something anyone means to do. You leave with ביטול.
@@ -458,7 +456,7 @@ function App() {
   }
 
   return (
-    <AnimSpeedContext.Provider value={t.anim}>
+    <AnimSpeedContext.Provider value="normal">
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
 
         {/* Main tab screens */}
@@ -472,12 +470,12 @@ function App() {
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}
-              onDensity={(d) => { setDensity(d); setTweak('density', d); try { localStorage.setItem('maites.density', d); } catch {} }}
-              variant={t.cardVariant}
+              onDensity={(d) => { setDensity(d); try { localStorage.setItem('maites.density', d); } catch {} }}
+              variant={CARD_VARIANT}
               category={catFilter}
               onCategory={toggleCatFilter}
               onClearCategory={() => setCatFilter([])}
-              sharedKey={`${t.cardVariant}-${density}`}
+              sharedKey={density}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
               onManageCategories={() => setShowManageCategories(true)}
@@ -508,7 +506,7 @@ function App() {
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}
-              variant={t.cardVariant}
+              variant={CARD_VARIANT}
               onNav={navTo}
             />
           )}
@@ -776,36 +774,6 @@ function App() {
         />
       )}
 
-      {/* Tweaks panel — position:fixed, floats above the app */}
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="כרטיסים" />
-        <TweakRadio label="גודל"
-          value={density}
-          options={[
-            { value: 'compact', label: 'קומפקטי' },
-            { value: 'comfy',   label: 'נוח' },
-            { value: 'grid',    label: 'גריד' },
-          ]}
-          onChange={v => { setDensity(v); setTweak('density', v); }}/>
-        <TweakSelect label="סגנון"
-          value={t.cardVariant}
-          options={[
-            { value: 'block', label: 'בלוק צבע (TikTok)' },
-            { value: 'soft',  label: 'גרדיאנט רך' },
-            { value: 'bleed', label: 'בלוק פלאט' },
-          ]}
-          onChange={v => setTweak('cardVariant', v)}/>
-        <TweakSection label="אנימציות" />
-        <TweakRadio label="מהירות"
-          value={t.anim}
-          options={[
-            { value: 'slow',   label: 'איטי' },
-            { value: 'normal', label: 'רגיל' },
-            { value: 'fast',   label: 'מהיר' },
-            { value: 'off',    label: 'כבוי' },
-          ]}
-          onChange={v => setTweak('anim', v)}/>
-      </TweaksPanel>
     </AnimSpeedContext.Provider>
   );
 }

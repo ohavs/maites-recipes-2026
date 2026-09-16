@@ -17,7 +17,6 @@ const SHELL = [
   '/manifest.json',
   '/image-slot.js',
   '/errors.jsx',
-  '/tweaks-panel.jsx',
   '/data.jsx',
   '/icons.jsx',
   '/ui.jsx',
