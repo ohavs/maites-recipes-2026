@@ -10,11 +10,16 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLoad, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
+  // Favourites used to be a screen of its own, which meant leaving home to
+  // see a subset of home. It is a filter, like the categories next to it.
+  const [favOnly, setFavOnly] = uS(false);
   const selectedCats = Array.isArray(category) ? category : (category && category !== 'all' ? [category] : []);
+  const favCount = recipes.filter(r => r.favorite).length;
 
   const filtered = uM(() => {
     const qq = q.trim().toLowerCase();
     let r = recipes;
+    if (favOnly) r = r.filter(x => x.favorite);
     if (selectedCats.length) r = r.filter(x => selectedCats.includes(x.category));
     if (!qq) return r;
     return r.filter(x =>
@@ -22,7 +27,7 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
       || (x.description || '').toLowerCase().includes(qq)
       || (x.ingredients || []).some(i => (i.name || '').toLowerCase().includes(qq))
     );
-  }, [recipes, selectedCats.join(','), q]);
+  }, [recipes, selectedCats.join(','), q, favOnly]);
 
   // Only show categories that have at least one recipe, with per-category counts
   const { activeCats, counts } = uM(() => {
@@ -89,6 +94,23 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
             transition: 'all .2s',
           }}>
           {density === 'grid' ? <IconRows size={19} strokeWidth={2.2}/> : <IconGrid size={19} strokeWidth={2.2}/>}
+        </button>
+        <button onClick={() => setFavOnly(v => !v)}
+          aria-label={favOnly ? 'הצגת כל המתכונים' : 'רק מועדפים'}
+          aria-pressed={favOnly}
+          title="מועדפים"
+          disabled={!favCount && !favOnly}
+          style={{
+            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', flexShrink: 0,
+            cursor: (!favCount && !favOnly) ? 'default' : 'pointer',
+            opacity: (!favCount && !favOnly) ? .4 : 1,
+            background: favOnly ? 'var(--brand-strong)' : 'var(--glass)',
+            color: favOnly ? 'var(--on-brand)' : 'var(--ink)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: 'var(--e1)',
+            transition: 'all .2s',
+          }}>
+          <IconHeart filled={favOnly} size={19} strokeWidth={2.2}/>
         </button>
         <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
           style={{
@@ -581,40 +603,6 @@ function IngredientRow({ ing, palette, index, factor = 1 }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// FavoritesScreen
-// ───────────────────────────────────────────────────────────
-function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav }) {
-  const favs = recipes.filter(r => r.favorite);
-  return (
-    <div className="scroll-y" style={{ height: '100%', padding: '14px 0 130px' }}>
-      <h1 className="display" style={{
-        margin: '0 22px', fontSize: 'var(--t-display)', fontWeight: 700, color: 'var(--ink)',
-      }}>המועדפים שלי</h1>
-      <p style={{ margin: '4px 22px 18px', color: 'var(--ink-soft)', fontSize: 'var(--t-small)' }}>
-        {favs.length} {favs.length === 1 ? 'מתכון שמור' : 'מתכונים שמורים'}
-      </p>
-
-      <div style={{ padding: '0 18px', ...(density === 'grid'
-        ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }
-        : { display: 'flex', flexDirection: 'column', gap: 22 })
-      }}>
-        {favs.length === 0 && (
-          <EmptyState emoji="💝" title="אין עדיין מועדפים"
-            text="נגיעה בלב שעל כל כרטיס תשמור אותו כאן, כדי למצוא אותו מהר בפעם הבאה."
-            cta={{ label: 'לרשימת המתכונים', onClick: () => onNav('home') }}/>
-        )}
-        {favs.map((r, i) => (
-          density === 'grid'
-            ? <RecipeCardGrid key={r.id} recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav} />
-            : <RecipeCard key={r.id} recipe={r} index={i} onOpen={onOpen} onToggleFav={onToggleFav}
-                density={density} variant={variant}/>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
 // RecipeFormScreen — writing a recipe down, in four passes.
 //
 // It used to be one page with thirteen fields on it: a wall to look at,
@@ -632,10 +620,9 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 // can save from anywhere the moment the recipe has a name.
 // ───────────────────────────────────────────────────────────
 const FORM_STEPS = [
-  { id: 'what',  label: 'המתכון',  hint: 'שם, תיאור, קטגוריה' },
+  { id: 'what',  label: 'המתכון',  hint: 'שם, תמונה, איך ייראה' },
   { id: 'ings',  label: 'מצרכים',  hint: 'לכמה אנשים, ומה נכנס' },
-  { id: 'how',   label: 'הכנה',    hint: 'זמנים ושלבים' },
-  { id: 'look',  label: 'מראה',    hint: 'תמונות, צבע, הערות' },
+  { id: 'how',   label: 'הכנה',    hint: 'זמנים, שלבים, הערות' },
 ];
 
 function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
@@ -667,7 +654,6 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     const n = Math.min(FORM_STEPS.length - 1, Math.max(0, i));
     if (onStepChange) onStepChange(n); else setOwnStep(n);
   };
-  const scrollRef = uR(null);
   const mountedRef = uR(false);
   const ingsKey = ings.map(i => (i.name || '') + (i.qty || '')).join('|');
   const stepsKey = stepsArr.map(s => (s.title || '') + (s.body || '')).join('|');
@@ -676,8 +662,6 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     setIsDirty(true);
   }, [title, desc, cuisine, category, paletteKey, imageMode, notes, prepTime, cookTime, servings, ingsKey, stepsKey]);
   uE(() => { if (onDirtyChange) onDirtyChange(isDirty); }, [isDirty]);
-  // A new pass starts at the top of itself, not halfway down the last one.
-  uE(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
 
   const tryCancel = () => {
     if (isDirty) { setShowLeaveConfirm(true); }
@@ -700,10 +684,6 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     !!title.trim(),
     ings.some(i => (i.name || '').trim()),
     stepsArr.some(s => (s.title || '').trim() || (s.body || '').trim()),
-    (gallery || []).some(slot => {
-      const d = window.__getImageSlot && window.__getImageSlot(`food-${recipeId}-${slot}`);
-      return !!(d && d.u);
-    }),
   ];
 
   const save = () => {
@@ -750,10 +730,10 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
         <NTabs tabs={FORM_STEPS} index={step} onIndex={setStep} done={done}/>
       </div>
 
-      <div ref={scrollRef} className="scroll-y" style={{ flex: 1, minHeight: 0 }}>
-
-        {step === 0 && (
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        <FormPager step={step} onStep={setStep} count={FORM_STEPS.length}>
           <div style={pane}>
+
             <NField label="שם המתכון" value={title} onChange={setTitle}
               placeholder="עוגת אגוזים של סבתא" autoFocus={mode === 'add'}/>
             <NField label="תיאור" value={desc} onChange={setDesc} multiline rows={3}
@@ -763,12 +743,24 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
               onClick={() => setCatSheet(true)}/>
             <NField label="סוג מטבח" value={cuisine} onChange={setCuisine}
               placeholder="איטלקית, אסייתית…" hint="לא חובה"/>
+            <PhotoStage
+              recipeId={recipeId}
+              gallery={gallery}
+              setGallery={setGallery}
+              mainSlot={mainSlot}
+              setMainSlot={setMainSlot}
+              palette={p}
+            />
+            <div style={group}>צבע הכרטיס</div>
+            <NSwatches keys={Object.keys(PALETTES)} palettes={PALETTES} value={paletteKey} onChange={setPaletteKey}/>
+            <div style={group}>איך התמונה יושבת בכרטיס</div>
+            <NCards value={imageMode} onChange={setImageMode} options={[
+              { value: 'pop',    label: 'בולטת',  hint: 'עיגול שיוצא מהמסגרת', preview: <CardShapePreview mode="pop" p={p}/> },
+              { value: 'inside', label: 'בפנים',  hint: 'מלבן בתוך המסגרת',    preview: <CardShapePreview mode="inside" p={p}/> },
+            ]}/>
             <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
               servings={servings} cuisine={cuisine}/>
           </div>
-        )}
-
-        {step === 1 && (
           <div style={pane}>
             <NStepper label="לכמה אנשים" value={servings} onChange={setServings}
               hint="זו נקודת ההתחלה לחישוב הכמויות. אפשר להשאיר ריק אם לא ידוע."/>
@@ -786,10 +778,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
               </button>
             </div>
           </div>
-        )}
-
-        {step === 2 && (
           <div style={pane}>
+
             <div style={{ display: 'flex', gap: 12 }}>
               <NField label="הכנה (דק׳)" value={prepTime} onChange={setPrepTime}
                 type="number" inputMode="numeric" style={{ flex: 1 }}/>
@@ -832,33 +822,11 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
                 <IconPlus size={18}/> הוספת שלב
               </button>
             </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div style={pane}>
-            <PhotoStage
-              recipeId={recipeId}
-              gallery={gallery}
-              setGallery={setGallery}
-              mainSlot={mainSlot}
-              setMainSlot={setMainSlot}
-              palette={p}
-            />
-            <div style={group}>צבע הכרטיס</div>
-            <NSwatches keys={Object.keys(PALETTES)} palettes={PALETTES} value={paletteKey} onChange={setPaletteKey}/>
-            <div style={group}>איך התמונה יושבת בכרטיס</div>
-            <NCards value={imageMode} onChange={setImageMode} options={[
-              { value: 'pop',    label: 'בולטת',  hint: 'עיגול שיוצא מהמסגרת', preview: <CardShapePreview mode="pop" p={p}/> },
-              { value: 'inside', label: 'בפנים',  hint: 'מלבן בתוך המסגרת',    preview: <CardShapePreview mode="inside" p={p}/> },
-            ]}/>
             <NField label="הערות אישיות" value={notes} onChange={setNotes} multiline rows={3}
               placeholder="טיפים, שדרוגים, תזכורות לפעם הבאה…"
               hint="רק בשבילך — לא מופיע על הכרטיס"/>
-            <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
-              servings={servings} cuisine={cuisine}/>
           </div>
-        )}
+        </FormPager>
       </div>
 
       {/* ── the bar that moves you along ───────────────── */}
@@ -2030,7 +1998,7 @@ function DiagnosticsBlock() {
 }
 
 Object.assign(window, {
-  HomeScreen, DetailScreen, FavoritesScreen,
+  HomeScreen, DetailScreen,
   AddRecipeScreen, EditRecipeScreen, RecipeFormScreen,
   DeleteConfirm, UnsavedChangesDialog, LoginScreen, AccountPanel,
   SharedRecipesSection, RecipeSelectSheet, DiagnosticsBlock, SignInBlock, LocalNotebookBlock,

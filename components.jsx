@@ -506,16 +506,18 @@ function FavHeart({ filled }) {
 // ───────────────────────────────────────────────────────────
 // BottomNav — three pill buttons floating above content
 // ───────────────────────────────────────────────────────────
-function BottomNav({ active, onChange, accent = 'var(--brand-strong)' }) {
+function BottomNav({ active, onChange, onAdd, accent = 'var(--brand-strong)' }) {
   const items = [
-    { id: 'home',      icon: IconHome,     label: 'בית' },
-    { id: 'book',      icon: IconBook,     label: 'ספר' },
-    { id: 'favorites', icon: IconHeart,    label: 'מועדפים' },
-    { id: 'add',       icon: IconPlus,     label: 'הוספה' },
+    { id: 'home', icon: IconHome, label: 'בית' },
+    { id: 'book', icon: IconBook, label: 'ספר' },
   ];
   return (
     <div style={{
       position: 'absolute', bottom: 18, left: 18, right: 18, zIndex: 5,
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+    <div style={{
+      flex: 1,
       background: 'var(--glass)',
       backdropFilter: 'blur(20px) saturate(160%)',
       borderRadius: 'var(--r-pill)',
@@ -549,6 +551,15 @@ function BottomNav({ active, onChange, accent = 'var(--brand-strong)' }) {
         );
       })}
       <style>{`@keyframes navPop{0%{transform:scale(.6);opacity:.4}100%{transform:scale(1);opacity:1}}`}</style>
+    </div>
+    <button onClick={onAdd} aria-label="מתכון חדש"
+      style={{
+        width: 58, height: 58, flexShrink: 0, borderRadius: 'var(--r-pill)',
+        border: 'none', cursor: 'pointer', background: accent, color: 'var(--on-brand)',
+        boxShadow: 'var(--e3)', display: 'grid', placeItems: 'center',
+      }}>
+      <IconPlus size={26} strokeWidth={2.6}/>
+    </button>
     </div>
   );
 }

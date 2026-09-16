@@ -237,11 +237,39 @@ function ListRow({ leading, title, meta, trailing, onClick, divider = true, styl
 // ───────────────────────────────────────────────────────────
 function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', style }) {
   const panelRef = xR(null);
+  // Dragging a sheet down to get rid of it is how every sheet on the phone
+  // behaves, and it is a far bigger target than the × in the corner.
+  const grab = xR(null);
+  const [pull, setPull] = xS(0);
+  const [leaving, setLeaving] = xS(false);
+
   xE(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const dragStart = (e) => {
+    const t = e.touches ? e.touches[0] : e;
+    // Only from the top of the sheet, so a list inside can still scroll.
+    grab.current = { y: t.clientY };
+  };
+  const dragMove = (e) => {
+    if (!grab.current) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dy = t.clientY - grab.current.y;
+    setPull(dy > 0 ? dy : dy * 0.2);
+  };
+  const dragEnd = () => {
+    if (!grab.current) return;
+    grab.current = null;
+    if (pull > 110) {
+      setLeaving(true);
+      setTimeout(() => onClose && onClose(), 160);
+    } else {
+      setPull(0);
+    }
+  };
 
   return (
     <div onClick={onClose} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
@@ -256,10 +284,16 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
           background: 'var(--surface)', color: 'var(--ink)',
           borderRadius: 'var(--r-lg) var(--r-lg) 0 0', width: '100%',
           maxHeight, display: 'flex', flexDirection: 'column',
-          boxShadow: 'var(--e3)', animation: 'sheetUp var(--dur-slow) var(--ease-out)',
+          boxShadow: 'var(--e3)',
+          transform: leaving ? 'translateY(100%)' : (pull ? `translateY(${pull}px)` : undefined),
+          transition: (pull && !leaving) ? 'none' : 'transform var(--dur) var(--ease-out)',
+          animation: (pull || leaving) ? 'none' : 'sheetUp var(--dur-slow) var(--ease-out)',
           ...style,
         }}>
-        <div style={{ padding: '14px 20px 8px', flexShrink: 0 }}>
+        <div
+          onTouchStart={dragStart} onTouchMove={dragMove}
+          onTouchEnd={dragEnd} onTouchCancel={dragEnd}
+          style={{ padding: '14px 20px 8px', flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
           <div style={{
             width: 42, height: 5, borderRadius: 'var(--r-pill)',
             background: 'var(--line-strong)', margin: '0 auto 14px',

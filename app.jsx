@@ -334,7 +334,7 @@ function App() {
     e.target.value = '';
   };
 
-  const TABS = ['home', 'book', 'favorites', 'add'];
+  const TABS = ['home', 'book', 'add'];
   const goTab = (id) => {
     setTab(TABS.includes(id) ? id : 'home');
     if (id !== 'book') setBookRecipeId(null);
@@ -514,16 +514,6 @@ function App() {
               onSelectPrint={() => setShowPrintSheet(true)}
             />
           )}
-          {tab === 'favorites' && (
-            <FavoritesScreen
-              recipes={recipes}
-              onOpen={r => setOpenRecipeId(r.id)}
-              onToggleFav={toggleFav}
-              density={density}
-              variant={CARD_VARIANT}
-              onNav={navTo}
-            />
-          )}
           {tab === 'add' && (
             <AddRecipeScreen
               onAdd={addRecipe}
@@ -535,7 +525,7 @@ function App() {
               onStepChange={setFormStep}
             />
           )}
-          {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
+          {!anyOverlay && <BottomNav active={tab} onChange={navTo} onAdd={() => navTo('add')} />}
         </div>
 
         {/* Overlay: recipe detail (own recipe) */}

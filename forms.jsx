@@ -286,6 +286,80 @@ function NTabs({ tabs, index, onIndex, done = [] }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// FormPager — the passes of the form, side by side.
+//
+// Tapping a tab still works, but a form you can only move through by
+// aiming at a small target is a form that fights you. Swiping sideways
+// moves between the passes, the way every other app on the phone does,
+// and each pass keeps its own vertical scroll.
+// ───────────────────────────────────────────────────────────
+function FormPager({ step, onStep, count, children }) {
+  const start = fR(null);
+  const [drag, setDrag] = fS(0);
+
+  const onDown = (e) => {
+    const t = e.touches ? e.touches[0] : e;
+    start.current = { x: t.clientX, y: t.clientY, decided: null };
+  };
+
+  const onMove = (e) => {
+    const st = start.current;
+    if (!st) return;
+    const t = e.touches ? e.touches[0] : e;
+    const dx = t.clientX - st.x;
+    const dy = t.clientY - st.y;
+    if (st.decided === null) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      // Sideways only when it is clearly sideways: the panes scroll too.
+      st.decided = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'x' : 'y';
+    }
+    if (st.decided !== 'x') return;
+    // Nothing past the ends — a rubber band that goes nowhere is a lie.
+    const blocked = (dx < 0 && step >= count - 1) || (dx > 0 && step <= 0);
+    setDrag(blocked ? dx * 0.18 : dx);
+  };
+
+  const onUp = () => {
+    const st = start.current;
+    start.current = null;
+    if (!st || st.decided !== 'x') { setDrag(0); return; }
+    const w = window.innerWidth || 400;
+    const far = Math.abs(drag) > Math.min(90, w * 0.22);
+    if (far) {
+      const next = drag < 0 ? step + 1 : step - 1;
+      if (next >= 0 && next < count) {
+        onStep(next);
+        if (typeof hapticTap === 'function') hapticTap();
+      }
+    }
+    setDrag(0);
+  };
+
+  const pct = -step * 100;
+  return (
+    <div
+      onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} onTouchCancel={onUp}
+      style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
+      <div style={{
+        display: 'flex', direction: 'ltr', height: '100%',
+        transform: `translateX(calc(${pct}% + ${drag}px))`,
+        transition: drag ? 'none' : 'transform var(--dur) var(--ease-out)',
+      }}>
+        {React.Children.map(children, (child, i) => (
+          <div key={i} className="scroll-y" style={{
+            width: '100%', flexShrink: 0, height: '100%', direction: 'rtl',
+            overflowY: 'auto', overscrollBehaviorY: 'contain',
+            // Only the pass you are on takes taps, so a half-visible one
+            // beside it cannot swallow them.
+            pointerEvents: i === step ? 'auto' : 'none',
+          }}>{child}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // NAppBar — a title, and one action at the far side. The bar
 // a phone puts at the top of a screen you are inside.
 // ───────────────────────────────────────────────────────────
@@ -316,7 +390,7 @@ function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
 }
 
 Object.assign(window, {
-  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio,
+  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager,
 });
 
 // ───────────────────────────────────────────────────────────
