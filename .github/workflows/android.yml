@@ -19,6 +19,10 @@ on:
         default: '1.0.0'
   push:
     tags: [ 'v*' ]
+  # Publishing a release from the GitHub page does not always fire a push
+  # event, so that path is listened for on its own.
+  release:
+    types: [ published ]
 
 permissions:
   contents: write
