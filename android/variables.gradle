@@ -13,4 +13,10 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
+
+    // @capacitor-firebase/authentication ships the Google sign-in libraries
+    // as compileOnly unless this is on, so without it the code compiles and
+    // then cannot find the classes at runtime. Signing in fails on the
+    // device and nowhere else.
+    rgcfaIncludeGoogle = true
 }

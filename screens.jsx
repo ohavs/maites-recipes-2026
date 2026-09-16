@@ -1409,14 +1409,28 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
 function LoginScreen({ onSignIn }) {
   const [loading, setLoading] = uS(false);
   const [err, setErr] = uS('');
+  // What actually went wrong. The screen before the sign-in is the one
+  // place the diagnostics panel cannot be reached from, so a failure here
+  // has to say what it was rather than "try again".
+  const [detail, setDetail] = uS('');
+  const [showDetail, setShowDetail] = uS(false);
 
   const handleSignIn = async () => {
-    setLoading(true); setErr('');
+    setLoading(true); setErr(''); setDetail('');
     try { await onSignIn(); }
     catch (e) {
-      if (e.code !== 'auth/popup-closed-by-user') setErr('ההתחברות נכשלה, נסי שוב');
+      const code = (e && e.code) || '';
+      if (code !== 'auth/popup-closed-by-user') {
+        setErr('ההתחברות נכשלה');
+        setDetail([code, (e && e.message) || String(e)].filter(Boolean).join(' · '));
+        if (typeof reportError === 'function') reportError('sign-in', e);
+      }
       setLoading(false);
     }
+  };
+
+  const copyDetail = async () => {
+    try { await navigator.clipboard.writeText(detail); } catch {}
   };
 
   return (
@@ -1458,7 +1472,37 @@ function LoginScreen({ onSignIn }) {
           )}
           {loading ? 'מתחברת…' : 'כניסה עם Google'}
         </button>
-        {err && <p style={{ marginTop: 14, color: 'var(--brand-strong)', fontSize: 'var(--t-small)' }}>{err}</p>}
+        {err && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ margin: 0, color: 'var(--brand-strong)', fontSize: 'var(--t-small)', fontWeight: 700 }}>{err}</p>
+            {detail && (
+              <>
+                <button type="button" onClick={() => setShowDetail(v => !v)}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                    color: 'var(--ink-soft)', fontSize: 'var(--t-caption)', fontWeight: 700,
+                    padding: '10px 4px', minHeight: 44, textDecoration: 'underline',
+                  }}>{showDetail ? 'הסתרת הפרטים' : 'מה נכשל?'}</button>
+                {showDetail && (
+                  <div style={{
+                    background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)', padding: '12px 14px',
+                    fontSize: 'var(--t-caption)', color: 'var(--ink)', lineHeight: 1.5,
+                    wordBreak: 'break-word', textAlign: 'start', direction: 'ltr',
+                  }}>
+                    {detail}
+                    <button type="button" onClick={copyDetail}
+                      style={{
+                        display: 'block', marginTop: 10, border: 'none', cursor: 'pointer',
+                        background: 'var(--ink)', color: 'var(--bg)', borderRadius: 'var(--r-sm)',
+                        padding: '10px 16px', minHeight: 44, fontFamily: 'inherit',
+                        fontSize: 'var(--t-caption)', fontWeight: 700, direction: 'rtl',
+                      }}>העתקת הפרטים</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
