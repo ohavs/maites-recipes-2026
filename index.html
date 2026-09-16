@@ -68,8 +68,14 @@
     --p-peach-bg:#ffb494;  --p-peach-bg2:#ffdfcd;  --p-peach-ink:#3d1a0a;  --p-peach-tag:#ffd2bd;  --p-peach-accent:#b34c24;
 
     /* ── spacing scale ────────────────────────────── */
-    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 18px;
-    --sp-5: 26px; --sp-6: 38px; --sp-7: 56px;
+    /* An 8 grid: 24 between groups of fields, 32 between areas
+       of a screen. Nothing sits at an in-between number. */
+    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
+
+    /* Anything you tap is at least this tall. */
+    --tap: 48px;
+    --field-h: 56px;
 
     /* ── radii, by role ───────────────────────────── */
     --r-sm: 10px;    /* chips, small controls */
@@ -86,10 +92,11 @@
     --shadow-card-lift: var(--e3);
 
     /* ── type scale ───────────────────────────────── */
+    --t-hero: 34px;      /* a recipe's own name, on its page */
     --t-display: 30px;   /* screen title */
     --t-title: 24px;     /* card title, sheet title */
     --t-heading: 19px;   /* section heading */
-    --t-body: 16px;      /* running text */
+    --t-body: 17px;      /* running text — read from an arm's length */
     --t-small: 14px;     /* secondary text */
     --t-caption: 12.5px; /* captions, counters */
     --t-label: 11px;     /* uppercase eyebrows */

@@ -304,8 +304,8 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           boxShadow: 'var(--e3)',
         }}>
           <h1 className="display" data-comment-anchor="detail-title" style={{
-            margin: 0, fontSize: 'var(--t-display)', fontWeight: 700, color: 'var(--ink)',
-            textWrap: 'balance',
+            margin: 0, fontSize: 'var(--t-hero)', fontWeight: 700, color: 'var(--ink)',
+            lineHeight: 1.15, textWrap: 'balance',
           }}>{recipe.title}</h1>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
@@ -618,10 +618,68 @@ function FavoritesScreen({ recipes, onOpen, onToggleFav, density, variant, onNav
 }
 
 // ───────────────────────────────────────────────────────────
-// RecipeFormScreen — used for both "add new" and "edit existing".
-// Includes per-ingredient icon picker.
+// RecipeFormScreen — writing a recipe down, in four passes.
+//
+// It used to be one page with thirteen fields on it, which is a wall to
+// look at and impossible to fill in on a phone without losing your place.
+// The same thirteen fields are here, grouped the way you actually think
+// about a recipe: what it is, what goes in, what you do, how it looks.
+//
+// Nothing is gated. You can move between the four in any order, from the
+// rail at the top, and save from anywhere the moment it has a name —
+// which matters, because most recipes get written down in a hurry.
 // ───────────────────────────────────────────────────────────
-function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange }) {
+const FORM_STEPS = [
+  { id: 'what',  label: 'המתכון',  hint: 'שם, תיאור, קטגוריה' },
+  { id: 'ings',  label: 'מצרכים',  hint: 'לכמה אנשים, ומה נכנס' },
+  { id: 'how',   label: 'הכנה',    hint: 'זמנים ושלבים' },
+  { id: 'look',  label: 'מראה',    hint: 'תמונות, צבע, הערות' },
+];
+
+function StepRail({ step, onStep, filled }) {
+  return (
+    <div style={{ padding: '0 18px', marginTop: 18 }}>
+      <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 6 }}>
+        {FORM_STEPS.map((s, i) => {
+          const on = i === step;
+          const done = filled[i] && !on;
+          return (
+            <button key={s.id} type="button" onClick={() => onStep(i)}
+              aria-label={s.label} aria-current={on ? 'step' : undefined}
+              style={{
+                flex: on ? 2.2 : 1, minWidth: 0, minHeight: 'var(--tap)',
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                borderRadius: 'var(--r-pill)', padding: on ? '0 16px' : 0,
+                background: on ? 'var(--ink)' : done ? 'var(--glass-strong)' : 'var(--surface-sunken)',
+                color: on ? 'var(--bg)' : 'var(--ink-soft)',
+                boxShadow: on ? 'var(--e2)' : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                transition: 'flex var(--dur) var(--ease-out), background var(--dur-fast)',
+                overflow: 'hidden',
+              }}>
+              <span style={{
+                ...TYPE.caption, fontWeight: 800,
+                opacity: on ? 1 : done ? .9 : .55,
+              }}>{done ? '✓' : i + 1}</span>
+              {on && (
+                <span style={{
+                  ...TYPE.small, fontWeight: 700, whiteSpace: 'nowrap',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>{s.label}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{
+        ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600,
+        marginTop: 10, paddingInlineStart: 6,
+      }}>{FORM_STEPS[step].hint}</div>
+    </div>
+  );
+}
+
+function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -641,6 +699,15 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const [recipeId] = uS(existing?.id || `new-${Date.now().toString(36)}`);
   const [isDirty, setIsDirty] = uS(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = uS(false);
+  // The step lives in App when it is mounted there, so the phone's back
+  // gesture walks back through the four instead of throwing the form away.
+  const [ownStep, setOwnStep] = uS(0);
+  const step = typeof stepProp === 'number' ? stepProp : ownStep;
+  const setStep = (i) => {
+    const n = Math.min(FORM_STEPS.length - 1, Math.max(0, i));
+    if (onStepChange) onStepChange(n); else setOwnStep(n);
+  };
+  const scrollRef = uR(null);
   const mountedRef = uR(false);
   const ingsKey = ings.map(i => (i.name || '') + (i.qty || '')).join('|');
   const stepsKey = stepsArr.map(s => (s.title || '') + (s.body || '')).join('|');
@@ -649,6 +716,9 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
     setIsDirty(true);
   }, [title, desc, cuisine, category, paletteKey, imageMode, notes, prepTime, cookTime, servings, ingsKey, stepsKey]);
   uE(() => { if (onDirtyChange) onDirtyChange(isDirty); }, [isDirty]);
+  // A new pass starts at the top of itself, not halfway down the last one.
+  uE(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [step]);
+
   const tryCancel = () => {
     if (isDirty) { setShowLeaveConfirm(true); }
     else if (onCancel) { onCancel(); }
@@ -664,7 +734,18 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
   const removeGallerySlot = (slot) => setGallery(arr => arr.length > 1 ? arr.filter(s => s !== slot) : arr);
 
   const p = paletteOf(paletteKey);
-  const canSave = title.trim();
+  const canSave = !!title.trim();
+
+  // What the rail marks as done — enough of a pass to be worth a tick.
+  const filled = [
+    !!title.trim(),
+    ings.some(i => (i.name || '').trim()),
+    stepsArr.some(s => (s.title || '').trim() || (s.body || '').trim()),
+    (gallery || []).some(slot => {
+      const d = window.__getImageSlot && window.__getImageSlot(`food-${recipeId}-${slot}`);
+      return !!(d && d.u);
+    }),
+  ];
 
   const save = () => {
     if (!canSave) return;
@@ -689,272 +770,315 @@ function RecipeFormScreen({ existing, onSave, onCancel, onExport, onImport, mode
     });
   };
 
+  const pane = { display: 'flex', flexDirection: 'column', gap: 24, padding: '0 18px' };
+
   return (
-    <div className="scroll-y" style={{ height: '100%', padding: '14px 0 140px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 22px' }}>
-        <h1 className="display" style={{ margin: 0, fontSize: 'var(--t-title)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-          {mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
-        </h1>
-        {onCancel && (
-          <button onClick={tryCancel} aria-label="ביטול" style={{
-            width: 36, height: 36, borderRadius: 'var(--r-pill)', border: 'none', background: 'var(--glass)',
-            color: 'var(--ink)', cursor: 'pointer', display: 'grid', placeItems: 'center',
-            boxShadow: 'var(--e1)',
-          }}><IconClose size={16} strokeWidth={2.2}/></button>
-        )}
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── header ─────────────────────────────────────── */}
+      <div style={{ flexShrink: 0, paddingTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', gap: 12 }}>
+          <h1 className="display" style={{ margin: 0, ...TYPE.display, whiteSpace: 'nowrap' }}>
+            {mode === 'edit' ? 'עריכת מתכון' : 'מתכון חדש'}
+          </h1>
+          {onCancel && (
+            <IconButton size="md" tone="glass" label="ביטול" onClick={tryCancel}>
+              <IconClose size={18} strokeWidth={2.2}/>
+            </IconButton>
+          )}
+        </div>
+        <StepRail step={step} onStep={setStep} filled={filled}/>
       </div>
 
-      {/* preview chip */}
-      <div style={{
-        margin: '18px 18px 22px', padding: '20px',
-        borderRadius: 'var(--r-lg)', background: p.bg, color: p.ink,
-        boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, opacity: .65, letterSpacing: '.12em' }}>תצוגה מקדימה</div>
-        <div className="display" style={{ fontSize: 'var(--t-title)', fontWeight: 700, marginTop: 6 }}>
-          {title || 'שם המתכון שלי'}
-        </div>
-        <div style={{ fontSize: 'var(--t-small)', marginTop: 6, opacity: .75 }}>
-          {desc || 'תיאור קצר שיופיע בכרטיס המתכון…'}
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-          <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
-          {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
-          {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
-        </div>
-      </div>
+      {/* ── the pass you are on ────────────────────────── */}
+      <div ref={scrollRef} className="scroll-y" style={{ flex: 1, minHeight: 0, padding: '24px 0 32px' }}>
 
-      <div style={{ padding: '0 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Field label="שם המתכון">
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="לדוגמה: עוגת אגוזים של סבתא"
-            style={inputStyle}/>
-        </Field>
-        <Field label="סוג מטבח">
-          <input value={cuisine} onChange={e => setCuisine(e.target.value)} placeholder="לדוגמה: איטלקית, אסייתית"
-            style={inputStyle}/>
-        </Field>
-        <Field label="תיאור">
-          <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="במה זה מיוחד?"
-            style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }}/>
-        </Field>
-
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Field label="הכנה (דק׳)" style={{ flex: 1 }}>
-            <input type="number" min="0" value={prepTime} onChange={e => setPrepTime(e.target.value)} style={inputStyle}/>
-          </Field>
-          <Field label="בישול (דק׳)" style={{ flex: 1 }}>
-            <input type="number" min="0" value={cookTime} onChange={e => setCookTime(e.target.value)} style={inputStyle}/>
-          </Field>
-          <Field label="מנות" hint="לכמה אנשים הכמויות? אפשר להשאיר ריק" style={{ flex: 1 }}>
-            <input type="number" min="1" max="99" inputMode="numeric" placeholder="—"
-              value={servings} onChange={e => setServings(e.target.value)} style={inputStyle}/>
-          </Field>
-        </div>
-
-        <Field label="קטגוריה">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
-            {(catsProp || []).filter(c => c.id !== 'all').map(c => (
-              <button key={c.id} onClick={() => setCategory(c.id)}
-                style={{
-                  border: 'none', cursor: 'pointer', padding: '8px 14px', borderRadius: 'var(--r-pill)',
-                  fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700,
-                  background: category === c.id ? 'var(--ink)' : 'var(--glass)',
-                  color: category === c.id ? 'var(--bg)' : 'var(--ink)',
-                  boxShadow: 'var(--e1)',
-                }}>{c.emoji} {c.label}</button>
-            ))}
-            {onAddCategory && (
-              <button onClick={onAddCategory} style={{
-                border: '1.5px dashed var(--line-strong)', cursor: 'pointer',
-                padding: '8px 14px', borderRadius: 'var(--r-pill)', background: 'transparent',
-                fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink-soft)',
-              }}>+ קטגוריה חדשה</button>
-            )}
-          </div>
-        </Field>
-
-        <Field label="צבע הכרטיס">
-          <div style={{ display: 'flex', gap: 10, flexDirection: 'row-reverse' }}>
-            {Object.keys(PALETTES).map(k => (
-              <button key={k} onClick={() => setPaletteKey(k)}
-                aria-label={k}
-                style={{
-                  width: 36, height: 36, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                  background: PALETTES[k].bg,
-                  boxShadow: paletteKey === k
-                    ? '0 0 0 3px var(--ink), var(--e1)'
-                    : 'var(--e1)',
-                  transform: paletteKey === k ? 'scale(1.05)' : 'scale(1)',
-                  transition: 'all .18s',
-                }}/>
-            ))}
-          </div>
-        </Field>
-
-        <Field label="סגנון התמונה בכרטיס">
-          <div style={{ display: 'flex', gap: 10, flexDirection: 'row-reverse' }}>
-            {[
-              { id: 'pop',    label: 'בולטת מהכרטיס', hint: 'עיגול שיוצא מהמסגרת' },
-              { id: 'inside', label: 'בתוך הכרטיס',   hint: 'תמונה מלבנית בתוך המסגרת' },
-            ].map(opt => {
-              const on = imageMode === opt.id;
-              return (
-                <button key={opt.id} onClick={() => setImageMode(opt.id)} style={{
-                  flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  borderRadius: 'var(--r-md)', padding: '12px 10px 11px', textAlign: 'center',
-                  background: on ? 'var(--ink)' : 'var(--glass)',
-                  color: on ? 'var(--bg)' : 'var(--ink)',
-                  boxShadow: on ? 'var(--e1)' : 'var(--e1)',
-                  transition: 'all .18s',
-                }}>
-                  {/* mini preview of the card layout */}
-                  <div style={{
-                    position: 'relative', height: 40, borderRadius: 'var(--r-sm)',
-                    background: on ? 'rgba(255,255,255,.14)' : p.bg2,
-                    marginBottom: 8, overflow: opt.id === 'inside' ? 'hidden' : 'visible',
-                  }}>
-                    <div style={{
-                      position: 'absolute', top: opt.id === 'inside' ? 6 : '50%',
-                      insetInlineStart: opt.id === 'inside' ? 6 : -9,
-                      transform: opt.id === 'inside' ? 'none' : 'translateY(-50%)',
-                      width: 28, height: 28,
-                      borderRadius: opt.id === 'inside' ? 8 : 999,
-                      background: on ? 'var(--bg)' : 'var(--surface-raised)',
-                      boxShadow: 'var(--e1)',
-                    }}/>
-                    <div style={{
-                      position: 'absolute', insetInlineEnd: 8, top: 12, width: '45%', height: 5,
-                      borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.55)' : 'var(--line-strong)',
-                    }}/>
-                    <div style={{
-                      position: 'absolute', insetInlineEnd: 8, top: 22, width: '32%', height: 4,
-                      borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.35)' : 'var(--line)',
-                    }}/>
-                  </div>
-                  <div style={{ fontSize: 'var(--t-small)', fontWeight: 800 }}>{opt.label}</div>
-                  <div style={{ fontSize: 10.5, opacity: .7, marginTop: 2 }}>{opt.hint}</div>
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-
-        <Field label="תמונות המתכון">
-          <PhotoManager
-            recipeId={recipeId}
-            gallery={gallery}
-            setGallery={setGallery}
-            mainSlot={mainSlot}
-            setMainSlot={setMainSlot}
-            palette={p}
-          />
-        </Field>
-
-        <Field label="מצרכים">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ings.map((ing, i) => (
-              <IngredientFormRow key={i} ing={ing}
-                onChange={(k, v) => updateIng(i, k, v)}
-                onRemove={() => removeIng(i)}
-                canRemove={ings.length > 1}
-              />
-            ))}
-            <button onClick={addIng} style={addRowBtn}>
-              <IconPlus size={16}/> הוספת מצרך
-            </button>
-          </div>
-        </Field>
-
-        <Field label="שלבי הכנה">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {stepsArr.map((s, i) => (
-              <div key={i} style={{
-                background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 12,
-                boxShadow: 'var(--e1)', position: 'relative',
-              }}>
-                <input value={s.title} onChange={e => updateStep(i, 'title', e.target.value)}
-                  placeholder={`כותרת שלב ${i+1}`} style={{...inputStyle, marginBottom: 6}}/>
-                <textarea value={s.body} onChange={e => updateStep(i, 'body', e.target.value)} rows={2}
-                  placeholder="תיאור..." style={{...inputStyle, resize: 'vertical', minHeight: 56}}/>
-                {stepsArr.length > 1 && (
-                  <button onClick={() => removeStep(i)} aria-label="מחיקה" style={{
-                    position: 'absolute', top: 6, insetInlineEnd: 6,
-                    width: 26, height: 26, borderRadius: 'var(--r-pill)', border: 'none',
-                    background: 'var(--surface-sunken)', color: 'var(--ink-soft)', cursor: 'pointer',
-                    display: 'grid', placeItems: 'center',
-                  }}><IconTrash size={14}/></button>
+        {step === 0 && (
+          <div style={pane}>
+            <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
+              servings={servings} cuisine={cuisine}/>
+            <Field label="שם המתכון">
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="לדוגמה: עוגת אגוזים של סבתא"
+                style={inputStyle}/>
+            </Field>
+            <Field label="תיאור" hint="שורה אחת שתופיע על הכרטיס">
+              <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3} placeholder="במה זה מיוחד?"
+                style={{ ...inputStyle, resize: 'vertical', minHeight: 96 }}/>
+            </Field>
+            <Field label="קטגוריה">
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: 'row-reverse' }}>
+                {(catsProp || []).filter(c => c.id !== 'all').map(c => (
+                  <Chip key={c.id} tone="glass" active={category === c.id} onClick={() => setCategory(c.id)}>
+                    {c.emoji} {c.label}
+                  </Chip>
+                ))}
+                {onAddCategory && (
+                  <button onClick={onAddCategory} style={{
+                    border: '1.5px dashed var(--line-strong)', cursor: 'pointer',
+                    padding: '8px 14px', minHeight: 44, borderRadius: 'var(--r-pill)', background: 'transparent',
+                    fontFamily: 'inherit', ...TYPE.caption, color: 'var(--ink-soft)',
+                  }}>+ קטגוריה חדשה</button>
                 )}
               </div>
-            ))}
-            <button onClick={addStep} style={addRowBtn}>
-              <IconPlus size={16}/> הוספת שלב
-            </button>
+            </Field>
+            <Field label="סוג מטבח" hint="לא חובה">
+              <input value={cuisine} onChange={e => setCuisine(e.target.value)} placeholder="לדוגמה: איטלקית, אסייתית"
+                style={inputStyle}/>
+            </Field>
           </div>
-        </Field>
+        )}
 
-        <Field label="הערות אישיות">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-            placeholder="טיפים, שדרוגים, תזכורות לפעם הבאה…"
-            style={{ ...inputStyle, resize: 'vertical', minHeight: 70 }}/>
-        </Field>
+        {step === 1 && (
+          <div style={pane}>
+            <Field label="לכמה אנשים הכמויות?" hint="זו נקודת ההתחלה לחישוב. אפשר להשאיר ריק אם לא ידוע.">
+              <ServingsPicker value={servings} onChange={setServings}/>
+            </Field>
+            <Field label="מצרכים">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {ings.map((ing, i) => (
+                  <IngredientFormRow key={i} ing={ing}
+                    onChange={(k, v) => updateIng(i, k, v)}
+                    onRemove={() => removeIng(i)}
+                    canRemove={ings.length > 1}
+                  />
+                ))}
+                <button onClick={addIng} style={addRowBtn}>
+                  <IconPlus size={18}/> הוספת מצרך
+                </button>
+              </div>
+            </Field>
+          </div>
+        )}
 
-        <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
-          {onCancel && (
-            <button onClick={tryCancel} style={{
-              flexShrink: 0, padding: '18px 20px', border: 'none', cursor: 'pointer',
-              borderRadius: 'var(--r-lg)', background: 'var(--surface-sunken)',
-              color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
-            }}>ביטול</button>
-          )}
-          <button onClick={save} disabled={!canSave} style={{
-            flex: 1, padding: '18px', border: 'none',
-            cursor: canSave ? 'pointer' : 'default',
-            borderRadius: 'var(--r-lg)', background: canSave ? 'var(--ink)' : 'var(--line)',
-            color: 'var(--bg)', fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
-            boxShadow: canSave ? 'var(--e1)' : 'none',
-            opacity: canSave ? 1 : .7,
-          }}>{mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}</button>
-        </div>
-
-        {/* Export / Import — only shown in add mode */}
-        {mode === 'add' && onExport && (
-          <div style={{
-            marginTop: 22, padding: 16, borderRadius: 'var(--r-md)',
-            background: 'var(--glass)', backdropFilter: 'blur(10px)',
-            boxShadow: 'var(--e1)',
-          }}>
-            <SectionLabel ink="var(--ink-soft)">ייצוא וייבוא</SectionLabel>
-            <p style={{ margin: '8px 0 12px', fontSize: 'var(--t-small)', lineHeight: 1.55, color: 'var(--ink-soft)' }}>
-              גיבוי ספריית המתכונים, או ייבוא מקובץ Excel.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <ExportRow icon={<IconExcel size={20}/>} bg="#1d6f42" label="ייצוא ל-Excel"
-                sub="קובץ XLSX עם כל המתכונים"
-                onClick={() => onExport('excel')}/>
-              <ExportRow icon={<IconWord size={20}/>} bg="#2b579a" label="ייצוא לוורד"
-                sub="ספר מתכונים מעוצב להדפסה · עמוד נפרד לכל מתכון"
-                onClick={() => onExport('word')}/>
-              <label style={{
-                ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)', cursor: 'pointer',
-              }}>
-                <span style={{ ...exportIconStyle, background: '#5b4452' }}><IconUpload size={20}/></span>
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>ייבוא מקובץ Excel</span>
-                  <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>קובץ .xlsx · עמודות בעברית</span>
-                </div>
-                <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  onChange={onImport} style={{ display: 'none' }}/>
-              </label>
+        {step === 2 && (
+          <div style={pane}>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <Field label="הכנה (דק׳)" style={{ flex: 1 }}>
+                <input type="number" min="0" inputMode="numeric" value={prepTime}
+                  onChange={e => setPrepTime(e.target.value)} style={inputStyle}/>
+              </Field>
+              <Field label="בישול (דק׳)" style={{ flex: 1 }}>
+                <input type="number" min="0" inputMode="numeric" value={cookTime}
+                  onChange={e => setCookTime(e.target.value)} style={inputStyle}/>
+              </Field>
             </div>
+            <Field label="שלבי הכנה">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {stepsArr.map((s, i) => (
+                  <div key={i} style={{
+                    background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: 14,
+                    boxShadow: 'var(--e1)', position: 'relative',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <span style={{
+                        width: 30, height: 30, borderRadius: 'var(--r-pill)', flexShrink: 0,
+                        background: p.bg, color: p.ink, display: 'grid', placeItems: 'center',
+                        ...TYPE.caption, fontWeight: 800,
+                      }}>{i + 1}</span>
+                      <input value={s.title} onChange={e => updateStep(i, 'title', e.target.value)}
+                        placeholder="כותרת השלב" style={{ ...inputStyle, boxShadow: 'none', background: 'var(--surface-sunken)' }}/>
+                      {stepsArr.length > 1 && (
+                        <IconButton size="sm" tone="ghost" label="מחיקת שלב" onClick={() => removeStep(i)}>
+                          <IconTrash size={16}/>
+                        </IconButton>
+                      )}
+                    </div>
+                    <textarea value={s.body} onChange={e => updateStep(i, 'body', e.target.value)} rows={3}
+                      placeholder="מה עושים בשלב הזה?"
+                      style={{ ...inputStyle, boxShadow: 'none', background: 'var(--surface-sunken)', resize: 'vertical', minHeight: 84 }}/>
+                  </div>
+                ))}
+                <button onClick={addStep} style={addRowBtn}>
+                  <IconPlus size={18}/> הוספת שלב
+                </button>
+              </div>
+            </Field>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div style={pane}>
+            <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
+              servings={servings} cuisine={cuisine}/>
+            <Field label="תמונות המתכון">
+              <PhotoManager
+                recipeId={recipeId}
+                gallery={gallery}
+                setGallery={setGallery}
+                mainSlot={mainSlot}
+                setMainSlot={setMainSlot}
+                palette={p}
+              />
+            </Field>
+            <Field label="צבע הכרטיס">
+              <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
+                {Object.keys(PALETTES).map(k => (
+                  <button key={k} onClick={() => setPaletteKey(k)} aria-label={k}
+                    style={{
+                      flex: 1, height: 48, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+                      background: PALETTES[k].bg,
+                      boxShadow: paletteKey === k ? '0 0 0 3px var(--ink), var(--e1)' : 'var(--e1)',
+                      transform: paletteKey === k ? 'scale(1.04)' : 'scale(1)',
+                      transition: 'all .18s',
+                    }}/>
+                ))}
+              </div>
+            </Field>
+            <Field label="סגנון התמונה בכרטיס">
+              <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse' }}>
+                {[
+                  { id: 'pop',    label: 'בולטת מהכרטיס', hint: 'עיגול שיוצא מהמסגרת' },
+                  { id: 'inside', label: 'בתוך הכרטיס',   hint: 'תמונה מלבנית בתוך המסגרת' },
+                ].map(opt => {
+                  const on = imageMode === opt.id;
+                  return (
+                    <button key={opt.id} onClick={() => setImageMode(opt.id)} style={{
+                      flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      borderRadius: 'var(--r-lg)', padding: '14px 12px 13px', textAlign: 'center',
+                      background: on ? 'var(--ink)' : 'var(--glass)',
+                      color: on ? 'var(--bg)' : 'var(--ink)',
+                      boxShadow: 'var(--e1)', transition: 'all .18s',
+                    }}>
+                      {/* mini preview of the card layout */}
+                      <div style={{
+                        position: 'relative', height: 44, borderRadius: 'var(--r-sm)',
+                        background: on ? 'rgba(255,255,255,.14)' : p.bg2,
+                        marginBottom: 10, overflow: opt.id === 'inside' ? 'hidden' : 'visible',
+                      }}>
+                        <div style={{
+                          position: 'absolute', top: opt.id === 'inside' ? 6 : '50%',
+                          insetInlineStart: opt.id === 'inside' ? 6 : -9,
+                          transform: opt.id === 'inside' ? 'none' : 'translateY(-50%)',
+                          width: 30, height: 30,
+                          borderRadius: opt.id === 'inside' ? 8 : 999,
+                          background: on ? 'var(--bg)' : 'var(--surface-raised)',
+                          boxShadow: 'var(--e1)',
+                        }}/>
+                        <div style={{
+                          position: 'absolute', insetInlineEnd: 8, top: 13, width: '45%', height: 5,
+                          borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.55)' : 'var(--line-strong)',
+                        }}/>
+                        <div style={{
+                          position: 'absolute', insetInlineEnd: 8, top: 24, width: '32%', height: 4,
+                          borderRadius: 'var(--r-pill)', background: on ? 'rgba(255,255,255,.35)' : 'var(--line)',
+                        }}/>
+                      </div>
+                      <div style={{ ...TYPE.small, fontWeight: 800 }}>{opt.label}</div>
+                      <div style={{ ...TYPE.caption, opacity: .7, marginTop: 3, fontWeight: 500 }}>{opt.hint}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="הערות אישיות" hint="רק בשבילך — טיפים ותזכורות לפעם הבאה">
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                placeholder="טיפים, שדרוגים, תזכורות לפעם הבאה…"
+                style={{ ...inputStyle, resize: 'vertical', minHeight: 96 }}/>
+            </Field>
           </div>
         )}
       </div>
+
+      {/* ── the bar that moves you along ───────────────── */}
+      <div style={{
+        flexShrink: 0, padding: '12px 18px calc(12px + env(safe-area-inset-bottom))',
+        background: 'var(--glass-strong)', backdropFilter: 'blur(14px)',
+        boxShadow: '0 -1px 0 var(--line)', display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <Button tone="quiet" size="lg" onClick={() => (step === 0 ? tryCancel() : setStep(step - 1))}
+          style={{ flexShrink: 0, paddingInline: 22 }}>
+          {step === 0 ? 'ביטול' : 'חזרה'}
+        </Button>
+
+        {step < FORM_STEPS.length - 1 ? (
+          <>
+            {canSave && (
+              <Button tone="glass" size="lg" onClick={save} style={{ flexShrink: 0, paddingInline: 18 }}>
+                שמירה
+              </Button>
+            )}
+            <Button tone="primary" size="lg" full onClick={() => setStep(step + 1)}>
+              {FORM_STEPS[step + 1].label} ←
+            </Button>
+          </>
+        ) : (
+          <Button tone="primary" size="lg" full disabled={!canSave} onClick={save}>
+            {mode === 'edit' ? 'שמירת שינויים' : 'שמירת המתכון'}
+          </Button>
+        )}
+      </div>
+
+      {!canSave && step === FORM_STEPS.length - 1 && (
+        <div style={{
+          position: 'absolute', insetInline: 18, bottom: 96,
+          ...TYPE.caption, color: 'var(--danger)', fontWeight: 700, textAlign: 'center',
+        }}>למתכון עוד אין שם — הוא נמצא בצעד הראשון</div>
+      )}
+
       {showLeaveConfirm && (
         <UnsavedChangesDialog
           onStay={() => setShowLeaveConfirm(false)}
           onLeave={() => { setIsDirty(false); setShowLeaveConfirm(false); if (onCancel) onCancel(); }}
         />
       )}
+    </div>
+  );
+}
+
+// The card as it will look on the home screen, kept next to the two passes
+// where what you type changes it.
+function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) {
+  return (
+    <div style={{
+      padding: 22, borderRadius: 'var(--r-lg)', background: p.bg, color: p.ink,
+      boxShadow: 'var(--shadow-card)', position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ ...TYPE.label, opacity: .6 }}>תצוגה מקדימה</div>
+      <div className="display" style={{ ...TYPE.title, marginTop: 8 }}>
+        {title || 'שם המתכון שלי'}
+      </div>
+      <div style={{ ...TYPE.small, marginTop: 8, opacity: .75 }}>
+        {desc || 'תיאור קצר שיופיע בכרטיס המתכון…'}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+        <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
+        {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
+        {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
+      </div>
+    </div>
+  );
+}
+
+// How many people the written quantities are for. Typing a number on a
+// phone is a keyboard and a mis-tap; the common answers are one tap.
+function ServingsPicker({ value, onChange }) {
+  const n = parseInt(value, 10) || 0;
+  const bump = (d) => onChange(String(Math.min(99, Math.max(0, n + d)) || ''));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: 'var(--surface-raised)', borderRadius: 'var(--r-md)',
+        boxShadow: 'var(--e1)', padding: 4,
+      }}>
+        <IconButton size="md" tone="ghost" label="פחות" onClick={() => bump(-1)} disabled={n <= 0}>
+          <span style={{ ...TYPE.heading, fontWeight: 700, lineHeight: 1 }}>−</span>
+        </IconButton>
+        <div style={{
+          minWidth: 52, textAlign: 'center', fontFamily: 'var(--font-display)',
+          fontSize: 'var(--t-display)', fontWeight: 800, lineHeight: 1,
+          color: n > 0 ? 'var(--ink)' : 'var(--ink-faint)',
+        }}>{n > 0 ? n : '·'}</div>
+        <IconButton size="md" tone="ghost" label="עוד" onClick={() => bump(1)}>
+          <span style={{ ...TYPE.heading, fontWeight: 700, lineHeight: 1 }}>+</span>
+        </IconButton>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flex: 1, flexDirection: 'row-reverse' }}>
+        {[2, 4, 6].map(k => (
+          <Chip key={k} tone="glass" active={n === k} onClick={() => onChange(String(k))}
+            style={{ flex: 1, justifyContent: 'center' }}>{k}</Chip>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1120,12 +1244,14 @@ function PhotoManager({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pa
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onExport, onImport, categories, onAddCategory, onDirtyChange }) {
-  return <RecipeFormScreen mode="add" onSave={onAdd} onExport={onExport} onImport={onImport} categories={categories} onAddCategory={onAddCategory} onDirtyChange={onDirtyChange}/>;
+function AddRecipeScreen({ onAdd, onCancel, categories, onAddCategory, onDirtyChange, step, onStepChange }) {
+  return <RecipeFormScreen mode="add" onSave={onAdd} onCancel={onCancel} categories={categories} onAddCategory={onAddCategory}
+    onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory }) {
-  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel} categories={categories} onAddCategory={onAddCategory}/>;
+function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory, step, onStepChange }) {
+  return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel}
+    categories={categories} onAddCategory={onAddCategory} step={step} onStepChange={onStepChange}/>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -1609,7 +1735,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange, onResetServings }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onInvite, onCancelInvite, onRevokeShare, themeMode = 'auto', onThemeChange, onResetServings, onExport, onImport }) {
   const [confirmReset, setConfirmReset] = uS(false);
   const withServings = recipes.filter(r => +r.servings > 0).length;
   const [inviteEmail, setInviteEmail] = uS('');
@@ -1751,6 +1877,36 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
               {/* Backup */}
               {typeof BackupBlock === 'function' && <BackupBlock user={user}/>}
+
+              {/* Files — Excel and Word. This used to sit at the bottom of
+                  "new recipe", which is not where anyone looks for it. */}
+              {onExport && (
+                <div style={{ marginTop: 4 }}>
+                  <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>קבצים</SectionLabel>
+                  <div style={{
+                    background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)',
+                    padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+                  }}>
+                    <ExportRow icon={<IconExcel size={20}/>} bg="#1d6f42" label="ייצוא ל-Excel"
+                      sub="קובץ XLSX עם כל המתכונים"
+                      onClick={() => onExport('excel')}/>
+                    <ExportRow icon={<IconWord size={20}/>} bg="#2b579a" label="ייצוא לוורד"
+                      sub="ספר מתכונים מעוצב להדפסה · עמוד נפרד לכל מתכון"
+                      onClick={() => onExport('word')}/>
+                    {onImport && (
+                      <label style={{ ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)', cursor: 'pointer' }}>
+                        <span style={{ ...exportIconStyle, background: '#5b4452' }}><IconUpload size={20}/></span>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                          <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>ייבוא מקובץ Excel</span>
+                          <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>קובץ .xlsx · עמודות בעברית</span>
+                        </div>
+                        <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                          onChange={onImport} style={{ display: 'none' }}/>
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Diagnostics */}
               <DiagnosticsBlock/>

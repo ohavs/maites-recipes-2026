@@ -81,7 +81,7 @@ function Card({ variant = 'surface', palette, elevation = 2, radius = 'lg', styl
 // IconButton — round control. Always at least 40px, `lg` for
 // anything that is a primary target.
 // ───────────────────────────────────────────────────────────
-const ICON_BTN_SIZE = { sm: 36, md: 40, lg: 44 };
+const ICON_BTN_SIZE = { sm: 40, md: 48, lg: 56 };
 
 function IconButton({ size = 'md', tone = 'glass', label, onClick, disabled, style, children, ...rest }) {
   const px = ICON_BTN_SIZE[size] || ICON_BTN_SIZE.md;
@@ -123,7 +123,7 @@ function Button({ tone = 'primary', size = 'md', full, disabled, onClick, style,
     glass:   { background: 'var(--glass)',         color: 'var(--ink)',      boxShadow: 'var(--e1)' },
     danger:  { background: 'var(--danger)',        color: '#fff',            boxShadow: 'var(--e2)' },
   };
-  const pad = size === 'lg' ? '17px 22px' : size === 'sm' ? '9px 14px' : '13px 18px';
+  const pad = size === 'lg' ? '18px 24px' : size === 'sm' ? '10px 16px' : '14px 20px';
   const fs  = size === 'lg' ? 'var(--t-body)' : size === 'sm' ? 'var(--t-caption)' : 'var(--t-small)';
   return (
     <button type="button" onClick={onClick} disabled={disabled}
@@ -131,7 +131,8 @@ function Button({ tone = 'primary', size = 'md', full, disabled, onClick, style,
         border: 'none', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
         borderRadius: 'var(--r-md)', padding: pad, fontSize: fs, fontWeight: 700,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        width: full ? '100%' : undefined, minHeight: 44,
+        width: full ? '100%' : undefined,
+        minHeight: size === 'lg' ? 'var(--field-h)' : 'var(--tap)',
         opacity: disabled ? .5 : 1,
         transition: 'transform var(--dur-fast), opacity var(--dur-fast)',
         ...tones[tone], ...style,
@@ -151,7 +152,7 @@ function Chip({ tone = 'neutral', palette, active, onClick, style, children, ...
   const base = {
     display: 'inline-flex', alignItems: 'center', gap: 5,
     ...TYPE.caption,
-    padding: '6px 11px', borderRadius: 'var(--r-pill)',
+    padding: '8px 14px', borderRadius: 'var(--r-pill)',
     border: 'none', fontFamily: 'inherit', flexShrink: 0,
     transition: 'background var(--dur-fast), color var(--dur-fast)',
   };
@@ -165,7 +166,7 @@ function Chip({ tone = 'neutral', palette, active, onClick, style, children, ...
   const tn = active ? tones.solid : tones[tone];
   const Tag = onClick ? 'button' : 'span';
   return (
-    <Tag {...(onClick ? { type: 'button', onClick, style: { ...base, ...tn, cursor: 'pointer', minHeight: 32, ...style } }
+    <Tag {...(onClick ? { type: 'button', onClick, style: { ...base, ...tn, cursor: 'pointer', minHeight: 44, ...style } }
                       : { style: { ...base, ...tn, ...style } })} {...rest}>{children}</Tag>
   );
 }
@@ -183,11 +184,11 @@ function SectionLabel({ children, ink = 'var(--ink-soft)', style }) {
 function Field({ label, hint, error, htmlFor, children, style }) {
   return (
     <label htmlFor={htmlFor} style={{ display: 'block', ...style }}>
-      <div style={{ ...TYPE.caption, color: 'var(--ink-soft)', marginBottom: 6, paddingInlineStart: 4 }}>{label}</div>
+      <div style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, paddingInlineStart: 4 }}>{label}</div>
       {children}
       {(error || hint) && (
         <div style={{
-          ...TYPE.caption, marginTop: 5, paddingInlineStart: 4,
+          ...TYPE.caption, marginTop: 8, paddingInlineStart: 4,
           color: error ? 'var(--danger)' : 'var(--ink-faint)', fontWeight: error ? 700 : 500,
         }}>{error || hint}</div>
       )}
@@ -198,9 +199,9 @@ function Field({ label, hint, error, htmlFor, children, style }) {
 const inputStyle = {
   width: '100%', border: 'none', outline: 'none',
   background: 'var(--surface-raised)', color: 'var(--ink)',
-  borderRadius: 'var(--r-md)', padding: '13px 15px',
+  borderRadius: 'var(--r-md)', padding: '16px 18px',
   fontFamily: 'inherit', fontSize: 'var(--t-body)', textAlign: 'right',
-  boxShadow: 'var(--e1)', minHeight: 46,
+  boxShadow: 'var(--e1)', minHeight: 'var(--field-h)',
 };
 
 // ───────────────────────────────────────────────────────────

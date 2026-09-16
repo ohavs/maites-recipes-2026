@@ -43,6 +43,9 @@ function App() {
   const [showClaimPrompt, setShowClaimPrompt] = $S(false);
   const [claiming, setClaiming] = $S(false);
   const [showAccountPanel, setShowAccountPanel] = $S(false);
+  // Which of the recipe form's four passes is showing. It lives here so
+  // the phone's back gesture walks back through them one at a time.
+  const [formStep, setFormStep] = $S(0);
   const [sharesInfo, setSharesInfo] = $S({ asOwner: [], asGuest: [] });
   const [pendingInvites, setPendingInvites] = $S([]);
   const [sharedOwnerUids, setSharedOwnerUids] = $S([]);
@@ -343,6 +346,8 @@ function App() {
   if (openRecipeId)        layers.push('recipe');
   if (bookRecipeId)        layers.push('bookpage');
   if (editingRecipeId)     layers.push('edit');
+  const formOpen = tab === 'add' || !!editingRecipeId;
+  if (formOpen) for (let i = 0; i < formStep; i++) layers.push('formstep');
   if (cookRecipe)          layers.push('cook');
   if (sharingRecipe)       layers.push('share');
   if (showAccountPanel)    layers.push('account');
@@ -369,6 +374,7 @@ function App() {
       case 'account':    setShowAccountPanel(false); break;
       case 'share':      setSharingRecipe(null); break;
       case 'cook':       setCookRecipeId(null); break;
+      case 'formstep':   setFormStep(n => Math.max(0, n - 1)); break;
       case 'edit':       setEditingRecipeId(null); break;
       case 'bookpage':   setBookRecipeId(null); break;
       case 'recipe':     setOpenRecipeId(null); break;
@@ -407,8 +413,13 @@ function App() {
     }
   }, [layerKey]);
 
+  $E(() => { if (!formOpen) setFormStep(0); }, [formOpen]);
+
   const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
-  const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe);
+  // Writing a recipe down takes over the screen: the tab bar would sit on
+  // top of the form's own controls, and leaving mid-sentence by tapping a
+  // tab is not something anyone means to do. You leave with ביטול.
+  const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe || tab === 'add');
 
   const handleClaimRecipes = async () => {
     if (!currentUser) return;
@@ -504,11 +515,12 @@ function App() {
           {tab === 'add' && (
             <AddRecipeScreen
               onAdd={addRecipe}
-              onExport={handleExport}
-              onImport={handleImport}
+              onCancel={() => { formDirtyRef.current = false; navTo('home'); }}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
               onDirtyChange={(d) => { formDirtyRef.current = d; }}
+              step={formStep}
+              onStepChange={setFormStep}
             />
           )}
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
@@ -554,6 +566,8 @@ function App() {
               onCancel={() => setEditingRecipeId(null)}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
+              step={formStep}
+              onStepChange={setFormStep}
             />
           </div>
         )}
@@ -619,6 +633,8 @@ function App() {
           <AccountPanel
             user={currentUser}
             recipes={recipes}
+            onExport={handleExport}
+            onImport={handleImport}
             themeMode={themeMode}
             onThemeChange={setThemeMode}
             onResetServings={async () => {
