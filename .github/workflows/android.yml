@@ -5,7 +5,7 @@
 # forever — the same key that signed the copy already on the phone, or the
 # update refuses to install over it.
 #
-# Nothing secret is in this repository. The four secrets below are set in
+# Nothing secret is in this repository. The five secrets below are set in
 # Settings → Secrets and variables → Actions.
 
 name: Android
