@@ -1,0 +1,28 @@
+{
+  "name": "maites",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Maites — a Hebrew recipe app. A web app and an Android app from one source.",
+  "scripts": {
+    "build": "node build.js",
+    "vendor:cap": "esbuild src/capacitor-entry.js --bundle --format=iife --minify --target=es2020 --outfile=vendor/capacitor.js",
+    "build:test": "node build.js --test",
+    "sync": "node build.js && cap sync android",
+    "deploy": "node build.js && firebase deploy --only hosting"
+  },
+  "dependencies": {
+    "@capacitor-firebase/authentication": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/camera": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/haptics": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.0.0",
+    "esbuild": "^0.28.2"
+  }
+}

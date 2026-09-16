@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Maites</string>
+    <string name="title_activity_main">Maites</string>
+    <string name="package_name">com.maites.recipes</string>
+    <string name="custom_url_scheme">com.maites.recipes</string>
+</resources>

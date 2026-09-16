@@ -31,6 +31,12 @@ const track = (label, promise) =>
 
 // ── Auth ──────────────────────────────────────────────────────
 async function auth_signInWithGoogle() {
+  // Inside the Android app the popup cannot work — Google refuses OAuth in
+  // an embedded browser — so the native sheet runs instead and Firebase is
+  // handed the credential it produces.
+  if (typeof isNative === 'function' && isNative()) {
+    return signInWithGoogleNative();
+  }
   const provider = new firebase.auth.GoogleAuthProvider();
   return _auth.signInWithPopup(provider);
 }

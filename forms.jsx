@@ -328,26 +328,30 @@ Object.assign(window, {
 // ───────────────────────────────────────────────────────────
 const PHOTO_MAX_PX = 900;
 
+// Downscales whatever came in — a file, or a photograph straight from the
+// camera — and puts it in the slot.
+function storeImageDataUrl(dataUrl, slotId, done) {
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    let { width: w, height: h } = img;
+    if (w > PHOTO_MAX_PX || h > PHOTO_MAX_PX) {
+      if (w > h) { h = Math.round(h * PHOTO_MAX_PX / w); w = PHOTO_MAX_PX; }
+      else { w = Math.round(w * PHOTO_MAX_PX / h); h = PHOTO_MAX_PX; }
+    }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    const out = canvas.toDataURL('image/webp', 0.85);
+    if (window.__setImageSlot) window.__setImageSlot(slotId, { u: out, s: 1, x: 0, y: 0 });
+    done(out);
+  };
+  img.onerror = () => done(null);
+  img.src = dataUrl;
+}
+
 function readImageToSlot(file, slotId, done) {
   const reader = new FileReader();
-  reader.onload = ev => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let { width: w, height: h } = img;
-      if (w > PHOTO_MAX_PX || h > PHOTO_MAX_PX) {
-        if (w > h) { h = Math.round(h * PHOTO_MAX_PX / w); w = PHOTO_MAX_PX; }
-        else { w = Math.round(w * PHOTO_MAX_PX / h); h = PHOTO_MAX_PX; }
-      }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/webp', 0.85);
-      if (window.__setImageSlot) window.__setImageSlot(slotId, { u: dataUrl, s: 1, x: 0, y: 0 });
-      done(dataUrl);
-    };
-    img.onerror = () => done(null);
-    img.src = ev.target.result;
-  };
+  reader.onload = ev => storeImageDataUrl(ev.target.result, slotId, done);
   reader.onerror = () => done(null);
   reader.readAsDataURL(file);
 }
@@ -377,9 +381,25 @@ function PhotoStage({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pale
     return () => clearTimeout(t);
   }, [recipeId, gallery.length]);
 
-  const pick = (which, slot) => {
+  const landed = (slot, url) => {
+    if (!url) return;
+    setShots(prev => {
+      if (!Object.values(prev).some(Boolean)) setMainSlot(slot);
+      return { ...prev, [slot]: url };
+    });
+    if (typeof hapticTap === 'function') hapticTap();
+  };
+
+  const pick = async (which, slot) => {
     targetRef.current = slot;
     setSheetFor(null);
+    // On a phone this is the real camera roll. In a browser it is the
+    // file input below, which is the same two choices by another road.
+    if (typeof isNative === 'function' && isNative()) {
+      const dataUrl = await pickPhotoNative(which);
+      if (dataUrl) storeImageDataUrl(dataUrl, `food-${recipeId}-${slot}`, (url) => landed(slot, url));
+      return;
+    }
     setTimeout(() => (which === 'camera' ? camRef : libRef).current?.click(), 60);
   };
 
@@ -388,19 +408,13 @@ function PhotoStage({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pale
     const slot = targetRef.current;
     e.target.value = '';
     if (!file || !slot) return;
-    readImageToSlot(file, `food-${recipeId}-${slot}`, (url) => {
-      if (!url) return;
-      setShots(prev => {
-        if (!Object.values(prev).some(Boolean)) setMainSlot(slot);
-        return { ...prev, [slot]: url };
-      });
-    });
+    readImageToSlot(file, `food-${recipeId}-${slot}`, (url) => landed(slot, url));
   };
 
   const addAndPick = (which) => {
     const slot = `g${Date.now().toString(36)}`;
     setGallery(g => [...g, slot]);
-    pick(which, slot);
+    return pick(which, slot);
   };
 
   const remove = (slot) => {
@@ -544,4 +558,4 @@ function PhotoAction({ icon, label, onClick, danger }) {
   );
 }
 
-Object.assign(window, { PhotoStage, PhotoAction, readImageToSlot });
+Object.assign(window, { PhotoStage, PhotoAction, readImageToSlot, storeImageDataUrl });

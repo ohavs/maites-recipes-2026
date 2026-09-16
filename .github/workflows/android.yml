@@ -1,0 +1,113 @@
+# Builds the Android app and publishes the APK as a GitHub Release.
+#
+# This has to run here rather than on a developer's machine: the Android
+# SDK is a few gigabytes, and the release has to be signed by one key
+# forever — the same key that signed the copy already on the phone, or the
+# update refuses to install over it.
+#
+# Nothing secret is in this repository. The four secrets below are set in
+# Settings → Secrets and variables → Actions.
+
+name: Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version name, e.g. 1.2.0'
+        required: true
+        default: '1.0.0'
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Work out the version
+        id: v
+        run: |
+          NAME="${{ github.event.inputs.version }}"
+          if [ -z "$NAME" ]; then NAME="${GITHUB_REF_NAME#v}"; fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          # The build number must only ever go up, so it is the run number.
+          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+
+      - name: Compile the web layer
+        run: node build.js
+
+      - name: Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON is not set. Signing in will not work without it."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))" \
+            || { echo "::error::google-services.json is not valid JSON"; exit 1; }
+
+      - name: Copy the web layer into the app
+        run: npx cap sync android
+
+      - name: Unpack the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/maites.keystore"
+
+      - name: Build the APK
+        working-directory: android
+        env:
+          MAITES_VERSION_NAME: ${{ steps.v.outputs.name }}
+          MAITES_VERSION_CODE: ${{ steps.v.outputs.code }}
+          MAITES_KEYSTORE_PATH: ${{ runner.temp }}/maites.keystore
+          MAITES_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MAITES_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MAITES_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Check it really is signed
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::no APK was produced"; exit 1; }
+          "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$APK"
+          cp "$APK" "maites-${{ steps.v.outputs.name }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maites-apk
+          path: maites-*.apk
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.name }}
+          name: Maites ${{ steps.v.outputs.name }}
+          files: maites-*.apk
+          body: |
+            גרסה ${{ steps.v.outputs.name }} · build ${{ steps.v.outputs.code }}
+
+            להתקנה: להוריד את הקובץ מלמטה ולפתוח אותו בטלפון.

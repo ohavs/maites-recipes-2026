@@ -36,6 +36,8 @@ function applyTheme(mode) {
   const dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', dark ? '#191218' : '#f7a8b8');
+  // …and the real system bars, when there are real system bars.
+  if (typeof paintSystemBars === 'function') paintSystemBars(dark);
 }
 
 function useTheme() {

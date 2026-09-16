@@ -31,6 +31,31 @@ invalidates the old cache on its own — there is no version number to remember.
 `build.js` reads the list of sources, and their order, out of `index.html`, so
 a new file is added in one place.
 
+## The Android app
+
+The same code. Capacitor puts `dist/` inside a WebView, and `native.jsx` is
+the one place that knows the difference — camera, vibration, system bars,
+the hardware back button and Google sign-in each have a native path and a
+web fallback. Nothing above that file asks which it is running on.
+
+    node build.js && npx cap sync android    # or: npm run sync
+
+The APK is built by `.github/workflows/android.yml`, not locally: the
+Android SDK is a few gigabytes, and a release has to be signed by the same
+key every time or it will not install over the copy already on the phone.
+Run the workflow by hand with a version number, or push a `v1.2.3` tag.
+
+Four repository secrets feed it: `GOOGLE_SERVICES_JSON`,
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
+and `ANDROID_KEY_PASSWORD`. None of them are in this repository, and the
+build stops with a clear message if one is missing.
+
+`vendor/capacitor.js` is Capacitor's own JavaScript, bundled once because
+it ships as ES modules and this project has no bundler. Regenerate it after
+changing `src/capacitor-entry.js`:
+
+    npm run vendor:cap
+
 ## The test harness
 
 `__test.html` and `__stub.jsx` run the app against a stubbed backend, for

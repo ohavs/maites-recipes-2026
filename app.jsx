@@ -871,3 +871,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 );
 // Tells the boot watchdog in index.html that the app is up.
 window.dispatchEvent(new Event('maites-ready'));
+
+// …and, on a phone, takes down the splash screen, colours the system bars
+// and hands the hardware back button to the app's own layer stack.
+if (typeof startNative === 'function') startNative();
