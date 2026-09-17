@@ -49,6 +49,12 @@
     --success: #2c8a52;
     --success-soft: rgba(44,138,82,.14);
     --warning: #b5790d;
+    /* What text goes on top of each of those. In dark mode the state
+       colours are light, so white on them cannot be read — which is the
+       whole reason these exist rather than a hardcoded #fff. */
+    --on-danger: #ffffff;
+    --on-success: #ffffff;
+    --on-warning: #ffffff;
 
     /* ── recipe palettes (themed) ─────────────────── */
     --p-yellow-bg:#ffd255; --p-yellow-bg2:#fff1c2; --p-yellow-ink:#3a2a0a; --p-yellow-tag:#ffefb8; --p-yellow-accent:#a8730e;
@@ -137,6 +143,9 @@
       --brand-strong: #e8536f;
       --danger: #f07070;
       --danger-soft: rgba(240,112,112,.16);
+      --on-danger: #3b0d0d;
+      --on-success: #06240f;
+      --on-warning: #2a1c00;
       --success: #6ecb95;
       --success-soft: rgba(110,203,149,.16);
       --warning: #e0ab3c;
@@ -183,6 +192,9 @@
     --brand-strong: #e8536f;
     --danger: #f07070;
     --danger-soft: rgba(240,112,112,.16);
+    --on-danger: #3b0d0d;
+    --on-success: #06240f;
+    --on-warning: #2a1c00;
     --success: #6ecb95;
     --success-soft: rgba(110,203,149,.16);
     --warning: #e0ab3c;

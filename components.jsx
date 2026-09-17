@@ -82,6 +82,52 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false,
 
 // Returns the stored data-URL for a recipe's main photo, or null.
 // Used by the recipe book / print views, which need a plain <img>.
+// ───────────────────────────────────────────────────────────
+// RecipePhoto — one treatment for every photograph.
+//
+// The pictures are never alike. Some are wide, some tall, some square.
+// Some are photographs with a background, some are cut-outs on nothing at
+// all. Cropping them to a common shape ruins half of them: a cut-out cake
+// gets its edges sliced off, a wide pan loses the pan.
+//
+// So nothing is cropped. Every photo is shown whole, centred, at the
+// largest size that fits — and the space left around it is filled by a
+// blurred, enlarged copy of the photo itself, over the recipe's own
+// colour. A wide photo gets soft bands above and below in its own tones; a
+// tall one gets them at the sides; a cut-out sits on the recipe's colour
+// because a transparent picture has nothing to blur. Every card ends up
+// the same shape and the same weight, and no photo is cut.
+// ───────────────────────────────────────────────────────────
+function RecipePhoto({ url, palette, radius = 'var(--r-lg)', alt = '', style, dim = false }) {
+  if (!url) return null;
+  const tint = palette ? palette.bg2 || palette.bg : 'var(--surface-sunken)';
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: radius,
+      background: tint, ...style,
+    }}>
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: '-12%',
+        backgroundImage: `url("${url}")`,
+        backgroundSize: 'cover', backgroundPosition: 'center',
+        filter: 'blur(22px) saturate(1.5)',
+        opacity: .85,
+        transform: 'scale(1.1)',
+      }}/>
+      <img src={url} alt={alt} loading="lazy" style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        objectFit: 'contain', display: 'block',
+      }}/>
+      {dim && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.35) 100%)',
+        }}/>
+      )}
+    </div>
+  );
+}
+
 function getRecipePhoto(recipe, slot) {
   if (!recipe || !window.__getImageSlot) return null;
   const s = slot || recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main';
@@ -331,16 +377,12 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               position: 'absolute',
               top: '50%', insetInlineStart: -imgPokeOut,
               transform: 'translateY(-50%)',
-              ...(inside ? {
-                borderRadius: 'var(--r-md)', overflow: 'hidden',
-                boxShadow: 'var(--e2)',
-                background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
-                display: 'grid', placeItems: 'center',
-              } : {}),
+              width: imgSize, height: imgSize,
+              borderRadius: inside ? 'var(--r-md)' : 'var(--r-pill)',
+              overflow: 'hidden', boxShadow: 'var(--e2)',
             }}>
-              <FoodImage recipeId={recipe.id} size={imgSize}
-                shape={inside ? 'rounded' : 'circle'} radius={20} fit={inside ? 'cover' : 'contain'}
-                slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
+              <RecipePhoto url={photo} palette={p}
+                radius={inside ? 'var(--r-md)' : 'var(--r-pill)'} alt=""/>
             </div>
           </div>}
         </div>
@@ -1009,12 +1051,8 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
         transition: 'transform var(--dur-fast) cubic-bezier(.2,.8,.2,1.05)',
       }}>
         {hasPhoto && (
-          <div style={{
-            flex: 1, minHeight: 0, position: 'relative',
-            background: `linear-gradient(150deg, ${p.bg2} 0%, ${p.tag} 100%)`,
-          }}>
-            <FoodImage recipeId={recipe.id} width="100%" height="100%"
-              shape="rounded" radius={0} fit="cover" slotIdSuffix={slotSuffix} readonly />
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <RecipePhoto url={photo} palette={p} radius={0} alt=""/>
           </div>
         )}
 
@@ -1056,7 +1094,11 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 // ConfirmDialog — reusable destructive-action confirmation
 // emoji: big icon shown in badge, confirmColor: button color
 // ───────────────────────────────────────────────────────────
-function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', confirmColor = 'var(--danger)', onConfirm, onCancel }) {
+function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', danger = true, onConfirm, onCancel }) {
+  // The colour comes from the tone, never from a caller passing a hex — a
+  // hardcoded white on a state colour is unreadable the moment the theme
+  // flips, which is exactly what happened here.
+  const confirmColor = danger ? 'var(--danger)' : 'var(--brand-strong)';
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 90,
@@ -1086,21 +1128,10 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
           {body && <p style={{ margin: 0, fontSize: 'var(--t-body)', color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
         </div>
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: '16px', border: 'none', borderRadius: 'var(--r-md)',
-            background: 'var(--surface-sunken)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)', cursor: 'pointer',
-          }}>{cancelLabel}</button>
-          <button onClick={onConfirm} style={{
-            flex: 1.5, padding: '16px', border: 'none', borderRadius: 'var(--r-md)',
-            background: confirmColor, color: '#fff',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)', cursor: 'pointer',
-            boxShadow: `0 10px 24px -8px ${confirmColor}88`,
-          }}
-            onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
-            onMouseUp={e => e.currentTarget.style.transform = ''}
-            onMouseLeave={e => e.currentTarget.style.transform = ''}
-          >{confirmLabel}</button>
+          <Button tone="quiet" size="lg" onClick={onCancel} style={{ flex: 1 }}>{cancelLabel}</Button>
+          <Button tone={danger ? 'danger' : 'primary'} size="lg" onClick={onConfirm} style={{ flex: 1.5 }}>
+            {confirmLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -1109,7 +1140,7 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  FoodImage, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
+  FoodImage, RecipePhoto, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
   BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet,
   ConfirmDialog,

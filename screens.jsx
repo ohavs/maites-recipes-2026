@@ -735,7 +735,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
           <div style={pane}>
 
             <NField label="שם המתכון" value={title} onChange={setTitle}
-              placeholder="עוגת אגוזים של סבתא" autoFocus={mode === 'add'}/>
+              placeholder="עוגת אגוזים של סבתא"/>
             <NField label="תיאור" value={desc} onChange={setDesc} multiline rows={3}
               placeholder="במה זה מיוחד?" hint="שורה אחת שתופיע על הכרטיס"/>
             <NRow label="קטגוריה"
@@ -762,8 +762,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
               servings={servings} cuisine={cuisine}/>
           </div>
           <div style={pane}>
-            <NStepper label="לכמה אנשים" value={servings} onChange={setServings}
-              hint="זו נקודת ההתחלה לחישוב הכמויות. אפשר להשאיר ריק אם לא ידוע."/>
+            <NStepper label="לכמה אנשים" value={servings} onChange={setServings}/>
             <div style={group}>מצרכים</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {ings.map((ing, i) => (
@@ -969,36 +968,47 @@ function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory,
 // ───────────────────────────────────────────────────────────
 function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   const [pickerOpen, setPickerOpen] = uS(false);
+  const [qtyOpen, setQtyOpen] = uS(false);
   const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
-      <div style={{ flexShrink: 0 }}>
-        <button type="button" onClick={() => setPickerOpen(o => !o)}
-          aria-label="בחירת סמל"
-          style={{
-            width: 56, height: 56, borderRadius: 'var(--r-md)', border: 'none',
-            background: 'var(--field-fill)', color: 'var(--ink)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 26,
-          }}>{emoji}</button>
-        {pickerOpen && (
-          <EmojiPickerPopover current={emoji}
-            onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
-            onClose={() => setPickerOpen(false)}
-          />
+    <div>
+      <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
+        <div style={{ flexShrink: 0 }}>
+          <button type="button" onClick={() => setPickerOpen(o => !o)}
+            aria-label="בחירת סמל"
+            style={{
+              width: 56, height: 56, borderRadius: 'var(--r-lg)', border: 'none',
+              background: 'var(--surface-raised)', color: 'var(--ink)',
+              cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 26,
+            }}>{emoji}</button>
+          {pickerOpen && (
+            <EmojiPickerPopover current={emoji}
+              onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
+              onClose={() => setPickerOpen(false)}
+            />
+          )}
+        </div>
+        {/* The amounts strip belongs to this field, so it shows while the
+            field is being filled in and gets out of the way after. */}
+        <div style={{ width: 104, flex: 'none' }}
+          onFocusCapture={() => setQtyOpen(true)}
+          onBlurCapture={() => setTimeout(() => setQtyOpen(false), 150)}>
+          <NField label="כמות" hideLabel placeholder="כמות"
+            value={ing.qty || ''} onChange={v => onChange('qty', v)}/>
+        </div>
+        <NField label="מצרך" hideLabel placeholder="מצרך"
+          value={ing.name || ''} onChange={v => onChange('name', v)}
+          style={{ flex: 1, minWidth: 0 }}/>
+        {canRemove && (
+          <button type="button" onClick={onRemove} aria-label="מחיקת מצרך" style={{
+            width: 44, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+            background: 'transparent', color: 'var(--ink-faint)', flexShrink: 0,
+            display: 'grid', placeItems: 'center',
+          }}><IconTrash size={18}/></button>
         )}
       </div>
-      <NField label="כמות" value={ing.qty || ''} onChange={v => onChange('qty', v)}
-        style={{ width: 104, flex: 'none' }}/>
-      <NField label="מצרך" value={ing.name || ''} onChange={v => onChange('name', v)}
-        style={{ flex: 1, minWidth: 0 }}/>
-      {canRemove && (
-        <button type="button" onClick={onRemove} aria-label="מחיקת מצרך" style={{
-          width: 44, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
-          background: 'transparent', color: 'var(--ink-faint)', flexShrink: 0,
-          display: 'grid', placeItems: 'center',
-        }}><IconTrash size={18}/></button>
-      )}
+      {qtyOpen && <QtyPresets value={ing.qty || ''} onPick={v => onChange('qty', v)}/>}
     </div>
   );
 }
@@ -1088,7 +1098,7 @@ function UnsavedChangesDialog({ onStay, onLeave }) {
       body="יש שינויים שטרם נשמרו. לצאת בלי לשמור?"
       confirmLabel="המשך עריכה"
       cancelLabel="צא בלי לשמור"
-      confirmColor="var(--ink)"
+      danger={false}
       onConfirm={onStay}
       onCancel={onLeave}
     />
@@ -1103,10 +1113,9 @@ function DeleteConfirm({ recipe, onConfirm, onCancel }) {
     <ConfirmDialog
       emoji="🗑️"
       title="מחיקת מתכון"
-      body={<>בטוח למחוק את<br/><strong style={{ color: 'var(--ink)' }}>"{recipe.title}"</strong>?<br/><span style={{ fontSize: 'var(--t-small)', color: '#c0304f', fontWeight: 700 }}>לא ניתן לשחזר אחרי המחיקה</span></>}
+      body={<>בטוח למחוק את<br/><strong style={{ color: 'var(--ink)' }}>"{recipe.title}"</strong>?<br/><span style={{ fontSize: 'var(--t-small)', color: 'var(--danger)', fontWeight: 700 }}>לא ניתן לשחזר אחרי המחיקה</span></>}
       confirmLabel="מחק מתכון"
       cancelLabel="ביטול"
-      confirmColor="#e34466"
       onConfirm={onConfirm}
       onCancel={onCancel}
     />
@@ -1128,7 +1137,6 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
           body={`להסיר את "${confirmItem.title}" ששותף איתך ע״י ${confirmItem._sharedBy}?`}
           confirmLabel="הסר"
           cancelLabel="ביטול"
-          confirmColor="#e34466"
           onConfirm={() => { onRemove(confirmId); setConfirmId(null); }}
           onCancel={() => setConfirmId(null)}
         />
@@ -1477,9 +1485,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onResetServings, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
-  const [confirmReset, setConfirmReset] = uS(false);
-  const withServings = recipes.filter(r => +r.servings > 0).length;
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
   const [mutual, setMutual] = uS(false);
@@ -1495,70 +1501,23 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
   };
 
   return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 55,
-      background: 'var(--overlay)', backdropFilter: 'blur(12px)',
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        background: 'var(--surface)',
-        borderRadius: '32px 32px 0 0',
-        maxHeight: '88vh', overflowY: 'auto',
-        boxShadow: 'var(--e3)',
-        animation: 'slideUp .36s cubic-bezier(.2,1.1,.35,1)',
-      }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 'var(--r-pill)', background: 'var(--line)' }}/>
-        </div>
+    <Page
+      title={user ? (user.displayName || 'משתמש') : 'ללא חשבון'}
+      subtitle={user ? user.email : 'המתכונים נשמרים על המכשיר הזה'}
+      onClose={onClose}
+      header={(
+        <>
+        {user && (
+          <NTabs
+            tabs={[{ id: 'profile', label: 'פרופיל' }, { id: 'share', label: 'שיתוף' }]}
+            index={tab === 'share' ? 1 : 0}
+            onIndex={(i) => setTab(i === 1 ? 'share' : 'profile')}
+          />
+        )}
+        </>
+      )}>
 
-        {/* User header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14,
-          padding: '18px 24px 16px',
-        }}>
-          <div style={{
-            width: 54, height: 54, borderRadius: 'var(--r-pill)', flexShrink: 0,
-            background: 'linear-gradient(135deg,#f7a8b8,#c9b8e8)',
-            overflow: 'hidden', display: 'grid', placeItems: 'center',
-            boxShadow: 'var(--e1)',
-          }}>
-            {user?.photoURL
-              ? <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-              : <span style={{ fontSize: 'var(--t-title)', fontWeight: 700, color: 'var(--ink)' }}>
-                  {user ? (user.displayName || user.email || '?')[0].toUpperCase() : '⚙'}
-                </span>
-            }
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 'var(--t-body)', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user ? (user.displayName || 'משתמש') : 'ללא חשבון'}
-            </div>
-            <div style={{ fontSize: 'var(--t-small)', color: 'var(--ink-soft)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user ? user.email : 'המתכונים נשמרים על המכשיר הזה'}
-            </div>
-          </div>
-          <button onClick={onClose} style={{
-            width: 34, height: 34, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
-            background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
-            display: 'grid', placeItems: 'center', fontSize: 'var(--t-heading)', flexShrink: 0,
-          }}>×</button>
-        </div>
-
-        {/* Tab bar */}
-        <div style={{ display: 'flex', padding: '0 20px 0', gap: 8, borderBottom: '1px solid var(--line)' }}>
-          {(user ? [['profile', 'פרופיל'], ['share', 'שיתוף']] : [['profile', 'פרופיל']]).map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              padding: '10px 16px', border: 'none', cursor: 'pointer', background: 'transparent',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
-              color: tab === id ? 'var(--ink)' : 'var(--ink-soft)',
-              borderBottom: tab === id ? '2.5px solid var(--ink)' : '2.5px solid transparent',
-              marginBottom: -1,
-            }}>{label}</button>
-          ))}
-        </div>
-
-        <div style={{ padding: '20px 20px 40px' }}>
+        <div style={{ padding: '4px 16px 40px' }}>
 
           {tab === 'profile' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1599,25 +1558,6 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   ]}
                 />
               </div>
-
-              {/* Quantities */}
-              {onResetServings && withServings > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>כמויות</SectionLabel>
-                  <div style={{
-                    background: 'var(--surface-sunken)', borderRadius: 'var(--r-md)', padding: '12px 14px',
-                    display: 'grid', gap: 10,
-                  }}>
-                    <div style={{ ...TYPE.caption, color: 'var(--ink-soft)', fontWeight: 500, lineHeight: 1.5 }}>
-                      מתכונים שיובאו מאקסל קיבלו בעבר "4 מנות" אוטומטית, גם אם הקובץ לא אמר כלום.
-                      אפשר לאפס את המספר בכל המתכונים ולהגדיר אותו מחדש רק היכן שהוא באמת ידוע.
-                    </div>
-                    <Button size="sm" tone="glass" onClick={() => setConfirmReset(true)}>
-                      איפוס מספר המנות ({withServings} מתכונים)
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               {typeof UpdateBlock === 'function' && <UpdateBlock/>}
 
@@ -1825,21 +1765,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
             </div>
           )}
         </div>
-      </div>
-      {confirmReset && (
-        <ConfirmDialog
-          emoji="👥"
-          title="איפוס מספר המנות"
-          body={`המספר יימחק מ-${withServings} מתכונים, וכל מתכון יתחיל ממנה אחת עד שתגדירו לו מספר. הכמויות עצמן לא משתנות.`}
-          confirmLabel="איפוס"
-          cancelLabel="ביטול"
-          confirmColor="var(--ink)"
-          onConfirm={() => { setConfirmReset(false); onResetServings(); }}
-          onCancel={() => setConfirmReset(false)}
-        />
-      )}
-      <style>{`@keyframes slideUp{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
-    </div>
+    </Page>
   );
 }
 

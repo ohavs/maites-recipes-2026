@@ -16,14 +16,14 @@ const { useState: fS, useRef: fR, useEffect: fE, useId: fId } = React;
 // NField — one line of text, with its label inside it.
 // ───────────────────────────────────────────────────────────
 function NField({ value, onChange, label, hint, type = 'text', inputMode, placeholder,
-                  multiline = false, rows = 3, autoFocus, style }) {
+                  multiline = false, rows = 3, autoFocus, hideLabel = false, style }) {
   const [focused, setFocused] = fS(false);
   const id = fId();
   const Tag = multiline ? 'textarea' : 'input';
 
   return (
     <div style={style}>
-      {label && (
+      {label && !hideLabel && (
         <label htmlFor={id} style={{
           display: 'block',
           ...TYPE.small, fontWeight: 700, marginBottom: 8, paddingInlineStart: 6,
@@ -62,6 +62,50 @@ function NField({ value, onChange, label, hint, type = 'text', inputMode, placeh
         <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500,
                       marginTop: 7, paddingInlineStart: 6 }}>{hint}</div>
       )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// QtyPresets — the amounts you write over and over.
+//
+// A quantity is a number and a measure, and almost all of them come from
+// a short list. Typing "2 כפות" on a phone keyboard is slower than two
+// taps, so the strip appears under the amount you are filling in and
+// each tap appends its piece.
+// ───────────────────────────────────────────────────────────
+const QTY_NUMBERS = ['¼', '½', '¾', '1', '2', '3', '4'];
+const QTY_UNITS   = ['כוס', 'כפות', 'כף', 'כפית', 'גרם', 'מ״ל', 'יח׳', 'חבילה', 'קורט'];
+
+function QtyPresets({ value, onPick }) {
+  const append = (token) => {
+    const cur = String(value || '').trim();
+    // A number replaces a number; a measure joins one.
+    const isNumber = QTY_NUMBERS.includes(token);
+    if (!cur) return onPick(token);
+    if (isNumber) {
+      const rest = cur.replace(/^[\d¼½¾/.\s]+/, '').trim();
+      return onPick(rest ? `${token} ${rest}` : token);
+    }
+    if (cur.endsWith(token)) return onPick(cur);
+    return onPick(`${cur} ${token}`);
+  };
+  const chip = (t) => (
+    <button key={t} type="button" onMouseDown={e => e.preventDefault()} onClick={() => append(t)}
+      style={{
+        flexShrink: 0, minHeight: 44, padding: '0 16px', borderRadius: 'var(--r-md)',
+        border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        background: 'var(--field-fill)', color: 'var(--ink)',
+        ...TYPE.small, fontWeight: 700,
+      }}>{t}</button>
+  );
+  return (
+    <div className="scroll-x" style={{
+      display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginTop: 10,
+    }}>
+      {QTY_NUMBERS.map(chip)}
+      <span style={{ width: 1, flexShrink: 0, background: 'var(--line-strong)', margin: '6px 2px' }}/>
+      {QTY_UNITS.map(chip)}
     </div>
   );
 }
@@ -170,9 +214,7 @@ function NStepper({ label, hint, value, onChange, min = 0, max = 99, empty = 'ל
       background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: '14px 18px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ ...TYPE.body, fontWeight: 600, color: 'var(--ink)' }}>{label}</div>
-        </div>
+        <div style={{ flex: 1, minWidth: 0, ...TYPE.body, fontWeight: 600, color: 'var(--ink)' }}>{label}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button type="button" aria-label="פחות" onClick={() => set(n - 1)} disabled={n <= min} style={btn(n <= min)}>−</button>
           <div style={{
@@ -184,7 +226,7 @@ function NStepper({ label, hint, value, onChange, min = 0, max = 99, empty = 'ל
           <button type="button" aria-label="עוד" onClick={() => set(n + 1)} disabled={n >= max} style={btn(n >= max)}>+</button>
         </div>
       </div>
-      {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 8, lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 10, lineHeight: 1.5 }}>{hint}</div>}
     </div>
   );
 }
@@ -401,7 +443,7 @@ function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
 }
 
 Object.assign(window, {
-  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager,
+  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPresets,
 });
 
 // ───────────────────────────────────────────────────────────

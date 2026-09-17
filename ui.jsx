@@ -123,7 +123,7 @@ function Button({ tone = 'primary', size = 'md', full, disabled, onClick, style,
     brand:   { background: 'var(--brand-strong)',  color: 'var(--on-brand)', boxShadow: 'var(--e2)' },
     quiet:   { background: 'var(--surface-sunken)', color: 'var(--ink)',     boxShadow: 'none' },
     glass:   { background: 'var(--glass)',         color: 'var(--ink)',      boxShadow: 'var(--e1)' },
-    danger:  { background: 'var(--danger)',        color: '#fff',            boxShadow: 'var(--e2)' },
+    danger:  { background: 'var(--danger)',        color: 'var(--on-danger)', boxShadow: 'var(--e2)' },
   };
   const pad = size === 'lg' ? '18px 24px' : size === 'sm' ? '10px 16px' : '14px 20px';
   const fs  = size === 'lg' ? 'var(--t-body)' : size === 'sm' ? 'var(--t-caption)' : 'var(--t-small)';
@@ -346,6 +346,74 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
 }
 
 // ───────────────────────────────────────────────────────────
+// Page — a screen that covers the app, the way a phone opens
+// one: it slides in from the leading edge and pushes back the
+// screen behind it. Not a sheet — there is nothing to peek at
+// underneath, and nothing to drag it away by.
+// ───────────────────────────────────────────────────────────
+function Page({ title, subtitle, onClose, closeLabel = 'סגירה', header, footer, children, style }) {
+  xE(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 55,
+      background: 'var(--surface)', color: 'var(--ink)',
+      display: 'flex', flexDirection: 'column',
+      animation: 'pageIn var(--dur-slow) var(--ease-out)',
+      ...style,
+    }}>
+      <div style={{ flexShrink: 0 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 8px 10px 14px', minHeight: 64,
+        }}>
+          <div style={{ flex: 1, minWidth: 0, paddingInlineStart: 10 }}>
+            <div className="display" style={{ ...TYPE.title, color: 'var(--ink)' }}>{title}</div>
+            {subtitle && (
+              <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>{subtitle}</div>
+            )}
+          </div>
+          {onClose && (
+            <button type="button" onClick={onClose} aria-label={closeLabel}
+              style={{
+                width: 48, height: 48, borderRadius: 999, border: 'none', flexShrink: 0,
+                background: 'transparent', color: 'var(--ink)', cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}>
+              <IconClose size={22} strokeWidth={2.2}/>
+            </button>
+          )}
+        </div>
+        {header}
+      </div>
+
+      <div className="scroll-y" style={{ flex: 1, minHeight: 0 }}>{children}</div>
+
+      {footer && (
+        <div style={{
+          flexShrink: 0, padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
+          borderTop: '1px solid var(--line)', display: 'flex', gap: 10, alignItems: 'center',
+        }}>{footer}</div>
+      )}
+
+      <style>{`
+        @keyframes pageIn{
+          0%{opacity:0;transform:translateX(-7%) scale(.98)}
+          100%{opacity:1;transform:translateX(0) scale(1)}
+        }
+        @media (prefers-reduced-motion: reduce){
+          @keyframes pageIn{0%{opacity:0}100%{opacity:1}}
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // EmptyState / ErrorState / Spinner — the three "nothing to
 // show" screens, identical everywhere they appear.
 // ───────────────────────────────────────────────────────────
@@ -397,8 +465,8 @@ function Spinner({ size = 22, color = 'var(--ink-soft)' }) {
 function Toast({ message, tone = 'neutral', onDismiss }) {
   const tones = {
     neutral: { background: 'var(--ink)', color: 'var(--bg)' },
-    success: { background: 'var(--success)', color: '#fff' },
-    danger:  { background: 'var(--danger)', color: '#fff' },
+    success: { background: 'var(--success)', color: 'var(--on-success)' },
+    danger:  { background: 'var(--danger)', color: 'var(--on-danger)' },
   };
   return (
     <div role="status" aria-live="polite" onClick={onDismiss}
@@ -528,7 +596,7 @@ function SegmentedControl({ value, options, onChange, label }) {
 
 Object.assign(window, {
   TYPE, useTheme, applyTheme, readTheme,
-  Card, IconButton, Button, Chip, SectionLabel, Field, inputStyle,
+  Card, IconButton, Button, Chip, SectionLabel, Field, inputStyle, Page,
   ListRow, Sheet, EmptyState, ErrorState, Spinner, Toast, SaveState, OfflineBanner,
   Switch, SegmentedControl,
 });

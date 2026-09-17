@@ -655,17 +655,6 @@ function App() {
             }}
             themeMode={themeMode}
             onThemeChange={setThemeMode}
-            onResetServings={async () => {
-              const affected = recipes.filter(r => +r.servings > 0);
-              setRecipes(rs => rs.map(r => (+r.servings > 0 ? { ...r, servings: 0 } : r)));
-              try {
-                await Promise.all(affected.map(r => db_saveRecipe({ ...r, servings: 0 })));
-                showToast(`מספר המנות אופס ב-${affected.length} מתכונים`, 'success');
-              } catch (err) {
-                reportError('reset-servings', err);
-                showToast('האיפוס נכשל', 'danger');
-              }
-            }}
             sharesInfo={sharesInfo}
             pendingInvites={pendingInvites}
             onClose={() => setShowAccountPanel(false)}
