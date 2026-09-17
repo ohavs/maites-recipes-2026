@@ -395,7 +395,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
             position: 'absolute', top: 12, insetInlineEnd: 12,
             width: 36, height: 36, borderRadius: 'var(--r-pill)',
             display: 'grid', placeItems: 'center',
-            background: 'var(--glass)', backdropFilter: 'blur(6px)',
+            background: 'var(--glass)',
             border: 'none', boxShadow: 'var(--e1)',
             cursor: 'pointer', color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
             zIndex: 2,
@@ -560,10 +560,11 @@ function BottomNav({ active, onChange, onAdd, accent = 'var(--brand-strong)' }) 
     }}>
     <div style={{
       flex: 1,
-      background: 'var(--glass)',
-      backdropFilter: 'blur(20px) saturate(160%)',
+      // Solid, like every other control. The one shadow it keeps is the
+      // one that says it floats over the list rather than sits in it.
+      background: 'var(--surface-raised)',
       borderRadius: 'var(--r-pill)',
-      boxShadow: 'var(--e3)',
+      boxShadow: 'var(--e2)',
       padding: 6,
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
     }}>
@@ -572,23 +573,34 @@ function BottomNav({ active, onChange, onAdd, accent = 'var(--brand-strong)' }) 
         const I = it.icon;
         return (
           <button key={it.id} onClick={() => onChange(it.id)} aria-label={it.label}
+            aria-current={isActive ? 'page' : undefined}
             style={{
               flex: 1, height: 46, border: 'none', cursor: 'pointer', background: 'transparent',
               borderRadius: 'var(--r-pill)', position: 'relative', minWidth: 0, padding: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              color: isActive ? 'var(--bg)' : 'var(--ink)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              color: isActive ? 'var(--on-brand)' : 'var(--ink-soft)',
+              fontFamily: 'inherit',
               fontWeight: 700, fontSize: 'var(--t-small)',
-              transition: 'color .2s',
+              transition: 'color var(--dur-fast)',
             }}>
+            {/* The pill stacks at 0 with the label above it at 1, rather
+                than at -1: a negative index paints it behind the bar's own
+                background, which used to be translucent and now is not. */}
             {isActive && (
               <span style={{
-                position: 'absolute', inset: 0, borderRadius: 'var(--r-pill)', background: accent, zIndex: -1,
-                boxShadow: `0 8px 18px -6px ${accent}`,
+                position: 'absolute', inset: 0, borderRadius: 'var(--r-pill)', background: accent, zIndex: 0,
                 animation: 'navPop .35s cubic-bezier(.2,1.4,.4,1)',
               }} />
             )}
-            <I size={20} strokeWidth={isActive ? 2.4 : 2}/>
-            {isActive && <span style={{ whiteSpace: 'nowrap' }}>{it.label}</span>}
+            <span style={{
+              position: 'relative', zIndex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <I size={20} strokeWidth={isActive ? 2.4 : 2}/>
+              {/* Both labels stay put, so the bar does not resize as you
+                  move between them. */}
+              <span style={{ whiteSpace: 'nowrap' }}>{it.label}</span>
+            </span>
           </button>
         );
       })}
@@ -666,7 +678,7 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
       {open && (
         <div role="listbox" style={{
           position: 'absolute', top: 52, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
-          background: 'var(--glass-strong)', backdropFilter: 'blur(18px) saturate(160%)',
+          background: 'var(--glass-strong)',
           borderRadius: 'var(--r-lg)', zIndex: 40, overflow: 'hidden',
           boxShadow: 'var(--e3)',
           animation: 'ddIn .2s cubic-bezier(.2,1.1,.4,1)', transformOrigin: 'top center',
@@ -1078,7 +1090,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
           style={{
             position: 'absolute', top: 8, insetInlineEnd: 8, zIndex: 3,
             width: 32, height: 32, borderRadius: 'var(--r-pill)', padding: 0, lineHeight: 0,
-            background: 'var(--glass)', border: 'none', backdropFilter: 'blur(6px)',
+            background: 'var(--glass)', border: 'none',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
             color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
             boxShadow: 'var(--e1)',

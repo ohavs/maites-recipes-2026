@@ -561,7 +561,7 @@ function App() {
 
         {/* Overlay: edit recipe */}
         {editingRecipe && (
-          <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 24 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', zIndex: 24 }}>
             <EditRecipeScreen
               recipe={editingRecipe}
               onSave={updateRecipe}
@@ -731,36 +731,34 @@ function App() {
         {showClaimPrompt && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 70,
-            background: 'rgba(28,22,32,.6)', backdropFilter: 'blur(10px)',
+            background: 'var(--overlay)', backdropFilter: 'blur(10px)',
             display: 'grid', placeItems: 'center', padding: 24,
           }}>
+            {/* Built from the shared primitives like every other dialog:
+                it used to carry its own radii, its own type sizes, a
+                background token that was never defined, and white text on
+                --ink, which is near-white in dark mode. */}
             <div style={{
-              background: 'var(--cream)', borderRadius: 28,
-              padding: '32px 28px', textAlign: 'center', maxWidth: 340,
-              boxShadow: 'var(--e1)',
+              background: 'var(--surface)', borderRadius: 'var(--r-lg)',
+              padding: '32px 28px', textAlign: 'center', maxWidth: 340, width: '100%',
+              boxShadow: 'var(--e3)',
             }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>🍽️</div>
-              <h2 style={{ margin: '0 0 10px', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 800 }}>
+              <h2 style={{ margin: '0 0 10px', ...TYPE.title }}>
                 נמצאו מתכונים!
               </h2>
-              <p style={{ margin: '0 0 24px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+              <p style={{ margin: '0 0 24px', ...TYPE.body, color: 'var(--ink-soft)' }}>
                 יש מתכונים שלא משויכים לאף חשבון.
                 האם לשייך אותם לחשבון שלך?
               </p>
-              <button onClick={handleClaimRecipes} disabled={claiming} style={{
-                width: '100%', border: 'none', borderRadius: 16, padding: '14px 0',
-                background: 'var(--ink)', color: '#fff',
-                fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer',
-                marginBottom: 10, opacity: claiming ? .7 : 1,
-              }}>{claiming ? 'מעביר…' : 'כן, שייך אליי'}</button>
-              <button onClick={() => {
+              <Button tone="primary" size="lg" full disabled={claiming}
+                onClick={handleClaimRecipes} style={{ marginBottom: 10 }}>
+                {claiming ? 'מעביר…' : 'כן, שייך אליי'}
+              </Button>
+              <Button tone="quiet" full onClick={() => {
                 localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
                 setShowClaimPrompt(false);
-              }} style={{
-                width: '100%', border: 'none', borderRadius: 16, padding: '12px 0',
-                background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
-                fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-              }}>דלג בינתיים</button>
+              }}>דלג בינתיים</Button>
             </div>
           </div>
         )}
@@ -793,11 +791,13 @@ function FirstHint({ onDismiss }) {
       position: 'absolute', inset: 0, zIndex: 30, pointerEvents: 'auto',
       animation: 'hintFade .4s ease',
     }}>
+      {/* Sits above the navigation bar rather than over the first card:
+          a hint that hides the thing it is pointing at is no hint. */}
       <div style={{
-        position: 'absolute', top: 220, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(28,22,32,.94)', color: '#fff',
-        padding: '12px 16px', borderRadius: 18, fontSize: 13, fontWeight: 600,
-        boxShadow: 'var(--e1)',
+        position: 'absolute', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+        background: 'var(--ink)', color: 'var(--bg)',
+        padding: '12px 16px', borderRadius: 'var(--r-pill)',
+        fontSize: 'var(--t-small)', fontWeight: 700,
         display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
       }}>
         ✨ הקישו על כרטיס לצפייה במתכון
@@ -815,9 +815,9 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
       animation: 'installSlide .4s cubic-bezier(.2,1.2,.4,1)',
     }}>
       <div style={{
-        background: 'var(--cream)',
-        borderRadius: 28,
-        boxShadow: '0 -4px 40px rgba(64,33,50,.18), 0 20px 60px rgba(64,33,50,.18)',
+        background: 'var(--surface)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--e3)',
         padding: '20px 20px 18px',
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
@@ -844,7 +844,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
 
         {isIOS ? (
           <div style={{
-            background: 'rgba(247,168,184,.15)', borderRadius: 16, padding: '12px 14px',
+            background: 'rgba(247,168,184,.15)', borderRadius: 'var(--r-md)', padding: '12px 14px',
             fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.7, textAlign: 'right',
           }}>
             בספארי: לחצי על <strong>שתף</strong> (□↑) ← <strong>"הוסף למסך הבית"</strong>
@@ -861,7 +861,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
           </button>
         ) : (
           <div style={{
-            background: 'rgba(247,168,184,.15)', borderRadius: 16, padding: '12px 14px',
+            background: 'rgba(247,168,184,.15)', borderRadius: 'var(--r-md)', padding: '12px 14px',
             fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.7, textAlign: 'right',
           }}>
             בכרום: תפריט (⋮) ← <strong>"הוסף למסך הבית"</strong> / <strong>"התקן אפליקציה"</strong>

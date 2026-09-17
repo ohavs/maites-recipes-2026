@@ -442,35 +442,30 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               background: 'var(--glass)', borderRadius: 'var(--r-pill)', padding: '8px 14px',
               fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)',
               display: 'flex', alignItems: 'center', gap: 6,
-              boxShadow: 'var(--e1)',
             }}>
               <span>👤</span> שותף ע״י {recipe._sharedBy}
             </div>
           ) : <div/>
         ) : (
-          <div style={{
-            pointerEvents: 'auto',
-            display: 'flex', alignItems: 'center', gap: 2, padding: 4,
-            borderRadius: 'var(--r-pill)', background: 'var(--glass-strong)',
-            backdropFilter: 'blur(14px) saturate(160%)',
-            boxShadow: 'var(--e2)',
-          }}>
-            <BarBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים"
-              ink={recipe.favorite ? 'var(--brand-strong)' : p.ink}>
+          // Each action is its own round button, the same one the back
+          // arrow is — rather than a frosted capsule, which was the only
+          // blurred floating thing left in the app.
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" size={42}
+              ink={recipe.favorite ? 'var(--brand-strong)' : 'var(--ink)'}>
               <FavHeart filled={recipe.favorite}/>
-            </BarBtn>
+            </RoundBtn>
             {onShare && (
-              <BarBtn onClick={() => onShare(recipe)} title="שיתוף" ink={p.ink}>
+              <RoundBtn onClick={() => onShare(recipe)} title="שיתוף" size={42}>
                 <IconShare size={18} strokeWidth={2.2}/>
-              </BarBtn>
+              </RoundBtn>
             )}
-            <BarBtn onClick={() => onEdit(recipe)} title="עריכה" ink={p.ink}>
+            <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" size={42}>
               <IconEdit size={18} strokeWidth={2.2}/>
-            </BarBtn>
-            <span style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 3px' }}/>
-            <BarBtn onClick={() => onDelete(recipe)} title="מחיקה" ink="#e34466">
+            </RoundBtn>
+            <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" size={42} ink="var(--danger)">
               <IconTrash size={18} strokeWidth={2.2}/>
-            </BarBtn>
+            </RoundBtn>
           </div>
         )}
       </div>
@@ -478,21 +473,6 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
   );
 }
 
-// A single action inside the detail-screen capsule bar.
-function BarBtn({ children, onClick, title, ink = '#000' }) {
-  return (
-    <button onClick={onClick} title={title} aria-label={title}
-      style={{
-        width: 38, height: 38, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
-        background: 'transparent', color: ink,
-        display: 'grid', placeItems: 'center', transition: 'background .18s, transform .18s',
-      }}
-      onPointerDown={e => { e.currentTarget.style.background = 'var(--surface-sunken)'; e.currentTarget.style.transform = 'scale(.9)'; }}
-      onPointerUp={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
-      onPointerLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.transform = ''; }}
-    >{children}</button>
-  );
-}
 
 // Inline-editable notes textarea
 function NotesEditor({ value, onChange, palette }) {
@@ -584,9 +564,8 @@ function IngredientRow({ ing, palette, index, factor = 1 }) {
       transition: `opacity ${ms}ms ease, transform ${ms}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
       <span style={{
-        width: 40, height: 40, borderRadius: 'var(--r-pill)', background: palette.tag,
+        width: 44, height: 44, borderRadius: 'var(--r-lg)', background: palette.tag,
         display: 'grid', placeItems: 'center', color: palette.accent, flexShrink: 0,
-        boxShadow: 'var(--e1)',
       }}>
         <IngredientIcon size={20} kind={
           (ing.icon && ing.icon !== 'chef')
@@ -1101,14 +1080,16 @@ const exportRowStyle = {
 };
 const exportIconStyle = {
   width: 40, height: 40, borderRadius: 'var(--r-sm)',
-  display: 'grid', placeItems: 'center', color: 'var(--bg)',
+  display: 'grid', placeItems: 'center',
   flexShrink: 0,
 };
 
 function ExportRow({ icon, bg, label, sub, onClick }) {
   return (
     <button onClick={onClick} style={{ ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)' }}>
-      <span style={{ ...exportIconStyle, background: bg }}>{icon}</span>
+      {/* Excel green and Word blue are those products' own colours and stay
+          dark in either theme, so the glyph on them is always light. */}
+      <span style={{ ...exportIconStyle, background: bg, color: '#ffffff' }}>{icon}</span>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'flex-end' }}>
         <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>{label}</span>
         <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>{sub}</span>
@@ -1286,7 +1267,7 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
         padding: '16px 18px 10px',
         display: 'flex', alignItems: 'center', gap: 10,
         borderBottom: '1px solid var(--line)', flexShrink: 0,
-        background: 'var(--glass)', backdropFilter: 'blur(8px)',
+        background: 'var(--glass)',
       }}>
         <button onClick={onClose} style={{
           width: 36, height: 36, borderRadius: 'var(--r-pill)', border: 'none',
@@ -1459,7 +1440,7 @@ function LoginScreen({ onSignIn }) {
           background: 'var(--surface-raised)',
           boxShadow: 'var(--e2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-          fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 700, color: '#1f1f1f',
+          fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)',
           opacity: loading ? .7 : 1,
           transition: 'transform .15s, box-shadow .15s',
         }}
@@ -1612,7 +1593,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                       onClick={() => onExport('word')}/>
                     {onImport && (
                       <label style={{ ...exportRowStyle, background: 'var(--glass)', color: 'var(--ink)', cursor: 'pointer' }}>
-                        <span style={{ ...exportIconStyle, background: '#5b4452' }}><IconUpload size={20}/></span>
+                        <span style={{ ...exportIconStyle, background: 'var(--ink)', color: 'var(--bg)' }}><IconUpload size={20}/></span>
                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                           <span style={{ fontWeight: 700, fontSize: 'var(--t-small)' }}>ייבוא מקובץ Excel</span>
                           <span style={{ fontSize: 'var(--t-caption)', opacity: .7 }}>קובץ .xlsx · עמודות בעברית</span>
@@ -1679,11 +1660,11 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                             {s.guestEmail}
                           </div>
                           {s.mutual && (
-                            <div style={{ fontSize: 'var(--t-caption)', color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                            <div style={{ fontSize: 'var(--t-caption)', color: 'var(--p-lavender-accent)', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
                         <button onClick={() => onRevokeShare(s.id)} style={{
-                          border: 'none', background: 'rgba(227,68,102,.1)', color: '#c0304f',
+                          border: 'none', background: 'var(--danger-soft)', color: 'var(--danger)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
                         }}>בטל</button>
@@ -1708,7 +1689,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                             {inv.guestEmail}
                           </div>
                           {inv.mutual && (
-                            <div style={{ fontSize: 'var(--t-caption)', color: '#6b48a0', fontWeight: 700, marginTop: 1 }}>הדדי</div>
+                            <div style={{ fontSize: 'var(--t-caption)', color: 'var(--p-lavender-accent)', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
                         <button onClick={() => onCancelInvite(inv.id)} style={{

@@ -21,8 +21,8 @@
     --surface: #fff7e8;                /* sheets, panels */
     --surface-raised: #ffffff;         /* inputs, floating chips */
     --surface-sunken: rgba(0,0,0,.045);
-    --glass: rgba(255,255,255,.85);    /* frosted controls */
-    --glass-strong: rgba(255,255,255,.94);
+    --glass: #ffffff;                  /* a control is solid, like the fields */
+    --glass-strong: #ffffff;
     --overlay: rgba(28,22,32,.55);     /* behind modals */
     --line: rgba(0,0,0,.08);
     --line-strong: rgba(0,0,0,.16);
@@ -35,7 +35,7 @@
 
     --ink: #2c1d27;
     --ink-soft: #5b4452;
-    --ink-faint: #8a7280;
+    --ink-faint: #7a6270;   /* clears AA on every light surface */
     --sheen: rgba(255,255,255,.35);   /* gloss on coloured cards */
     /* the recipe-book cover panel on screen (the printed one stays paper) */
     --cover-1: #ffe9d8; --cover-2: #fbeef2; --cover-3: #e9e0f8;
@@ -82,7 +82,7 @@
     --radius-card: var(--r-lg);
 
     /* ── elevation: three levels, no more ─────────── */
-    --e1: 0 2px 8px -2px rgba(64,33,50,.16);
+    --e1: 0 0 0 0 rgba(0,0,0,0);   /* controls sit on the surface, they do not float */
     --e2: 0 10px 28px -8px rgba(64,33,50,.25), 0 1px 0 rgba(255,255,255,.55) inset;
     --e3: 0 22px 50px -10px rgba(64,33,50,.34), 0 40px 80px -28px rgba(64,33,50,.24);
     --shadow-card: var(--e2);
@@ -123,8 +123,8 @@
       --surface: #241b21;
       --surface-raised: #2f242c;
       --surface-sunken: rgba(255,255,255,.06);
-      --glass: rgba(47,36,44,.86);
-      --glass-strong: rgba(52,40,49,.95);
+      --glass: #2f242c;
+      --glass-strong: #342831;
       --overlay: rgba(8,5,9,.66);
       --line: rgba(255,255,255,.10);
       --line-strong: rgba(255,255,255,.2);
@@ -134,7 +134,7 @@
 
       --ink: #f6ecf1;
       --ink-soft: #c6b0bd;
-      --ink-faint: #9b8592;
+      --ink-faint: #a58f9c;
       --sheen: rgba(255,255,255,.09);
       --cover-1: #3b2a34; --cover-2: #241a22; --cover-3: #2b2440;
       --on-brand: #ffffff;
@@ -157,7 +157,7 @@
       --p-lavender-bg:#4b3b74;--p-lavender-bg2:#31264c;--p-lavender-ink:#e0d5f5;--p-lavender-tag:#3b2e5c;--p-lavender-accent:#c9b8e8;
       --p-peach-bg:#7c3b1f;  --p-peach-bg2:#4f2513;  --p-peach-ink:#ffd9c4;  --p-peach-tag:#5e2d17;  --p-peach-accent:#ffb494;
 
-      --e1: 0 2px 8px -2px rgba(0,0,0,.5);
+      --e1: 0 0 0 0 rgba(0,0,0,0);
       --e2: 0 10px 28px -8px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.06) inset;
       --e3: 0 22px 50px -10px rgba(0,0,0,.7), 0 40px 80px -28px rgba(0,0,0,.5);
     }
@@ -173,8 +173,8 @@
     --surface: #241b21;
     --surface-raised: #2f242c;
     --surface-sunken: rgba(255,255,255,.06);
-    --glass: rgba(47,36,44,.86);
-    --glass-strong: rgba(52,40,49,.95);
+    --glass: #2f242c;
+    --glass-strong: #342831;
     --overlay: rgba(8,5,9,.66);
     --line: rgba(255,255,255,.10);
     --line-strong: rgba(255,255,255,.2);
@@ -184,7 +184,7 @@
 
     --ink: #f6ecf1;
     --ink-soft: #c6b0bd;
-    --ink-faint: #9b8592;
+    --ink-faint: #a58f9c;
     --sheen: rgba(255,255,255,.09);
     --on-brand: #ffffff;
 
@@ -206,7 +206,7 @@
     --p-lavender-bg:#4b3b74;--p-lavender-bg2:#31264c;--p-lavender-ink:#e0d5f5;--p-lavender-tag:#3b2e5c;--p-lavender-accent:#c9b8e8;
     --p-peach-bg:#7c3b1f;  --p-peach-bg2:#4f2513;  --p-peach-ink:#ffd9c4;  --p-peach-tag:#5e2d17;  --p-peach-accent:#ffb494;
 
-    --e1: 0 2px 8px -2px rgba(0,0,0,.5);
+    --e1: 0 0 0 0 rgba(0,0,0,0);
     --e2: 0 10px 28px -8px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.06) inset;
     --e3: 0 22px 50px -10px rgba(0,0,0,.7), 0 40px 80px -28px rgba(0,0,0,.5);
   }

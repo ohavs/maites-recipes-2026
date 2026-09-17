@@ -330,17 +330,17 @@ function NTabs({ tabs, index, onIndex, done = [] }) {
         // puts the first tab on the right, where the first thing belongs.
         display: 'flex', gap: 4, padding: 4,
         background: 'var(--field-fill)', borderRadius: 'var(--r-lg)',
-      }}>
+      }} role="tablist">
         {tabs.map((t, i) => {
           const on = i === index;
           return (
             <button key={t.id} type="button" onClick={() => onIndex(i)}
+              role="tab" aria-selected={on}
               aria-current={on ? 'step' : undefined}
               style={{
                 flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 borderRadius: 'var(--r-md)', minHeight: 48, padding: '0 8px',
                 background: on ? 'var(--surface-raised)' : 'transparent',
-                boxShadow: on ? 'var(--e1)' : 'none',
                 color: on ? 'var(--ink)' : 'var(--ink-soft)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 transition: 'background var(--dur-fast), color var(--dur-fast)',

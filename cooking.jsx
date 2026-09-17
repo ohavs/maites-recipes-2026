@@ -437,7 +437,7 @@ function CookScreen({ recipe, onClose, servings }) {
       {/* step navigation */}
       <div style={{
         flexShrink: 0, display: 'flex', gap: 10, padding: '12px 16px calc(18px + env(safe-area-inset-bottom, 0px))',
-        borderTop: '1px solid var(--line)', background: 'var(--glass)', backdropFilter: 'blur(16px)',
+        borderTop: '1px solid var(--line)', background: 'var(--glass)',
       }}>
         <Button tone="quiet" disabled={i === 0} onClick={() => go(-1)} style={{ flex: 1 }}>
           <IconForward size={16} strokeWidth={2.4}/> הקודם
@@ -476,7 +476,10 @@ function CookScreen({ recipe, onClose, servings }) {
                     display: 'grid', placeItems: 'center',
                     background: on ? 'var(--success)' : 'transparent',
                     boxShadow: on ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
-                    color: '#fff',
+                    // --success is a light green in dark mode, so a white
+                    // tick on it cannot be seen. Same class of bug as the
+                    // reset button was.
+                    color: 'var(--on-success)',
                   }}>{on && <IconCheck size={13} strokeWidth={3}/>}</span>
                   <span style={{
                     ...TYPE.body, color: 'var(--ink)', flex: 1,

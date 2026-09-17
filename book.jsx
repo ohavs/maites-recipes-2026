@@ -483,7 +483,7 @@ function PrintSelectSheet({ recipes, categories, onPrint, onClose }) {
       backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end',
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--cream)', borderRadius: '30px 30px 0 0', width: '100%',
+        background: 'var(--surface)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', width: '100%',
         maxHeight: '86%', display: 'flex', flexDirection: 'column',
         boxShadow: 'var(--e3)', animation: 'slideUp .3s cubic-bezier(.2,1.1,.4,1)',
       }}>

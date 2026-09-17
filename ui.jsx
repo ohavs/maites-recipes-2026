@@ -73,7 +73,6 @@ function Card({ variant = 'surface', palette, elevation = 2, radius = 'lg', styl
       color: variant === 'recipe' && palette ? palette.ink : 'var(--ink)',
       borderRadius: `var(--r-${radius})`,
       boxShadow: elevation ? `var(--e${elevation})` : 'none',
-      ...(variant === 'glass' ? { backdropFilter: 'blur(18px) saturate(160%)' } : {}),
       ...style,
     }} {...rest}>{children}</div>
   );
@@ -502,7 +501,7 @@ function SaveState({ state, pending = 0, onRetry }) {
       transform: 'translateX(-50%)', zIndex: 70,
       display: 'inline-flex', alignItems: 'center', gap: 7,
       padding: '7px 14px', borderRadius: 'var(--r-pill)',
-      background: s.bg, color: s.fg, backdropFilter: 'blur(14px)',
+      background: s.bg, color: s.fg,
       boxShadow: 'var(--e1)', ...TYPE.caption,
       animation: 'toastIn var(--dur) var(--ease-out)',
       whiteSpace: 'nowrap',
@@ -528,7 +527,7 @@ function OfflineBanner({ pending }) {
       bottom: 'calc(86px + env(safe-area-inset-bottom, 0px))', zIndex: 65,
       display: 'flex', alignItems: 'center', gap: 9,
       padding: '10px 14px', borderRadius: 'var(--r-pill)',
-      background: 'var(--glass-strong)', backdropFilter: 'blur(16px)',
+      background: 'var(--glass-strong)',
       boxShadow: 'var(--e2)', color: 'var(--ink)',
       animation: 'toastIn var(--dur) var(--ease-out)',
     }}>
@@ -570,9 +569,12 @@ function Switch({ checked, onChange, label }) {
 // ───────────────────────────────────────────────────────────
 function SegmentedControl({ value, options, onChange, label }) {
   return (
+    // Same track, same thumb, same height as the tabs in the form and in
+    // settings — the app has one segmented control, not two that nearly
+    // match.
     <div role="radiogroup" aria-label={label} style={{
-      display: 'flex', gap: 3, padding: 3, borderRadius: 'var(--r-pill)',
-      background: 'var(--surface-sunken)',
+      display: 'flex', gap: 4, padding: 4, borderRadius: 'var(--r-lg)',
+      background: 'var(--field-fill)',
     }}>
       {options.map(opt => {
         const on = value === opt.value;
@@ -580,12 +582,11 @@ function SegmentedControl({ value, options, onChange, label }) {
           <button key={opt.value} type="button" role="radio" aria-checked={on}
             onClick={() => onChange(opt.value)}
             style={{
-              flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              borderRadius: 'var(--r-pill)', padding: '9px 12px', minHeight: 40,
-              ...TYPE.caption,
+              flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              borderRadius: 'var(--r-md)', padding: '0 12px', minHeight: 48,
+              ...TYPE.small, fontWeight: on ? 800 : 600,
               background: on ? 'var(--surface-raised)' : 'transparent',
               color: on ? 'var(--ink)' : 'var(--ink-soft)',
-              boxShadow: on ? 'var(--e1)' : 'none',
               transition: 'background var(--dur-fast), color var(--dur-fast)',
             }}>{opt.label}</button>
         );
