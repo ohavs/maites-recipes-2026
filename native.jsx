@@ -108,6 +108,10 @@ async function paintSystemBars(dark) {
   const c = CAP();
   if (!isNative() || !c.StatusBar) return;
   try {
+    // The app must sit below the status bar, not behind it. Drawing behind
+    // it puts the title under the clock and the tab bar under the phone's
+    // own navigation, which is what "covered edge to edge" looks like.
+    await c.StatusBar.setOverlaysWebView({ overlay: false });
     await c.StatusBar.setStyle({ style: dark ? c.Style.Dark : c.Style.Light });
     await c.StatusBar.setBackgroundColor({ color: dark ? '#191218' : '#fbeef2' });
   } catch {}

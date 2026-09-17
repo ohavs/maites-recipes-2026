@@ -249,23 +249,39 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const bodyRef = xR(null);
+
   const dragStart = (e) => {
     const t = e.touches ? e.touches[0] : e;
-    // Only from the top of the sheet, so a list inside can still scroll.
-    grab.current = { y: t.clientY };
+    // From anywhere on the sheet — but if the grab began inside the
+    // scrolling body, only while that body is already at the top, so a
+    // list can still be scrolled without the sheet running away.
+    const inBody = bodyRef.current && bodyRef.current.contains(e.target);
+    if (inBody && bodyRef.current.scrollTop > 0) { grab.current = null; return; }
+    grab.current = { y: t.clientY, decided: inBody ? null : 'y' };
   };
+
   const dragMove = (e) => {
-    if (!grab.current) return;
+    const g = grab.current;
+    if (!g) return;
     const t = e.touches ? e.touches[0] : e;
-    const dy = t.clientY - grab.current.y;
+    const dy = t.clientY - g.y;
+    if (g.decided === null) {
+      if (Math.abs(dy) < 8) return;
+      // Started in the body: only a downward pull counts.
+      if (dy < 0) { grab.current = null; return; }
+      g.decided = 'y';
+    }
     setPull(dy > 0 ? dy : dy * 0.2);
   };
+
   const dragEnd = () => {
     if (!grab.current) return;
     grab.current = null;
     if (pull > 110) {
       setLeaving(true);
-      setTimeout(() => onClose && onClose(), 160);
+      if (typeof hapticTap === 'function') hapticTap();
+      setTimeout(() => onClose && onClose(), 180);
     } else {
       setPull(0);
     }
@@ -280,6 +296,8 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
         animation: 'fadeIn var(--dur) ease',
       }}>
       <div ref={panelRef} onClick={e => e.stopPropagation()}
+        onTouchStart={dragStart} onTouchMove={dragMove}
+        onTouchEnd={dragEnd} onTouchCancel={dragEnd}
         style={{
           background: 'var(--surface)', color: 'var(--ink)',
           borderRadius: 'var(--r-lg) var(--r-lg) 0 0', width: '100%',
@@ -290,10 +308,7 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
           animation: (pull || leaving) ? 'none' : 'sheetUp var(--dur-slow) var(--ease-out)',
           ...style,
         }}>
-        <div
-          onTouchStart={dragStart} onTouchMove={dragMove}
-          onTouchEnd={dragEnd} onTouchCancel={dragEnd}
-          style={{ padding: '14px 20px 8px', flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
+        <div style={{ padding: '14px 20px 8px', flexShrink: 0, cursor: 'grab' }}>
           <div style={{
             width: 42, height: 5, borderRadius: 'var(--r-pill)',
             background: 'var(--line-strong)', margin: '0 auto 14px',
@@ -313,7 +328,8 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
             </div>
           )}
         </div>
-        <div className="scroll-y" style={{ flex: 1, padding: '4px 16px 8px', minHeight: 0 }}>{children}</div>
+        <div ref={bodyRef} className="scroll-y"
+          style={{ flex: 1, padding: '4px 16px 8px', minHeight: 0, overscrollBehavior: 'contain' }}>{children}</div>
         {footer && (
           <div style={{
             padding: '12px 18px calc(22px + env(safe-area-inset-bottom, 0px))',

@@ -18,50 +18,49 @@ const { useState: fS, useRef: fR, useEffect: fE, useId: fId } = React;
 function NField({ value, onChange, label, hint, type = 'text', inputMode, placeholder,
                   multiline = false, rows = 3, autoFocus, style }) {
   const [focused, setFocused] = fS(false);
-  const up = focused || String(value ?? '').length > 0;
+  const id = fId();
   const Tag = multiline ? 'textarea' : 'input';
 
   return (
     <div style={style}>
-      <label style={{
-        display: 'block', position: 'relative',
-        background: focused ? 'var(--field-fill-focus)' : 'var(--field-fill)',
-        borderRadius: '16px 16px 6px 6px',
-        borderBottom: `${focused ? 2 : 1}px solid ${focused ? 'var(--brand-strong)' : 'var(--field-line)'}`,
-        paddingBottom: focused ? 0 : 1,
-        transition: 'background var(--dur-fast)',
-      }}>
-        <span style={{
-          position: 'absolute', insetInlineStart: 18, pointerEvents: 'none',
-          top: up ? 9 : 'calc(50% - .62em)',
-          fontSize: up ? 'var(--t-caption)' : 'var(--t-body)',
-          fontWeight: up ? 700 : 500,
-          color: focused ? 'var(--brand-strong)' : 'var(--ink-faint)',
-          transition: 'top var(--dur-fast) var(--ease-out), font-size var(--dur-fast), color var(--dur-fast)',
-          ...(multiline && !up ? { top: 18 } : {}),
-        }}>{label}</span>
-        <Tag
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          autoFocus={autoFocus}
-          {...(multiline ? { rows } : { type, inputMode })}
-          placeholder={up ? placeholder : ''}
-          style={{
-            width: '100%', border: 'none', outline: 'none', background: 'transparent',
-            color: 'var(--ink)', fontFamily: 'inherit', fontSize: 'var(--t-body)',
-            fontWeight: 500, textAlign: 'right', direction: 'rtl',
-            padding: multiline ? '30px 18px 14px' : '26px 18px 10px',
-            minHeight: multiline ? 96 : 'var(--field-h)',
-            resize: 'none',
-            lineHeight: multiline ? 1.6 : 1.3,
-            display: 'block',
-          }}/>
-      </label>
+      {label && (
+        <label htmlFor={id} style={{
+          display: 'block',
+          ...TYPE.small, fontWeight: 700, marginBottom: 8, paddingInlineStart: 6,
+          color: focused ? 'var(--brand-strong)' : 'var(--ink-soft)',
+          transition: 'color var(--dur-fast)',
+        }}>{label}</label>
+      )}
+      <Tag
+        id={id}
+        aria-label={label}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoFocus={autoFocus}
+        {...(multiline ? { rows } : { type, inputMode })}
+        placeholder={placeholder}
+        style={{
+          width: '100%', outline: 'none',
+          // Solid, generous and squared-off at the same radius as the
+          // buttons — the label sits above it in plain sight rather than
+          // floating inside and moving about while you type.
+          background: 'var(--surface-raised)', color: 'var(--ink)',
+          border: `2px solid ${focused ? 'var(--brand-strong)' : 'transparent'}`,
+          borderRadius: 'var(--r-lg)',
+          fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 500,
+          textAlign: 'right', direction: 'rtl',
+          padding: multiline ? '16px 18px' : '0 18px',
+          height: multiline ? undefined : 'var(--field-h)',
+          minHeight: multiline ? 112 : 'var(--field-h)',
+          lineHeight: multiline ? 1.6 : undefined,
+          resize: 'none', display: 'block',
+          transition: 'border-color var(--dur-fast)',
+        }}/>
       {hint && (
         <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500,
-                      marginTop: 7, paddingInline: 18 }}>{hint}</div>
+                      marginTop: 7, paddingInlineStart: 6 }}>{hint}</div>
       )}
     </div>
   );
@@ -80,8 +79,9 @@ function NRow({ label, value, hint, onClick, leading }) {
       onPointerLeave={() => setDown(false)}
       style={{
         width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-        background: down ? 'var(--field-fill-focus)' : 'var(--field-fill)',
-        borderRadius: 'var(--r-md)', padding: '14px 18px', minHeight: 68,
+        background: 'var(--surface-raised)',
+        boxShadow: down ? '0 0 0 2px var(--brand-strong) inset' : 'none',
+        borderRadius: 'var(--r-lg)', padding: '14px 18px', minHeight: 68,
         display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
         transition: 'background var(--dur-fast)',
       }}>
@@ -160,14 +160,14 @@ function NStepper({ label, hint, value, onChange, min = 0, max = 99, empty = 'ל
   const set = (v) => onChange(v <= 0 ? '' : String(Math.min(max, Math.max(min, v))));
   const btn = (dis) => ({
     width: 52, height: 52, borderRadius: 'var(--r-md)', border: 'none', flexShrink: 0,
-    background: 'var(--surface-raised)', color: dis ? 'var(--ink-faint)' : 'var(--ink)',
+    background: 'var(--field-fill)', color: dis ? 'var(--ink-faint)' : 'var(--ink)',
     cursor: dis ? 'default' : 'pointer', opacity: dis ? .4 : 1,
     display: 'grid', placeItems: 'center', fontFamily: 'inherit',
     fontSize: 26, fontWeight: 500, lineHeight: 1,
   });
   return (
     <div style={{
-      background: 'var(--field-fill)', borderRadius: 'var(--r-md)', padding: '14px 18px',
+      background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: '14px 18px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -254,33 +254,42 @@ function NSwatches({ keys, palettes, value, onChange }) {
 // ───────────────────────────────────────────────────────────
 function NTabs({ tabs, index, onIndex, done = [] }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'row-reverse', borderBottom: '1px solid var(--line)' }}>
-      {tabs.map((t, i) => {
-        const on = i === index;
-        return (
-          <button key={t.id} type="button" onClick={() => onIndex(i)}
-            aria-current={on ? 'step' : undefined}
-            style={{
-              flex: 1, minWidth: 0, border: 'none', background: 'transparent', cursor: 'pointer',
-              fontFamily: 'inherit', padding: '14px 4px 0', minHeight: 'var(--tap)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            }}>
-            <span style={{
-              ...TYPE.small, fontWeight: on ? 800 : 600,
-              color: on ? 'var(--ink)' : 'var(--ink-faint)',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
-              transition: 'color var(--dur-fast)',
-            }}>
-              {done[i] && !on ? '✓ ' : ''}{t.label}
-            </span>
-            <span style={{
-              height: 3, width: '100%', borderRadius: '3px 3px 0 0',
-              background: on ? 'var(--brand-strong)' : 'transparent',
-              transition: 'background var(--dur-fast)',
-            }}/>
-          </button>
-        );
-      })}
+    <div style={{ padding: '4px 16px 14px' }}>
+      <div style={{
+        // A segmented control, not a row of thin underlines: the same solid,
+        // generous shape as the buttons. In an RTL box a plain `row` already
+        // puts the first tab on the right, where the first thing belongs.
+        display: 'flex', gap: 4, padding: 4,
+        background: 'var(--field-fill)', borderRadius: 'var(--r-lg)',
+      }}>
+        {tabs.map((t, i) => {
+          const on = i === index;
+          return (
+            <button key={t.id} type="button" onClick={() => onIndex(i)}
+              aria-current={on ? 'step' : undefined}
+              style={{
+                flex: 1, minWidth: 0, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                borderRadius: 'var(--r-md)', minHeight: 48, padding: '0 8px',
+                background: on ? 'var(--surface-raised)' : 'transparent',
+                boxShadow: on ? 'var(--e1)' : 'none',
+                color: on ? 'var(--ink)' : 'var(--ink-soft)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'background var(--dur-fast), color var(--dur-fast)',
+              }}>
+              {done[i] && !on && (
+                <span style={{
+                  width: 7, height: 7, borderRadius: 999, flexShrink: 0,
+                  background: 'var(--success)',
+                }}/>
+              )}
+              <span style={{
+                ...TYPE.small, fontWeight: on ? 800 : 600,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -290,8 +299,7 @@ function NTabs({ tabs, index, onIndex, done = [] }) {
 //
 // Tapping a tab still works, but a form you can only move through by
 // aiming at a small target is a form that fights you. Swiping sideways
-// moves between the passes, the way every other app on the phone does,
-// and each pass keeps its own vertical scroll.
+// moves between the passes, and each pass keeps its own vertical scroll.
 // ───────────────────────────────────────────────────────────
 function FormPager({ step, onStep, count, children }) {
   const start = fR(null);
@@ -310,12 +318,13 @@ function FormPager({ step, onStep, count, children }) {
     const dy = t.clientY - st.y;
     if (st.decided === null) {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      // Sideways only when it is clearly sideways: the panes scroll too.
+      // Sideways only when it is clearly sideways: the passes scroll too.
       st.decided = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'x' : 'y';
     }
     if (st.decided !== 'x') return;
-    // Nothing past the ends — a rubber band that goes nowhere is a lie.
-    const blocked = (dx < 0 && step >= count - 1) || (dx > 0 && step <= 0);
+    // Right to left: the next pass sits to the left of this one, so it is
+    // pulled in by dragging rightwards, the way a Hebrew page turns.
+    const blocked = (dx > 0 && step >= count - 1) || (dx < 0 && step <= 0);
     setDrag(blocked ? dx * 0.18 : dx);
   };
 
@@ -324,9 +333,8 @@ function FormPager({ step, onStep, count, children }) {
     start.current = null;
     if (!st || st.decided !== 'x') { setDrag(0); return; }
     const w = window.innerWidth || 400;
-    const far = Math.abs(drag) > Math.min(90, w * 0.22);
-    if (far) {
-      const next = drag < 0 ? step + 1 : step - 1;
+    if (Math.abs(drag) > Math.min(90, w * 0.22)) {
+      const next = drag > 0 ? step + 1 : step - 1;
       if (next >= 0 && next < count) {
         onStep(next);
         if (typeof hapticTap === 'function') hapticTap();
@@ -335,13 +343,16 @@ function FormPager({ step, onStep, count, children }) {
     setDrag(0);
   };
 
-  const pct = -step * 100;
+  // The track reads right to left, so the first pass is the rightmost one
+  // and moving forward slides the track rightwards. A transform is not
+  // affected by direction, so this sign is the screen's, not the language's.
+  const pct = step * 100;
   return (
     <div
       onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} onTouchCancel={onUp}
       style={{ flex: 1, minWidth: 0, overflow: 'hidden', position: 'relative' }}>
       <div style={{
-        display: 'flex', direction: 'ltr', height: '100%',
+        display: 'flex', direction: 'rtl', height: '100%',
         transform: `translateX(calc(${pct}% + ${drag}px))`,
         transition: drag ? 'none' : 'transform var(--dur) var(--ease-out)',
       }}>
