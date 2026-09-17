@@ -588,7 +588,11 @@ function IngredientRow({ ing, palette, index, factor = 1 }) {
         display: 'grid', placeItems: 'center', color: palette.accent, flexShrink: 0,
         boxShadow: 'var(--e1)',
       }}>
-        <IngredientIcon kind={ing.icon || 'chef'} size={20}/>
+        <IngredientIcon size={20} kind={
+          (ing.icon && ing.icon !== 'chef')
+            ? ing.icon
+            : ((typeof guessIngredientIcon === 'function' && guessIngredientIcon(ing.name)) || 'chef')
+        }/>
       </span>
       <span style={{
         fontSize: 'var(--t-body)', fontWeight: 600, color: 'var(--ink)', flex: 1,
@@ -668,7 +672,17 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     else if (onCancel) { onCancel(); }
   };
 
-  const updateIng = (i, k, v) => setIngs(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
+  const updateIng = (i, k, v) => setIngs(arr => arr.map((x, idx) => {
+    if (idx !== i) return x;
+    const next = { ...x, [k]: v };
+    // Typing a name picks the icon, so a recipe written in a hurry does
+    // not arrive as twenty identical plates. Choosing one by hand sticks.
+    if (k === 'name' && !x.iconPicked && typeof guessIngredientIcon === 'function') {
+      next.icon = guessIngredientIcon(v) || 'chef';
+    }
+    if (k === 'icon') next.iconPicked = true;
+    return next;
+  }));
   const addIng = () => setIngs(arr => [...arr, { qty: '', name: '', icon: 'chef' }]);
   const removeIng = (i) => setIngs(arr => arr.filter((_,idx) => idx !== i));
   const updateStep = (i, k, v) => setStepsArr(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
@@ -989,13 +1003,30 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
             />
           )}
         </div>
-        {/* The amounts strip belongs to this field, so it shows while the
-            field is being filled in and gets out of the way after. */}
-        <div style={{ width: 104, flex: 'none' }}
-          onFocusCapture={() => setQtyOpen(true)}
-          onBlurCapture={() => setTimeout(() => setQtyOpen(false), 150)}>
+        {/* The amounts strip is folded away behind the chevron: most rows
+            are typed straight in, and the strip is there for the ones that
+            are quicker to tap. */}
+        <div style={{ width: 116, flex: 'none' }}>
           <NField label="כמות" hideLabel placeholder="כמות"
-            value={ing.qty || ''} onChange={v => onChange('qty', v)}/>
+            value={ing.qty || ''} onChange={v => onChange('qty', v)}
+            after={
+              <button type="button"
+                onClick={() => { setQtyOpen(o => !o); if (typeof hapticTap === 'function') hapticTap(); }}
+                aria-label="כמויות מוכנות" aria-expanded={qtyOpen}
+                style={{
+                  width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                  background: qtyOpen ? 'var(--ink)' : 'transparent',
+                  color: qtyOpen ? 'var(--bg)' : 'var(--ink-faint)',
+                  display: 'grid', placeItems: 'center', padding: 0,
+                  transition: 'background var(--dur-fast), color var(--dur-fast)',
+                }}>
+                <span style={{
+                  display: 'grid', placeItems: 'center',
+                  transform: qtyOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform var(--dur) var(--ease-out)',
+                }}><IconChevronDown size={16} strokeWidth={2.6}/></span>
+              </button>
+            }/>
         </div>
         <NField label="מצרך" hideLabel placeholder="מצרך"
           value={ing.name || ''} onChange={v => onChange('name', v)}

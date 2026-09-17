@@ -16,7 +16,7 @@ const { useState: fS, useRef: fR, useEffect: fE, useId: fId } = React;
 // NField — one line of text, with its label inside it.
 // ───────────────────────────────────────────────────────────
 function NField({ value, onChange, label, hint, type = 'text', inputMode, placeholder,
-                  multiline = false, rows = 3, autoFocus, hideLabel = false, style }) {
+                  multiline = false, rows = 3, autoFocus, hideLabel = false, style, after }) {
   const [focused, setFocused] = fS(false);
   const id = fId();
   const Tag = multiline ? 'textarea' : 'input';
@@ -31,6 +31,7 @@ function NField({ value, onChange, label, hint, type = 'text', inputMode, placeh
           transition: 'color var(--dur-fast)',
         }}>{label}</label>
       )}
+      <div style={{ position: 'relative' }}>
       <Tag
         id={id}
         aria-label={label}
@@ -56,8 +57,16 @@ function NField({ value, onChange, label, hint, type = 'text', inputMode, placeh
           minHeight: multiline ? 112 : 'var(--field-h)',
           lineHeight: multiline ? 1.6 : undefined,
           resize: 'none', display: 'block',
+          paddingInlineEnd: after && !multiline ? 42 : undefined,
           transition: 'border-color var(--dur-fast)',
         }}/>
+      {after && !multiline && (
+        <div style={{
+          position: 'absolute', insetInlineEnd: 4, top: 0, height: 'var(--field-h)',
+          display: 'grid', placeItems: 'center',
+        }}>{after}</div>
+      )}
+      </div>
       {hint && (
         <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500,
                       marginTop: 7, paddingInlineStart: 6 }}>{hint}</div>
@@ -80,7 +89,6 @@ const QTY_UNITS   = ['כוס', 'כפות', 'כף', 'כפית', 'גרם', 'מ״ל
 function QtyPresets({ value, onPick }) {
   const append = (token) => {
     const cur = String(value || '').trim();
-    // A number replaces a number; a measure joins one.
     const isNumber = QTY_NUMBERS.includes(token);
     if (!cur) return onPick(token);
     if (isNumber) {
@@ -90,22 +98,41 @@ function QtyPresets({ value, onPick }) {
     if (cur.endsWith(token)) return onPick(cur);
     return onPick(`${cur} ${token}`);
   };
-  const chip = (t) => (
-    <button key={t} type="button" onMouseDown={e => e.preventDefault()} onClick={() => append(t)}
-      style={{
-        flexShrink: 0, minHeight: 44, padding: '0 16px', borderRadius: 'var(--r-md)',
-        border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-        background: 'var(--field-fill)', color: 'var(--ink)',
-        ...TYPE.small, fontWeight: 700,
-      }}>{t}</button>
-  );
+
+  const chip = (t, kind) => {
+    const on = kind === 'num'
+      ? String(value || '').trim().startsWith(t)
+      : String(value || '').includes(t);
+    return (
+      <button key={t} type="button" onMouseDown={e => e.preventDefault()} onClick={() => append(t)}
+        style={{
+          flexShrink: 0, minHeight: 44,
+          minWidth: kind === 'num' ? 48 : undefined,
+          padding: kind === 'num' ? '0 12px' : '0 16px',
+          borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          background: on ? 'var(--ink)' : 'var(--surface-raised)',
+          color: on ? 'var(--bg)' : 'var(--ink)',
+          fontSize: kind === 'num' ? 'var(--t-heading)' : 'var(--t-small)',
+          fontWeight: kind === 'num' ? 800 : 700,
+          fontFamily: kind === 'num' ? 'var(--font-display)' : 'inherit',
+          transition: 'background var(--dur-fast), color var(--dur-fast)',
+        }}>{t}</button>
+    );
+  };
+
   return (
-    <div className="scroll-x" style={{
-      display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginTop: 10,
+    <div style={{
+      marginTop: 10, padding: 12, borderRadius: 'var(--r-lg)',
+      background: 'var(--field-fill)', display: 'grid', gap: 10,
+      animation: 'qtyIn var(--dur) var(--ease-out)',
     }}>
-      {QTY_NUMBERS.map(chip)}
-      <span style={{ width: 1, flexShrink: 0, background: 'var(--line-strong)', margin: '6px 2px' }}/>
-      {QTY_UNITS.map(chip)}
+      <div className="scroll-x" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+        {QTY_NUMBERS.map(t => chip(t, 'num'))}
+      </div>
+      <div className="scroll-x" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+        {QTY_UNITS.map(t => chip(t, 'unit'))}
+      </div>
+      <style>{`@keyframes qtyIn{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }

@@ -300,12 +300,12 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   const inside   = recipe.imageMode === 'inside';
   const cardH    = 168;
   const padY     = 18;
-  const imgSize  = inside ? cardH - padY * 2 : 198;
+  const imgSize  = inside ? cardH - padY * 2 : 146;
   const titleSize= 26;
   const descClamp= 2;
   const padX     = 24;
   // How far the circle reaches past the card's start edge (RTL = right).
-  const imgPokeOut = inside ? 0 : Math.round(imgSize * 0.22);
+  const imgPokeOut = inside ? 0 : Math.round(imgSize * 0.18);
 
   const wrapperStyle = {
     position: 'relative',

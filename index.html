@@ -86,7 +86,28 @@
       }, 9000);
       window.addEventListener('maites-ready', function () { clearTimeout(t); });
 
-      if ('serviceWorker' in navigator) {
+      // Inside the Android app there must be no service worker. Every file
+      // it would cache is already in the APK, so it adds nothing — and its
+      // cache outlives the app's own update, so after installing a new
+      // version the worker keeps serving the old one. That is exactly the
+      // "I updated and nothing changed" everyone hits. Any worker left over
+      // from an earlier build is removed here, with its caches.
+      var inNativeApp = location.protocol === 'capacitor:'
+        || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+        || /\bwv\b/.test(navigator.userAgent) && location.hostname === 'localhost';
+
+      if (inNativeApp && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { caches.delete(k); });
+          }).catch(function () {});
+        }
+      }
+
+      if (!inNativeApp && 'serviceWorker' in navigator) {
         window.addEventListener('load', function () {
           navigator.serviceWorker.register('/sw.js').then(function (reg) {
             // Look for a newer version on every launch, so a deploy reaches

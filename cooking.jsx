@@ -43,10 +43,56 @@ function formatQtyNumber(n) {
 }
 
 // Scales the numeric part of a quantity string and leaves the units alone.
+// Kitchen measures, in millilitres. Doubling a recipe should not leave you
+// reading "32 כפות" — it should say two cups, because that is what you
+// would reach for. Halving should not say "⅛ כוס" either.
+const MEASURE_ML = { tsp: 5, tbsp: 15, cup: 240 };
+
+// Every way these get written down, longest first so "כפית" is not eaten
+// by "כף".
+const MEASURE_WORDS = [
+  ['cup',  ['כוסות', 'כוס']],
+  ['tbsp', ['כפות', 'כף']],
+  ['tsp',  ['כפיות', 'כפית']],
+];
+
+function readMeasure(rest) {
+  const t = String(rest || '').trim();
+  for (const [unit, words] of MEASURE_WORDS) {
+    for (const w of words) {
+      if (t === w || t.startsWith(w + ' ') || t.startsWith(w + ',')) {
+        return { unit, tail: t.slice(w.length).trim() };
+      }
+    }
+  }
+  return null;
+}
+
+// Says the amount in whichever measure needs the fewest awkward fractions.
+function sayMeasure(ml) {
+  if (ml >= MEASURE_ML.cup * 0.9) {
+    const cups = ml / MEASURE_ML.cup;
+    return formatQtyNumber(Math.round(cups * 4) / 4) + ' ' + (cups >= 1.9 ? 'כוסות' : 'כוס');
+  }
+  if (ml >= MEASURE_ML.tbsp) {
+    const tbsp = ml / MEASURE_ML.tbsp;
+    return formatQtyNumber(Math.round(tbsp * 2) / 2) + ' ' + (tbsp >= 1.9 ? 'כפות' : 'כף');
+  }
+  const tsp = ml / MEASURE_ML.tsp;
+  return formatQtyNumber(Math.round(tsp * 4) / 4) + ' ' + (tsp >= 1.9 ? 'כפיות' : 'כפית');
+}
+
 function scaleQuantity(qty, factor) {
   if (!factor || factor === 1) return qty || '';
   const parsed = parseQtyNumber(qty);
   if (!parsed) return qty || '';
+
+  const measure = readMeasure(parsed.rest);
+  if (measure && !parsed.wasRange) {
+    const ml = parsed.value * MEASURE_ML[measure.unit] * factor;
+    return (sayMeasure(ml) + (measure.tail ? ' ' + measure.tail : '')).trim();
+  }
+
   return (formatQtyNumber(parsed.value * factor) + (parsed.rest || '')).trim();
 }
 
@@ -456,6 +502,6 @@ function CookScreen({ recipe, onClose, servings }) {
 }
 
 Object.assign(window, {
-  scaleQuantity, parseQtyNumber, formatQtyNumber, ServingScaler,
+  scaleQuantity, parseQtyNumber, formatQtyNumber, readMeasure, sayMeasure, ServingScaler,
   parseDurations, useWakeLock, ringAlarm, StepTimer, CookScreen,
 });
