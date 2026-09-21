@@ -286,10 +286,15 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
     }
   };
 
-  return (
+  // Portalled to the body, and fixed rather than absolute. A sheet opened
+  // from inside the recipe form used to land off-screen: the form's pager
+  // translates its track sideways, and both `fixed` and `absolute` resolve
+  // against a transformed ancestor, so the sheet was positioned relative to
+  // a box that had been pushed a full screen width away.
+  return ReactDOM.createPortal((
     <div onClick={onClose} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}
       style={{
-        position: 'absolute', inset: 0, zIndex: 60,
+        position: 'fixed', inset: 0, zIndex: 60,
         background: 'var(--overlay)', backdropFilter: 'blur(6px)',
         display: 'flex', alignItems: 'flex-end',
         animation: 'fadeIn var(--dur) ease',
@@ -341,7 +346,7 @@ function Sheet({ title, subtitle, onClose, footer, children, maxHeight = '86%', 
         @keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
       `}</style>
     </div>
-  );
+  ), document.body);
 }
 
 // ───────────────────────────────────────────────────────────

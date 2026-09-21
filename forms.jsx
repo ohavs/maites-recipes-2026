@@ -76,63 +76,141 @@ function NField({ value, onChange, label, hint, type = 'text', inputMode, placeh
 }
 
 // ───────────────────────────────────────────────────────────
-// QtyPresets — the amounts you write over and over.
+// QtyPicker — the amounts you write over and over.
 //
 // A quantity is a number and a measure, and almost all of them come from
-// a short list. Typing "2 כפות" on a phone keyboard is slower than two
-// taps, so the strip appears under the amount you are filling in and
-// each tap appends its piece.
+// a short list. This used to be two strips you scrolled sideways, which
+// was the worst of both: you could not see what was on offer without
+// dragging, and the drag fought the swipe between the form's passes.
+//
+// It is a dropdown now, the width of the row, with everything on screen
+// at once. The two halves are separate: a number replaces the number, a
+// measure replaces the measure. Tapping does not append text, it edits
+// the part you tapped — so picking "כוס" after "2 כף" gives "2 כוסות",
+// not "2 כף כוס".
 // ───────────────────────────────────────────────────────────
-const QTY_NUMBERS = ['¼', '½', '¾', '1', '2', '3', '4'];
-const QTY_UNITS   = ['כוס', 'כפות', 'כף', 'כפית', 'גרם', 'מ״ל', 'יח׳', 'חבילה', 'קורט'];
+const QTY_NUMBERS = ['¼', '⅓', '½', '⅔', '¾', '1', '2', '3', '4', '6', '8', '10'];
 
-function QtyPresets({ value, onPick }) {
-  const append = (token) => {
-    const cur = String(value || '').trim();
-    const isNumber = QTY_NUMBERS.includes(token);
-    if (!cur) return onPick(token);
-    if (isNumber) {
-      const rest = cur.replace(/^[\d¼½¾/.\s]+/, '').trim();
-      return onPick(rest ? `${token} ${rest}` : token);
+// Only the singular is offered. Hebrew wants the plural above one, so the
+// picker says it for you rather than making you pick the right form.
+const QTY_UNITS  = ['כוס', 'כף', 'כפית', 'גרם', 'ק״ג', 'מ״ל', 'ליטר', 'יח׳', 'חבילה', 'קורט', 'חופן', 'צרור'];
+const QTY_PLURAL = { 'כוס': 'כוסות', 'כף': 'כפות', 'כפית': 'כפיות', 'חבילה': 'חבילות', 'יח׳': 'יח׳', 'צרור': 'צרורות' };
+
+// Written plural back to the singular the grid shows, so the right cell
+// lights up for a quantity that was typed rather than tapped.
+const QTY_SINGULAR = Object.fromEntries(
+  Object.entries(QTY_PLURAL).map(([one, many]) => [many, one])
+);
+
+// More than one? Hebrew pluralises from two up; a half cup is a cup.
+function plural(num, unit) {
+  const n = parseFloat(String(num || '').replace(',', '.'));
+  const many = Number.isFinite(n) && n >= 2;
+  return many ? (QTY_PLURAL[unit] || unit) : unit;
+}
+
+// Split "2 כפות סוכר" into its number, its measure and whatever is left,
+// so each can be replaced on its own.
+function splitQty(value) {
+  const t = String(value || '').trim();
+  const m = t.match(/^([\d¼⅓½⅔¾.,/\s-]+)?\s*(.*)$/);
+  const num = (m && m[1] ? m[1].trim() : '');
+  const rest = (m && m[2] ? m[2].trim() : '');
+  const words = [...QTY_UNITS, ...Object.values(QTY_PLURAL)].sort((a, b) => b.length - a.length);
+  let unit = '', tail = rest;
+  for (const w of words) {
+    if (rest === w || rest.startsWith(w + ' ')) {
+      unit = QTY_SINGULAR[w] || w;
+      tail = rest.slice(w.length).trim();
+      break;
     }
-    if (cur.endsWith(token)) return onPick(cur);
-    return onPick(`${cur} ${token}`);
-  };
+  }
+  return { num, unit, tail };
+}
 
-  const chip = (t, kind) => {
-    const on = kind === 'num'
-      ? String(value || '').trim().startsWith(t)
-      : String(value || '').includes(t);
+function joinQty({ num, unit, tail }) {
+  return [num, unit ? plural(num, unit) : '', tail].filter(Boolean).join(' ').trim();
+}
+
+function QtyPicker({ value, onPick, onClose }) {
+  const cur = splitQty(value);
+  const ref = fR(null);
+
+  // Tapping anywhere else puts it away, the way a menu does.
+  fE(() => {
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)
+          && !(e.target.closest && e.target.closest('[data-qty-toggle]'))) onClose();
+    };
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('pointerdown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const cell = (t, kind) => {
+    const on = kind === 'num' ? cur.num === t : cur.unit === t;
     return (
-      <button key={t} type="button" onMouseDown={e => e.preventDefault()} onClick={() => append(t)}
+      <button key={t} type="button"
+        onMouseDown={e => e.preventDefault()}
+        onClick={() => {
+          // Tapping the one already chosen clears that half.
+          const next = kind === 'num'
+            ? { ...cur, num: on ? '' : t }
+            : { ...cur, unit: on ? '' : t };
+          onPick(joinQty(next));
+          if (typeof hapticTap === 'function') hapticTap();
+        }}
         style={{
-          flexShrink: 0, minHeight: 44,
-          minWidth: kind === 'num' ? 48 : undefined,
-          padding: kind === 'num' ? '0 12px' : '0 16px',
-          borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-          background: on ? 'var(--ink)' : 'var(--surface-raised)',
+          height: 46, padding: 0,
+          borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+          background: on ? 'var(--ink)' : 'var(--field-fill)',
           color: on ? 'var(--bg)' : 'var(--ink)',
+          fontFamily: kind === 'num' ? 'var(--font-display)' : 'inherit',
           fontSize: kind === 'num' ? 'var(--t-heading)' : 'var(--t-small)',
           fontWeight: kind === 'num' ? 800 : 700,
-          fontFamily: kind === 'num' ? 'var(--font-display)' : 'inherit',
+          whiteSpace: 'nowrap', overflow: 'hidden',
           transition: 'background var(--dur-fast), color var(--dur-fast)',
         }}>{t}</button>
     );
   };
 
+  const heading = (t) => (
+    <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 700,
+                  paddingInlineStart: 4, marginBottom: 6 }}>{t}</div>
+  );
+
   return (
-    <div style={{
-      marginTop: 10, padding: 12, borderRadius: 'var(--r-lg)',
-      background: 'var(--field-fill)', display: 'grid', gap: 10,
-      animation: 'qtyIn var(--dur) var(--ease-out)',
-    }}>
-      <div className="scroll-x" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-        {QTY_NUMBERS.map(t => chip(t, 'num'))}
+    <div ref={ref}
+      data-qty-panel="true"
+      // The pager swipes between passes on a horizontal drag; this panel is
+      // not part of that, so it keeps its own gestures to itself.
+      onTouchStart={e => e.stopPropagation()}
+      onTouchMove={e => e.stopPropagation()}
+      style={{
+        position: 'absolute', insetInlineStart: 0, insetInlineEnd: 0, top: 'calc(100% + 8px)',
+        zIndex: 40,
+        background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--e3)', padding: 14,
+        display: 'grid', gap: 14,
+        animation: 'qtyIn var(--dur) var(--ease-out)',
+      }}>
+      <div>
+        {heading('כמה')}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+          {QTY_NUMBERS.map(t => cell(t, 'num'))}
+        </div>
       </div>
-      <div className="scroll-x" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-        {QTY_UNITS.map(t => chip(t, 'unit'))}
+      <div>
+        {heading('יחידה')}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {QTY_UNITS.map(t => cell(t, 'unit'))}
+        </div>
       </div>
-      <style>{`@keyframes qtyIn{0%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`@keyframes qtyIn{0%{opacity:0;transform:translateY(-8px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}`}</style>
     </div>
   );
 }
@@ -374,8 +452,22 @@ function FormPager({ step, onStep, count, children }) {
   const start = fR(null);
   const [drag, setDrag] = fS(0);
 
+  // A sideways drag that begins on something which itself scrolls
+  // sideways — the photo strip, a menu — belongs to that thing, not to the
+  // pager. Without this the two fight: scrolling the strip also turned the
+  // page.
+  const ownsSideways = (node) => {
+    for (let n = node; n && n !== document.body; n = n.parentElement) {
+      if (n.dataset && n.dataset.qtyPanel) return true;
+      const cs = getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 1) return true;
+    }
+    return false;
+  };
+
   const onDown = (e) => {
     const t = e.touches ? e.touches[0] : e;
+    if (ownsSideways(e.target)) { start.current = null; return; }
     start.current = { x: t.clientX, y: t.clientY, decided: null };
   };
 
@@ -470,7 +562,7 @@ function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
 }
 
 Object.assign(window, {
-  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPresets,
+  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPicker, splitQty, joinQty,
 });
 
 // ───────────────────────────────────────────────────────────

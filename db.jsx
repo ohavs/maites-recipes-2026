@@ -117,22 +117,59 @@ function authReady() {
   // a transient failure must not become a permanent "no photos".
   let slotsPromise = null;
 
-  async function fetchSlots(attempt = 0) {
+  const readSnap = (snap) => {
+    const result = {};
+    snap.forEach(doc => { result[doc.id] = doc.data(); });
+    return result;
+  };
+
+  // Photos are stored inline, one base64 document each, so this collection
+  // is by far the heaviest thing the app reads — and it is the same bytes
+  // on every launch, because a photo almost never changes after it is set.
+  //
+  // So: serve whatever is already on the device first, and go to the server
+  // afterwards, in the background, merging anything that turned out to be
+  // new. A returning user sees their photos immediately instead of waiting
+  // for the whole collection to come down the wire again.
+  async function serverSlots(attempt = 0) {
     try {
       await authReady();
-      const snap = await _db.collection('image_slots').get();
-      const result = {};
-      snap.forEach(doc => { result[doc.id] = doc.data(); });
-      return result;
+      return readSnap(await _db.collection('image_slots').get({ source: 'server' }));
     } catch (err) {
       if (attempt < 2) {
         await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
-        return fetchSlots(attempt + 1);
+        return serverSlots(attempt + 1);
       }
       if (typeof reportError === 'function') reportError('load-images', err);
-      slotsPromise = null;      // let a later attempt try again
+      return null;
+    }
+  }
+
+  const catchUp = () => {
+    serverSlots().then(fresh => {
+      if (fresh && Object.keys(fresh).length && window.__mergeImageSlots) {
+        window.__mergeImageSlots(fresh);
+      }
+    }).catch(() => {});
+  };
+
+  async function fetchSlots() {
+    try {
+      await authReady();
+      const cached = await _db.collection('image_slots').get({ source: 'cache' });
+      if (!cached.empty) {
+        catchUp();                 // quietly bring it up to date behind the photos
+        return readSnap(cached);
+      }
+    } catch {
+      // no cache yet, or persistence is unavailable — fall through
+    }
+    const fresh = await serverSlots();
+    if (fresh === null) {
+      slotsPromise = null;         // let a later attempt try again
       return {};
     }
+    return fresh;
   }
 
   const loadSlots = () => {

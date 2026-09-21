@@ -7,6 +7,32 @@ const { useState: uS, useRef: uR, useEffect: uE, useMemo: uM, useLayoutEffect: u
 // toggle + categories + stacked cards (with bigger circles
 // poking out of each card edge).
 // ───────────────────────────────────────────────────────────
+// One shape for every action on the home screen's toolbar: the same
+// height as the category dropdown beside them, so the row reads as a row
+// rather than as a dropdown with three circles stuck on the end.
+function HomeAction({ children, label, onClick, on = false, pressed, disabled = false }) {
+  return (
+    <button type="button" onClick={onClick}
+      aria-label={label} title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      style={{
+        width: 52, height: 52, flexShrink: 0,
+        borderRadius: 'var(--r-md)', border: 'none', padding: 0,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? .4 : 1,
+        background: on ? 'var(--ink)' : 'var(--surface-raised)',
+        color: on ? 'var(--bg)' : 'var(--ink)',
+        display: 'grid', placeItems: 'center',
+        transition: 'background var(--dur-fast), color var(--dur-fast), transform var(--dur-fast)',
+      }}
+      onPointerDown={e => { if (!disabled) e.currentTarget.style.transform = 'scale(.92)'; }}
+      onPointerUp={e => { e.currentTarget.style.transform = ''; }}
+      onPointerLeave={e => { e.currentTarget.style.transform = ''; }}
+    >{children}</button>
+  );
+}
+
 function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLoad, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
@@ -42,34 +68,41 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
 
   return (
     <div className="scroll-y" style={{ height: '100%', position: 'relative' }}>
-      {/* Brand bar */}
-      <div style={{
-        padding: '14px 22px 0',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-      }}>
-        <h1 className="display" data-comment-anchor="home-brand" style={{
-          margin: 0, fontSize: 'var(--t-display)', fontWeight: 800, letterSpacing: '-.01em',
-          color: 'var(--ink)', fontFamily: 'var(--font-display)',
-        }}>Maites</h1>
-        <button onClick={onOpenAccount} aria-label="חשבון"
-          style={{
-            width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
-            background: 'var(--glass)', padding: 0, overflow: 'hidden',
-            boxShadow: 'var(--e1)',
-            display: 'grid', placeItems: 'center', flexShrink: 0,
-          }}>
-          {currentUser && currentUser.photoURL
-            ? <img src={currentUser.photoURL} style={{ width: 44, height: 44, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
-            : <span style={{ fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)' }}>
-                {currentUser ? (currentUser.displayName || currentUser.email || '?')[0].toUpperCase() : '⚙'}
-              </span>
-          }
-        </button>
+      {/* The top of the screen used to be two crowded rows: a title with an
+          avatar, then a dropdown and three floating circles beside it, all
+          different shapes. It is one row of actions under the title now,
+          each the same shape as the other, and the search field is one of
+          them rather than a circle that unfolds into one. */}
+      <div style={{ padding: '14px 20px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 className="display" data-comment-anchor="home-brand" style={{
+              margin: 0, fontSize: 'var(--t-display)', fontWeight: 800, letterSpacing: '-.01em',
+              color: 'var(--ink)', fontFamily: 'var(--font-display)',
+            }}>Maites</h1>
+            <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>
+              {recipes.length ? `${recipes.length} מתכונים` : 'ספר המתכונים שלך'}
+            </div>
+          </div>
+          <button onClick={onOpenAccount} aria-label="חשבון"
+            style={{
+              width: 46, height: 46, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer',
+              background: 'var(--surface-raised)', padding: 0, overflow: 'hidden',
+              display: 'grid', placeItems: 'center', flexShrink: 0,
+            }}>
+            {currentUser && currentUser.photoURL
+              ? <img src={currentUser.photoURL} style={{ width: 46, height: 46, objectFit: 'cover' }} alt="" referrerPolicy="no-referrer"/>
+              : <span style={{ fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)' }}>
+                  {currentUser ? (currentUser.displayName || currentUser.email || '?')[0].toUpperCase() : '⚙'}
+                </span>
+            }
+          </button>
+        </div>
       </div>
 
-      {/* Filter toolbar — dropdown (start) + layout & search (end) */}
+      {/* One row: what you are looking at, and the three ways to change it. */}
       <div style={{
-        padding: '12px 22px 0', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '14px 20px 0', display: 'flex', alignItems: 'center', gap: 8,
         position: 'relative', zIndex: 4,
       }}>
         <CategoryDropdown
@@ -82,47 +115,20 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
           onAdd={onAddCategory}
           onManage={onManageCategories}
         />
-        <button onClick={() => onDensity(density === 'grid' ? 'comfy' : 'grid')}
-          aria-label={density === 'grid' ? 'מעבר לכרטיסים' : 'מעבר לגריד'}
-          title={density === 'grid' ? 'כרטיסים' : 'גריד'}
-          style={{
-            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: density === 'grid' ? 'var(--ink)' : 'var(--glass)',
-            color: density === 'grid' ? 'var(--bg)' : 'var(--ink)',
-            display: 'grid', placeItems: 'center',
-            boxShadow: 'var(--e1)',
-            transition: 'all .2s',
-          }}>
-          {density === 'grid' ? <IconRows size={19} strokeWidth={2.2}/> : <IconGrid size={19} strokeWidth={2.2}/>}
-        </button>
-        <button onClick={() => setFavOnly(v => !v)}
-          aria-label={favOnly ? 'הצגת כל המתכונים' : 'רק מועדפים'}
-          aria-pressed={favOnly}
-          title="מועדפים"
+        <HomeAction label="חיפוש" on={searching || !!q} onClick={() => setSearching(s => !s)}>
+          <IconSearch size={19} strokeWidth={2.2}/>
+        </HomeAction>
+        <HomeAction label={favOnly ? 'הצגת כל המתכונים' : 'רק מועדפים'}
+          on={favOnly} pressed={favOnly}
           disabled={!favCount && !favOnly}
-          style={{
-            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', flexShrink: 0,
-            cursor: (!favCount && !favOnly) ? 'default' : 'pointer',
-            opacity: (!favCount && !favOnly) ? .4 : 1,
-            background: favOnly ? 'var(--brand-strong)' : 'var(--glass)',
-            color: favOnly ? 'var(--on-brand)' : 'var(--ink)',
-            display: 'grid', placeItems: 'center',
-            boxShadow: 'var(--e1)',
-            transition: 'all .2s',
-          }}>
+          onClick={() => setFavOnly(v => !v)}>
           <IconHeart filled={favOnly} size={19} strokeWidth={2.2}/>
-        </button>
-        <button onClick={() => setSearching(s => !s)} aria-label="חיפוש"
-          style={{
-            width: 48, height: 48, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: searching || q ? 'var(--ink)' : 'var(--glass)',
-            color: searching || q ? 'var(--bg)' : 'var(--ink)',
-            display: 'grid', placeItems: 'center',
-            boxShadow: 'var(--e1)',
-            transition: 'all .2s',
-          }}>
-          <IconSearch size={18} strokeWidth={2.2}/>
-        </button>
+        </HomeAction>
+        <HomeAction label={density === 'grid' ? 'מעבר לכרטיסים' : 'מעבר לגריד'}
+          on={density === 'grid'}
+          onClick={() => onDensity(density === 'grid' ? 'comfy' : 'grid')}>
+          {density === 'grid' ? <IconRows size={19} strokeWidth={2.2}/> : <IconGrid size={19} strokeWidth={2.2}/>}
+        </HomeAction>
       </div>
 
       {/* Inline search input — expands when search is on */}
@@ -746,11 +752,6 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
             />
             <div style={group}>צבע הכרטיס</div>
             <NSwatches keys={Object.keys(PALETTES)} palettes={PALETTES} value={paletteKey} onChange={setPaletteKey}/>
-            <div style={group}>איך התמונה יושבת בכרטיס</div>
-            <NCards value={imageMode} onChange={setImageMode} options={[
-              { value: 'pop',    label: 'בולטת',  hint: 'עיגול שיוצא מהמסגרת', preview: <CardShapePreview mode="pop" p={p}/> },
-              { value: 'inside', label: 'בפנים',  hint: 'מלבן בתוך המסגרת',    preview: <CardShapePreview mode="inside" p={p}/> },
-            ]}/>
             <PreviewCard p={p} title={title} desc={desc} prepTime={prepTime} cookTime={cookTime}
               servings={servings} cuisine={cuisine}/>
           </div>
@@ -895,33 +896,6 @@ function BarButton({ tone = 'quiet', grow, disabled, onClick, children }) {
   );
 }
 
-// The little diagram on the two "how the photo sits" choices.
-function CardShapePreview({ mode, p }) {
-  const inside = mode === 'inside';
-  return (
-    <div style={{
-      position: 'relative', height: 52, borderRadius: 'var(--r-sm)',
-      background: p.bg2, overflow: inside ? 'hidden' : 'visible',
-    }}>
-      <div style={{
-        position: 'absolute', top: inside ? 7 : '50%',
-        insetInlineStart: inside ? 7 : -10,
-        transform: inside ? 'none' : 'translateY(-50%)',
-        width: 34, height: 34, borderRadius: inside ? 9 : 999,
-        background: p.bg, boxShadow: '0 0 0 2px var(--surface)',
-      }}/>
-      <div style={{
-        position: 'absolute', insetInlineEnd: 9, top: 15, width: '44%', height: 6,
-        borderRadius: 99, background: 'var(--line-strong)',
-      }}/>
-      <div style={{
-        position: 'absolute', insetInlineEnd: 9, top: 28, width: '30%', height: 5,
-        borderRadius: 99, background: 'var(--line)',
-      }}/>
-    </div>
-  );
-}
-
 // The card as it will look on the home screen.
 function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) {
   return (
@@ -965,7 +939,10 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
 
   return (
-    <div>
+    // The dropdown is the width of the whole row, so it is anchored here
+    // rather than to the quantity box, which is too narrow to lay a grid
+    // out in.
+    <div style={{ position: 'relative' }}>
       <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
         <div style={{ flexShrink: 0 }}>
           <button type="button" onClick={() => setPickerOpen(o => !o)}
@@ -982,14 +959,14 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
             />
           )}
         </div>
-        {/* The amounts strip is folded away behind the chevron: most rows
-            are typed straight in, and the strip is there for the ones that
-            are quicker to tap. */}
+        {/* The amounts are folded away behind the chevron: most rows are
+            typed straight in, and the dropdown is there for the ones that
+            are quicker to tap. It is anchored to this box. */}
         <div style={{ width: 116, flex: 'none' }}>
           <NField label="כמות" hideLabel placeholder="כמות"
             value={ing.qty || ''} onChange={v => onChange('qty', v)}
             after={
-              <button type="button"
+              <button type="button" data-qty-toggle="true"
                 onClick={() => { setQtyOpen(o => !o); if (typeof hapticTap === 'function') hapticTap(); }}
                 aria-label="כמויות מוכנות" aria-expanded={qtyOpen}
                 style={{
@@ -1018,7 +995,11 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
           }}><IconTrash size={18}/></button>
         )}
       </div>
-      {qtyOpen && <QtyPresets value={ing.qty || ''} onPick={v => onChange('qty', v)}/>}
+      {qtyOpen && (
+        <QtyPicker value={ing.qty || ''}
+          onPick={v => onChange('qty', v)}
+          onClose={() => setQtyOpen(false)}/>
+      )}
     </div>
   );
 }

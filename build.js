@@ -80,7 +80,15 @@ function build({ withHarness = false } = {}) {
 
     const page = transformHtml(html)
       .replace(/\s*<script src="\/vendor\/babel\.min\.js"><\/script>/, '')
-      .replace(tag, (_m, src) => `<script src="${compiled.get(src).name}"></script>`);
+      // `defer` on every app script: they download in parallel while the
+      // HTML is still parsing, run in order afterwards, and no longer hold
+      // up the first paint. They share one global scope, and defer keeps
+      // their order, so nothing else has to change.
+      .replace(tag, (_m, src) => `<script defer src="${compiled.get(src).name}"></script>`)
+      // the vendor libraries block parsing for the same reason, and are the
+      // biggest of the lot
+      .replace(/<script src="(\/vendor\/[^"]+|image-slot\.js)"><\/script>/g,
+               (_m, src) => `<script defer src="${src}"></script>`);
     fs.writeFileSync(path.join(OUT, file), page);
   };
 

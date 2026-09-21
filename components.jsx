@@ -288,24 +288,23 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   // Scroll-based physics (tilt / scale / fade / velocity-skew + tap bounce)
   useScrollPhysics(cardRef);
 
-  // Card geometry — tall, with the circle poking out hard.
-  // Per-recipe choice: 'inside' keeps the photo within the card bounds,
-  // anything else (default) lets the circle poke out past the edge.
   // With no photo at all we simply leave the space to the text — but only
   // once the photo store has actually been read, so a slow load can never
   // masquerade as "this recipe has no picture".
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
-  const inside   = recipe.imageMode === 'inside';
-  const cardH    = 168;
+  const cardH    = 140;
   const padY     = 18;
-  const imgSize  = inside ? cardH - padY * 2 : 146;
+  // One shape for every card. The photo is a thumbnail beside the title,
+  // not the card's centrepiece: it used to be 146 across and hang past the
+  // card's edge, and it was a circle on some recipes and a rounded square
+  // on others, so a list of them never lined up.
+  const imgSize  = 104;
+  const imgRadius= 'var(--r-md)';
   const titleSize= 26;
   const descClamp= 2;
   const padX     = 24;
-  // How far the circle reaches past the card's start edge (RTL = right).
-  const imgPokeOut = inside ? 0 : Math.round(imgSize * 0.18);
 
   const wrapperStyle = {
     position: 'relative',
@@ -330,7 +329,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           cursor: 'pointer',
           background: cardBg,
           boxShadow: 'var(--shadow-card)',
-          overflow: 'visible', // CRITICAL — lets the circle escape
+          overflow: 'hidden', // nothing escapes the card now
           transformStyle: 'preserve-3d',
           // Smooth out the scroll-physics transform between rAF frames
           transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05), opacity .25s ease-out, box-shadow .25s ease',
@@ -347,7 +346,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
         {/* RTL row: text on right, big circle photo on left poking out */}
         <div style={{
           position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${padY}px ${padX}px`, gap: inside ? 14 : 8, alignItems: 'center',
+          padding: `${padY}px ${padX}px`, gap: 14, alignItems: 'center',
         }}>
           {/* text */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -364,26 +363,12 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
             )}
           </div>
 
-          {/* photo — 'inside' keeps a rounded thumbnail within the card,
-             otherwise the circle sits on the inline-START side (RTL → right)
-             and pokes OUT past that edge. */}
+          {/* photo — the same square, the same size, on every card */}
           {hasPhoto && <div style={{
-            position: 'relative',
-            width: imgSize - imgPokeOut, // space the row reserves
-            height: imgSize,
-            flexShrink: 0,
+            position: 'relative', width: imgSize, height: imgSize, flexShrink: 0,
+            borderRadius: imgRadius, overflow: 'hidden',
           }} data-shared-img={sharedId}>
-            <div style={{
-              position: 'absolute',
-              top: '50%', insetInlineStart: -imgPokeOut,
-              transform: 'translateY(-50%)',
-              width: imgSize, height: imgSize,
-              borderRadius: inside ? 'var(--r-md)' : 'var(--r-pill)',
-              overflow: 'hidden', boxShadow: 'var(--e2)',
-            }}>
-              <RecipePhoto url={photo} palette={p}
-                radius={inside ? 'var(--r-md)' : 'var(--r-pill)'} alt=""/>
-            </div>
+            <RecipePhoto url={photo} palette={p} radius={imgRadius} alt=""/>
           </div>}
         </div>
 
@@ -652,11 +637,11 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
         style={{
           width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
           display: 'flex', alignItems: 'center', gap: 9,
-          padding: '0 14px 0 12px', height: 44, borderRadius: 'var(--r-pill)',
-          background: open || chosen.length ? 'var(--ink)' : 'var(--glass)',
+          // Same height and same corner as the actions beside it.
+          padding: '0 14px 0 12px', height: 52, borderRadius: 'var(--r-md)',
+          background: open || chosen.length ? 'var(--ink)' : 'var(--surface-raised)',
           color: open || chosen.length ? 'var(--bg)' : 'var(--ink)',
-          boxShadow: open ? 'var(--e2)' : 'var(--e1)',
-          transition: 'background .2s, color .2s, box-shadow .2s',
+          transition: 'background var(--dur-fast), color var(--dur-fast)',
         }}>
         <span style={{ fontSize: 'var(--t-body)', lineHeight: 1, flexShrink: 0 }}>{emojis}</span>
         <span style={{
@@ -677,8 +662,8 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
 
       {open && (
         <div role="listbox" style={{
-          position: 'absolute', top: 52, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
-          background: 'var(--glass-strong)',
+          position: 'absolute', top: 60, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
+          background: 'var(--surface-raised)',
           borderRadius: 'var(--r-lg)', zIndex: 40, overflow: 'hidden',
           boxShadow: 'var(--e3)',
           animation: 'ddIn .2s cubic-bezier(.2,1.1,.4,1)', transformOrigin: 'top center',
@@ -984,8 +969,7 @@ function AddCategorySheet({ onAdd, onCancel }) {
 // ───────────────────────────────────────────────────────────
 function RecipeCardSkeleton() {
   const cardH   = 168;
-  const imgSize = 198;
-  const imgPoke = Math.round(imgSize * 0.22);
+  const imgSize = 104;
   return (
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
       <div style={{
@@ -1005,14 +989,10 @@ function RecipeCardSkeleton() {
               <div style={{ height: 26, width: 44, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
             </div>
           </div>
-          <div style={{ width: imgSize - imgPoke, height: imgSize, flexShrink: 0, position: 'relative' }}>
-            <div style={{
-              position: 'absolute', top: '50%', insetInlineStart: -imgPoke,
-              transform: 'translateY(-50%)',
-              width: imgSize, height: imgSize, borderRadius: '50%',
-              background: 'var(--surface-sunken)',
-            }}/>
-          </div>
+          <div style={{
+            width: imgSize, height: imgSize, flexShrink: 0,
+            borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)',
+          }}/>
         </div>
       </div>
       <style>{`@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
