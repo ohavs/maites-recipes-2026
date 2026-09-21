@@ -216,6 +216,57 @@ function QtyPicker({ value, onPick, onClose }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// NTagField — one free-text value, but offered as tags.
+//
+// Kinds of cooking repeat across a recipe book, and typing "איטלקית"
+// for the ninth time is worse than tapping it. So the ones already in
+// use are listed underneath, most used first; tapping one sets the
+// value, tapping it again clears it. Anything new can still be typed,
+// and becomes a tag for next time by virtue of being saved.
+// ───────────────────────────────────────────────────────────
+function NTagField({ label, value, onChange, options = [], placeholder, hint, max = 12 }) {
+  const cur = String(value || '').trim();
+  // Whatever is chosen stays visible even if it is not in the list yet.
+  const tags = [];
+  if (cur && !options.includes(cur)) tags.push(cur);
+  for (const o of options) { if (tags.length >= max) break; tags.push(o); }
+
+  return (
+    <div>
+      <NField label={label} value={value} onChange={onChange}
+        placeholder={placeholder} hint={tags.length ? undefined : hint}/>
+      {tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10, paddingInlineStart: 2 }}>
+          {tags.map(t => {
+            const on = cur === t;
+            return (
+              <button key={t} type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => {
+                  onChange(on ? '' : t);
+                  if (typeof hapticTap === 'function') hapticTap();
+                }}
+                style={{
+                  border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  borderRadius: 'var(--r-pill)', padding: '0 14px', minHeight: 38,
+                  ...TYPE.small, fontWeight: 700,
+                  background: on ? 'var(--ink)' : 'var(--field-fill)',
+                  color: on ? 'var(--bg)' : 'var(--ink)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  transition: 'background var(--dur-fast), color var(--dur-fast)',
+                }}>
+                {t}
+                {on && <IconClose size={12} strokeWidth={3}/>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // NRow — a setting you tap. The value sits where you read it,
 // and a sheet comes up from the bottom to change it.
 // ───────────────────────────────────────────────────────────
@@ -562,7 +613,7 @@ function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
 }
 
 Object.assign(window, {
-  NField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPicker, splitQty, joinQty,
+  NField, NTagField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPicker, splitQty, joinQty,
 });
 
 // ───────────────────────────────────────────────────────────

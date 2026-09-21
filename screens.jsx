@@ -614,7 +614,7 @@ const FORM_STEPS = [
   { id: 'how',   label: 'הכנה',    hint: 'זמנים, שלבים, הערות' },
 ];
 
-function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
+function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, cuisines = [], onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -635,6 +635,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   const [isDirty, setIsDirty] = uS(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = uS(false);
   const [catSheet, setCatSheet] = uS(false);
+  const [confirmNode, confirm] = useConfirm();
   // The step lives in App when it is mounted there, so the phone's back
   // gesture walks back through the four instead of throwing the form away.
   const [ownStep, setOwnStep] = uS(0);
@@ -669,10 +670,33 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     return next;
   }));
   const addIng = () => setIngs(arr => [...arr, { qty: '', name: '', icon: 'chef' }]);
-  const removeIng = (i) => setIngs(arr => arr.filter((_,idx) => idx !== i));
+  const dropIng = (i) => setIngs(arr => arr.filter((_,idx) => idx !== i));
   const updateStep = (i, k, v) => setStepsArr(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
   const addStep = () => setStepsArr(arr => [...arr, { title: '', body: '' }]);
-  const removeStep = (i) => setStepsArr(arr => arr.filter((_,idx) => idx !== i));
+  const dropStep = (i) => setStepsArr(arr => arr.filter((_,idx) => idx !== i));
+
+  // Removing a row that has something written in it throws that writing
+  // away, so it asks first. An untouched row has nothing to lose and goes
+  // quietly — a dialog for an empty row is just a dialog in the way.
+  const removeIng = (i) => {
+    const row = ings[i] || {};
+    if (!(row.name || '').trim() && !(row.qty || '').trim()) return dropIng(i);
+    confirm({
+      title: 'למחוק את המצרך?',
+      body: <><strong style={{ color: 'var(--ink)' }}>{(row.qty ? row.qty + ' ' : '') + (row.name || '')}</strong> יימחק מהרשימה.</>,
+      onConfirm: () => dropIng(i),
+    });
+  };
+
+  const removeStep = (i) => {
+    const st = stepsArr[i] || {};
+    if (!(st.title || '').trim() && !(st.body || '').trim()) return dropStep(i);
+    confirm({
+      title: `למחוק את שלב ${i + 1}?`,
+      body: 'מה שנכתב בשלב הזה יימחק.',
+      onConfirm: () => dropStep(i),
+    });
+  };
 
   const p = paletteOf(paletteKey);
   const canSave = !!title.trim();
@@ -740,7 +764,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
             <NRow label="קטגוריה"
               value={currentCat ? `${currentCat.emoji || ''} ${currentCat.label}`.trim() : '—'}
               onClick={() => setCatSheet(true)}/>
-            <NField label="סוג מטבח" value={cuisine} onChange={setCuisine}
+            <NTagField label="סוג מטבח" value={cuisine} onChange={setCuisine}
+              options={cuisines}
               placeholder="איטלקית, אסייתית…" hint="לא חובה"/>
             <PhotoStage
               recipeId={recipeId}
@@ -872,6 +897,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
           onLeave={() => { setIsDirty(false); setShowLeaveConfirm(false); if (onCancel) onCancel(); }}
         />
       )}
+      {confirmNode}
     </div>
   );
 }
@@ -920,14 +946,14 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onCancel, categories, onAddCategory, onDirtyChange, step, onStepChange }) {
-  return <RecipeFormScreen mode="add" onSave={onAdd} onCancel={onCancel} categories={categories} onAddCategory={onAddCategory}
-    onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
+function AddRecipeScreen({ onAdd, onCancel, categories, cuisines, onAddCategory, onDirtyChange, step, onStepChange }) {
+  return <RecipeFormScreen mode="add" onSave={onAdd} onCancel={onCancel} categories={categories} cuisines={cuisines}
+    onAddCategory={onAddCategory} onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel, categories, onAddCategory, step, onStepChange }) {
+function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAddCategory, step, onStepChange }) {
   return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel}
-    categories={categories} onAddCategory={onAddCategory} step={step} onStepChange={onStepChange}/>;
+    categories={categories} cuisines={cuisines} onAddCategory={onAddCategory} step={step} onStepChange={onStepChange}/>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -939,16 +965,22 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
 
   return (
-    // The dropdown is the width of the whole row, so it is anchored here
-    // rather than to the quantity box, which is too narrow to lay a grid
-    // out in.
-    <div style={{ position: 'relative' }}>
+    // Two lines, not one. Everything used to be crammed onto a single row
+    // — symbol, amount, name and a bin — which left the name, the longest
+    // thing you type, with whatever was left over, usually about half the
+    // screen. The name now has the whole width, and the amount sits under
+    // it where it only needs to be as wide as "2 כפות".
+    <div style={{
+      position: 'relative',
+      background: 'var(--field-fill)', borderRadius: 'var(--r-lg)', padding: 8,
+      display: 'grid', gap: 8,
+    }}>
       <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
         <div style={{ flexShrink: 0 }}>
           <button type="button" onClick={() => setPickerOpen(o => !o)}
             aria-label="בחירת סמל"
             style={{
-              width: 56, height: 56, borderRadius: 'var(--r-lg)', border: 'none',
+              width: 56, height: 56, borderRadius: 'var(--r-md)', border: 'none',
               background: 'var(--surface-raised)', color: 'var(--ink)',
               cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 26,
             }}>{emoji}</button>
@@ -959,42 +991,42 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
             />
           )}
         </div>
-        {/* The amounts are folded away behind the chevron: most rows are
-            typed straight in, and the dropdown is there for the ones that
-            are quicker to tap. It is anchored to this box. */}
-        <div style={{ width: 116, flex: 'none' }}>
-          <NField label="כמות" hideLabel placeholder="כמות"
-            value={ing.qty || ''} onChange={v => onChange('qty', v)}
-            after={
-              <button type="button" data-qty-toggle="true"
-                onClick={() => { setQtyOpen(o => !o); if (typeof hapticTap === 'function') hapticTap(); }}
-                aria-label="כמויות מוכנות" aria-expanded={qtyOpen}
-                style={{
-                  width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                  background: qtyOpen ? 'var(--ink)' : 'transparent',
-                  color: qtyOpen ? 'var(--bg)' : 'var(--ink-faint)',
-                  display: 'grid', placeItems: 'center', padding: 0,
-                  transition: 'background var(--dur-fast), color var(--dur-fast)',
-                }}>
-                <span style={{
-                  display: 'grid', placeItems: 'center',
-                  transform: qtyOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform var(--dur) var(--ease-out)',
-                }}><IconChevronDown size={16} strokeWidth={2.6}/></span>
-              </button>
-            }/>
-        </div>
         <NField label="מצרך" hideLabel placeholder="מצרך"
           value={ing.name || ''} onChange={v => onChange('name', v)}
           style={{ flex: 1, minWidth: 0 }}/>
         {canRemove && (
           <button type="button" onClick={onRemove} aria-label="מחיקת מצרך" style={{
-            width: 44, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
+            width: 40, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
             background: 'transparent', color: 'var(--ink-faint)', flexShrink: 0,
             display: 'grid', placeItems: 'center',
           }}><IconTrash size={18}/></button>
         )}
       </div>
+
+      <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
+        <NField label="כמות" hideLabel placeholder="כמות"
+          value={ing.qty || ''} onChange={v => onChange('qty', v)}
+          style={{ flex: 1, minWidth: 0 }}
+          after={
+            <button type="button" data-qty-toggle="true"
+              onClick={() => { setQtyOpen(o => !o); if (typeof hapticTap === 'function') hapticTap(); }}
+              aria-label="כמויות מוכנות" aria-expanded={qtyOpen}
+              style={{
+                width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                background: qtyOpen ? 'var(--ink)' : 'transparent',
+                color: qtyOpen ? 'var(--bg)' : 'var(--ink-faint)',
+                display: 'grid', placeItems: 'center', padding: 0,
+                transition: 'background var(--dur-fast), color var(--dur-fast)',
+              }}>
+              <span style={{
+                display: 'grid', placeItems: 'center',
+                transform: qtyOpen ? 'rotate(180deg)' : 'none',
+                transition: 'transform var(--dur) var(--ease-out)',
+              }}><IconChevronDown size={16} strokeWidth={2.6}/></span>
+            </button>
+          }/>
+      </div>
+
       {qtyOpen && (
         <QtyPicker value={ing.qty || ''}
           onPick={v => onChange('qty', v)}
@@ -1479,6 +1511,7 @@ function LoginScreen({ onSignIn }) {
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
 function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
+  const [confirmNode, confirm] = useConfirm();
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
   const [mutual, setMutual] = uS(false);
@@ -1592,9 +1625,17 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
               {/* The account */}
               {user ? (
-                <Button tone="quiet" full onClick={onSignOut} style={{
+                <Button tone="quiet" full style={{
                   background: 'var(--danger-soft)', color: 'var(--danger)', marginTop: 4,
-                }}>
+                }}
+                  onClick={() => confirm({
+                    emoji: '🚪',
+                    title: 'לצאת מהחשבון?',
+                    body: 'המתכונים נשארים בענן. אפשר להיכנס שוב מתי שתרצה.',
+                    confirmLabel: 'יציאה',
+                    cancelLabel: 'השאר מחובר',
+                    onConfirm: onSignOut,
+                  })}>
                   <span style={{ fontSize: 'var(--t-heading)' }} aria-hidden="true">🚪</span> יציאה מהחשבון
                 </Button>
               ) : null}
@@ -1644,7 +1685,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                             <div style={{ fontSize: 'var(--t-caption)', color: 'var(--p-lavender-accent)', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
-                        <button onClick={() => onRevokeShare(s.id)} style={{
+                        <button onClick={() => confirm({
+                          emoji: '🤝',
+                          title: 'לבטל את השיתוף?',
+                          body: <><strong style={{ color: 'var(--ink)' }}>{s.guestEmail}</strong> לא יוכל/תוכל יותר לראות את המתכונים שלך.</>,
+                          confirmLabel: 'ביטול שיתוף',
+                          cancelLabel: 'השאר',
+                          onConfirm: () => onRevokeShare(s.id),
+                        })} style={{
                           border: 'none', background: 'var(--danger-soft)', color: 'var(--danger)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
@@ -1673,7 +1721,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                             <div style={{ fontSize: 'var(--t-caption)', color: 'var(--p-lavender-accent)', fontWeight: 700, marginTop: 1 }}>הדדי</div>
                           )}
                         </div>
-                        <button onClick={() => onCancelInvite(inv.id)} style={{
+                        <button onClick={() => confirm({
+                          emoji: '✉️',
+                          title: 'לבטל את ההזמנה?',
+                          body: <>ההזמנה ל<strong style={{ color: 'var(--ink)' }}>{inv.guestEmail}</strong> תבוטל.</>,
+                          confirmLabel: 'ביטול הזמנה',
+                          cancelLabel: 'השאר',
+                          onConfirm: () => onCancelInvite(inv.id),
+                        })} style={{
                           border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
@@ -1698,7 +1753,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                           <div style={{ fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink)' }}>{s.ownerDisplayName || s.ownerEmail}</div>
                           <div style={{ fontSize: 'var(--t-caption)', color: 'var(--ink-soft)' }}>{s.ownerEmail}</div>
                         </div>
-                        <button onClick={() => onRevokeShare(s.id)} style={{
+                        <button onClick={() => confirm({
+                          emoji: '🤝',
+                          title: 'לבטל את השיתוף?',
+                          body: <><strong style={{ color: 'var(--ink)' }}>{s.guestEmail}</strong> לא יוכל/תוכל יותר לראות את המתכונים שלך.</>,
+                          confirmLabel: 'ביטול שיתוף',
+                          cancelLabel: 'השאר',
+                          onConfirm: () => onRevokeShare(s.id),
+                        })} style={{
                           border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
@@ -1758,6 +1820,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
             </div>
           )}
         </div>
+      {confirmNode}
     </Page>
   );
 }

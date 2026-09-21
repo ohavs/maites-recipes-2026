@@ -201,6 +201,17 @@ function App() {
     return () => { clearTimeout(bail); unsub(); };
   }, []);
 
+  // Every kind of cooking already written down, most used first — the
+  // form offers these as tags rather than making you retype them.
+  const cuisines = $M(() => {
+    const counts = {};
+    recipes.forEach(r => {
+      const c = (r.cuisine || '').trim();
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'he'));
+  }, [recipes]);
+
   const addCategory = (cat) => {
     const next = [...categories, cat];
     setCategories(next);
@@ -519,6 +530,7 @@ function App() {
               onAdd={addRecipe}
               onCancel={() => { formDirtyRef.current = false; navTo('home'); }}
               categories={categories}
+              cuisines={cuisines}
               onAddCategory={() => setShowAddCategory(true)}
               onDirtyChange={(d) => { formDirtyRef.current = d; }}
               step={formStep}
@@ -567,6 +579,7 @@ function App() {
               onSave={updateRecipe}
               onCancel={() => setEditingRecipeId(null)}
               categories={categories}
+              cuisines={cuisines}
               onAddCategory={() => setShowAddCategory(true)}
               step={formStep}
               onStepChange={setFormStep}
@@ -598,8 +611,8 @@ function App() {
         {!online && <OfflineBanner pending={syncMeta.hasPendingWrites} />}
 
         {showAddCategory && (
-          <AddCategorySheet
-            onAdd={(cat) => { addCategory(cat); setShowAddCategory(false); }}
+          <CategoryEditSheet
+            onSave={(cat) => { addCategory(cat); setShowAddCategory(false); }}
             onCancel={() => setShowAddCategory(false)}
           />
         )}

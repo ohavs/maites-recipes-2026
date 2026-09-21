@@ -742,9 +742,6 @@ function DropRow({ emoji, label, count, checked, onClick }) {
   );
 }
 
-// ───────────────────────────────────────────────────────────
-// ManageCategoriesSheet — edit emoji/name + add + delete
-// ───────────────────────────────────────────────────────────
 const CAT_EMOJIS_ALL = [
   '🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳',
   '🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦','🍅','🧅','🧄','🥔',
@@ -754,215 +751,129 @@ const CAT_EMOJIS_ALL = [
   '🥜','🌰','🍋','🍊','🍎','🍇','🍓','🍒','🍌','🍉','🥝','🍈','🍐','🥭',
 ];
 
-function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose }) {
-  const { useState: uS } = React;
-  const [editingEmoji, setEditingEmoji] = uS(null); // catId whose emoji picker is open
-  const [addMode, setAddMode] = uS(false);
-  const [newName, setNewName] = uS('');
-  const [newEmoji, setNewEmoji] = uS('🍽️');
-
-  const confirmAdd = () => {
-    const n = newName.trim();
-    if (!n) return;
-    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji: newEmoji });
-    setNewName(''); setNewEmoji('🍽️'); setAddMode(false);
-  };
-
-  return (
-    <div onClick={onClose} style={{
-      position: 'absolute', inset: 0, zIndex: 55,
-      background: 'var(--overlay)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'flex-end',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--surface)',
-        borderRadius: '28px 28px 0 0',
-        padding: '24px 22px 40px',
-        boxShadow: 'var(--e3)',
-        maxHeight: '80vh', overflowY: 'auto',
-        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--t-heading)', fontWeight: 700, fontFamily: 'var(--font-display)' }}>ניהול קטגוריות</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 'var(--t-title)', color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
-        </div>
-
-        {/* Existing categories */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-          {categories.map(cat => (
-            <div key={cat.id} style={{ position: 'relative' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
-                background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: '12px 14px',
-                boxShadow: 'var(--e1)',
-              }}>
-                {/* Emoji button — opens picker */}
-                <button onClick={() => setEditingEmoji(editingEmoji === cat.id ? null : cat.id)}
-                  style={{
-                    width: 44, height: 44, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                    background: editingEmoji === cat.id ? 'var(--ink)' : 'var(--surface-sunken)',
-                    fontSize: 'var(--t-title)', display: 'grid', placeItems: 'center',
-                    flexShrink: 0, transition: 'all .15s',
-                  }}>{cat.emoji}</button>
-                <span style={{ flex: 1, fontSize: 'var(--t-body)', fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{cat.label}</span>
-                <button onClick={() => onDelete(cat.id)}
-                  style={{
-                    width: 32, height: 32, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                    background: 'var(--danger-soft)', color: 'var(--danger)',
-                    display: 'grid', placeItems: 'center', flexShrink: 0,
-                  }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                  </svg>
-                </button>
-              </div>
-              {/* Inline emoji picker */}
-              {editingEmoji === cat.id && (
-                <div style={{
-                  marginTop: 8, background: 'var(--surface-raised)', borderRadius: 'var(--r-md)', padding: 12,
-                  boxShadow: 'var(--e2)',
-                  display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse',
-                }}>
-                  {CAT_EMOJIS_ALL.map(e => (
-                    <button key={e} onClick={() => { onEdit(cat.id, { emoji: e }); setEditingEmoji(null); }}
-                      style={{
-                        width: 40, height: 40, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-title)',
-                        cursor: 'pointer', background: e === cat.emoji ? 'var(--ink)' : 'var(--surface-sunken)',
-                        transition: 'all .12s',
-                      }}>{e}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add new */}
-        {!addMode ? (
-          <button onClick={() => setAddMode(true)} style={{
-            width: '100%', border: '1.5px dashed var(--line-strong)', borderRadius: 'var(--r-md)',
-            padding: '12px 0', cursor: 'pointer', background: 'transparent',
-            fontFamily: 'inherit', fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink-soft)',
-          }}>+ קטגוריה חדשה</button>
-        ) : (
-          <div style={{ background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: 16 }}>
-            <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse', marginBottom: 14 }}>
-              {CAT_EMOJIS_ALL.slice(0, 24).map(e => (
-                <button key={e} onClick={() => setNewEmoji(e)} style={{
-                  width: 38, height: 38, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-heading)',
-                  cursor: 'pointer', background: newEmoji === e ? 'var(--ink)' : 'var(--surface-sunken)',
-                  transition: 'all .12s',
-                }}>{e}</button>
-              ))}
-            </div>
-            <input value={newName} onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && confirmAdd()}
-              placeholder="שם הקטגוריה" autoFocus
-              style={{
-                width: '100%', border: 'none', borderRadius: 'var(--r-sm)', padding: '10px 14px',
-                fontSize: 'var(--t-body)', background: 'var(--surface-sunken)', color: 'var(--ink)',
-                fontFamily: 'inherit', outline: 'none', textAlign: 'right',
-                marginBottom: 10, boxSizing: 'border-box',
-              }}/>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={confirmAdd} disabled={!newName.trim()} style={{
-                flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '11px 0', cursor: 'pointer',
-                background: newName.trim() ? 'var(--ink)' : 'var(--line)',
-                color: newName.trim() ? 'var(--bg)' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
-              }}>הוסיפי</button>
-              <button onClick={() => setAddMode(false)} style={{
-                flex: 1, border: 'none', borderRadius: 'var(--r-sm)', padding: '11px 0', cursor: 'pointer',
-                background: 'var(--surface-sunken)', color: 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
-              }}>ביטול</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ───────────────────────────────────────────────────────────
-// AddCategorySheet — bottom sheet for creating a new category
+// CategoryEditSheet — one editor, used both to add a category
+// and to change an existing one. There used to be two sheets that
+// did nearly the same thing, and neither of them could rename.
 // ───────────────────────────────────────────────────────────
-const CAT_EMOJIS = ['🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳','🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦'];
-
-function AddCategorySheet({ onAdd, onCancel }) {
+function CategoryEditSheet({ category, onSave, onCancel }) {
   const { useState: uS } = React;
-  const [name, setName] = uS('');
-  const [emoji, setEmoji] = uS('🍽️');
+  const editing = !!category;
+  const [name, setName] = uS(category ? category.label : '');
+  const [emoji, setEmoji] = uS(category ? (category.emoji || '🍽️') : '🍽️');
 
   const confirm = () => {
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji });
+    onSave(editing
+      ? { ...category, label: n, emoji }
+      : { id: `cat_${Date.now().toString(36)}`, label: n, emoji });
   };
 
   return (
-    <div onClick={onCancel} style={{
-      position: 'absolute', inset: 0, zIndex: 55,
-      background: 'var(--overlay)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'flex-end',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--surface)',
-        borderRadius: '28px 28px 0 0',
-        padding: '24px 22px 40px',
-        boxShadow: 'var(--e3)',
-        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--t-heading)', fontWeight: 700, fontFamily: 'var(--font-display)' }}>קטגוריה חדשה</h2>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 'var(--t-title)', color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flexDirection: 'row-reverse' }}>
-            {CAT_EMOJIS.map(e => (
-              <button key={e} onClick={() => setEmoji(e)} style={{
-                width: 42, height: 42, border: 'none', borderRadius: 'var(--r-sm)', fontSize: 'var(--t-title)',
-                cursor: 'pointer',
-                background: emoji === e ? 'var(--ink)' : 'var(--surface-sunken)',
-                boxShadow: emoji === e ? 'var(--e1)' : 'none',
-                transition: 'all .15s',
+    <Sheet title={editing ? 'עריכת קטגוריה' : 'קטגוריה חדשה'} onClose={onCancel}
+      footer={
+        <>
+          <Button tone="quiet" onClick={onCancel} style={{ flex: 1 }}>ביטול</Button>
+          <Button tone="primary" onClick={confirm} disabled={!name.trim()} style={{ flex: 2 }}>
+            {editing ? 'שמירה' : 'הוספה'}
+          </Button>
+        </>
+      }>
+      <div style={{ display: 'grid', gap: 18, paddingBottom: 8 }}>
+        <NField label="שם הקטגוריה" value={name} onChange={setName}
+          placeholder="לדוגמה: נשנושים, ממרחים…"/>
+        <div>
+          <div style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)',
+                        marginBottom: 8, paddingInlineStart: 6 }}>סמל</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+            {CAT_EMOJIS_ALL.map(e => (
+              <button key={e} type="button" onClick={() => setEmoji(e)} style={{
+                height: 46, border: 'none', borderRadius: 'var(--r-md)', fontSize: 'var(--t-title)',
+                cursor: 'pointer', padding: 0,
+                background: emoji === e ? 'var(--ink)' : 'var(--field-fill)',
+                transition: 'background var(--dur-fast)',
               }}>{e}</button>
             ))}
           </div>
         </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 8, letterSpacing: '.08em' }}>שם הקטגוריה</div>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && confirm()}
-            placeholder="לדוגמה: נשנושים, ממרחים…"
-            autoFocus
-            style={{
-              width: '100%', border: 'none', borderRadius: 'var(--r-md)',
-              padding: '12px 16px', fontSize: 'var(--t-body)',
-              background: 'var(--surface-sunken)', color: 'var(--ink)',
-              fontFamily: 'inherit', outline: 'none', textAlign: 'right',
-            }}
-          />
-        </div>
-
-        <button onClick={confirm} disabled={!name.trim()} style={{
-          width: '100%', border: 'none', borderRadius: 'var(--r-md)',
-          padding: '14px 0',
-          background: name.trim() ? 'var(--ink)' : 'var(--line)',
-          color: name.trim() ? 'var(--bg)' : 'var(--ink-soft)',
-          fontSize: 'var(--t-body)', fontWeight: 700,
-          fontFamily: 'var(--font-display)', cursor: name.trim() ? 'pointer' : 'default',
-          transition: 'all .2s',
-        }}>הוסיפי קטגוריה</button>
       </div>
-      <style>{`@keyframes catSlide{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
-    </div>
+    </Sheet>
   );
 }
+
+// ───────────────────────────────────────────────────────────
+// ManageCategoriesSheet — the list of them, each editable.
+// ───────────────────────────────────────────────────────────
+function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose }) {
+  const { useState: uS } = React;
+  const [editing, setEditing] = uS(null);   // a category, or 'new'
+  const [confirmNode, confirm] = useConfirm();
+
+  if (editing) {
+    return (
+      <CategoryEditSheet
+        category={editing === 'new' ? null : editing}
+        onCancel={() => setEditing(null)}
+        onSave={(cat) => {
+          if (editing === 'new') onAdd(cat);
+          else onEdit(cat.id, { label: cat.label, emoji: cat.emoji });
+          setEditing(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Sheet title="ניהול קטגוריות" onClose={onClose}
+      footer={<Button tone="primary" full onClick={() => setEditing('new')}>
+        <IconPlus size={18} strokeWidth={2.4}/> קטגוריה חדשה
+      </Button>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+        {categories.length === 0 && (
+          <div style={{ ...TYPE.small, color: 'var(--ink-faint)', textAlign: 'center', padding: '24px 0' }}>
+            עוד אין קטגוריות.
+          </div>
+        )}
+        {categories.map(cat => (
+          <div key={cat.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
+            background: 'var(--field-fill)', borderRadius: 'var(--r-md)', padding: 8,
+          }}>
+            <span style={{
+              width: 44, height: 44, borderRadius: 'var(--r-sm)', flexShrink: 0,
+              background: 'var(--surface-raised)', fontSize: 'var(--t-title)',
+              display: 'grid', placeItems: 'center',
+            }}>{cat.emoji}</span>
+            <span style={{
+              flex: 1, minWidth: 0, ...TYPE.body, fontWeight: 700, color: 'var(--ink)',
+              textAlign: 'start', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{cat.label}</span>
+            <button type="button" onClick={() => setEditing(cat)} aria-label={`עריכת ${cat.label}`}
+              style={{
+                width: 40, height: 40, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                background: 'var(--surface-raised)', color: 'var(--ink)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}><IconEdit size={16} strokeWidth={2.2}/></button>
+            <button type="button" aria-label={`מחיקת ${cat.label}`}
+              onClick={() => confirm({
+                title: 'למחוק את הקטגוריה?',
+                body: <>הקטגוריה <strong style={{ color: 'var(--ink)' }}>{cat.emoji} {cat.label}</strong> תימחק.<br/>המתכונים עצמם יישארו.</>,
+                onConfirm: () => onDelete(cat.id),
+              })}
+              style={{
+                width: 40, height: 40, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                background: 'var(--danger-soft)', color: 'var(--danger)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}><IconTrash size={16} strokeWidth={2.2}/></button>
+          </div>
+        ))}
+      </div>
+      {confirmNode}
+    </Sheet>
+  );
+}
+
 
 // ───────────────────────────────────────────────────────────
 // RecipeCardSkeleton — placeholder while recipes load
@@ -1086,6 +997,33 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 // ConfirmDialog — reusable destructive-action confirmation
 // emoji: big icon shown in badge, confirmColor: button color
 // ───────────────────────────────────────────────────────────
+// useConfirm — nothing is deleted, and nothing that was typed is thrown
+// away, without being asked first. Returns the dialog to render and the
+// function that raises it, so a component can guard several actions
+// without wiring up a dialog and a piece of state for each one.
+//
+//   const [confirmNode, confirm] = useConfirm();
+//   ...
+//   <button onClick={() => confirm({ title: 'למחוק?', onConfirm: doIt })}/>
+//   {confirmNode}
+function useConfirm() {
+  const [req, setReq] = useState(null);
+  const ask = (opts) => setReq(opts || {});
+  const node = req ? (
+    <ConfirmDialog
+      emoji={req.emoji}
+      title={req.title}
+      body={req.body}
+      confirmLabel={req.confirmLabel || 'מחיקה'}
+      cancelLabel={req.cancelLabel || 'ביטול'}
+      danger={req.danger !== false}
+      onCancel={() => setReq(null)}
+      onConfirm={() => { const go = req.onConfirm; setReq(null); if (go) go(); }}
+    />
+  ) : null;
+  return [node, ask];
+}
+
 function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', danger = true, onConfirm, onCancel }) {
   // The colour comes from the tone, never from a caller passing a hex — a
   // hardcoded white on a state colour is unreadable the moment the theme
@@ -1134,6 +1072,6 @@ Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   FoodImage, RecipePhoto, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
-  BottomNav, CategoryDropdown, AddCategorySheet, ManageCategoriesSheet,
+  BottomNav, CategoryDropdown, CategoryEditSheet, ManageCategoriesSheet, useConfirm,
   ConfirmDialog,
 });
