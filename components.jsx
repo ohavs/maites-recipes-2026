@@ -748,11 +748,12 @@ function DropRow({ emoji, label, count, checked, onClick }) {
 // and to change an existing one. There used to be two sheets that
 // did nearly the same thing, and neither of them could rename.
 // ───────────────────────────────────────────────────────────
-function CategoryEditSheet({ category, onSave, onCancel }) {
+function CategoryEditSheet({ category, onSave, onCancel, onDelete }) {
   const { useState: uS } = React;
   const editing = !!category;
   const [name, setName] = uS(category ? category.label : '');
   const [emoji, setEmoji] = uS(category ? (category.emoji || '🍽️') : '🍽️');
+  const [confirmNode, askDelete] = useConfirm();
 
   const confirm = () => {
     const n = name.trim();
@@ -781,6 +782,100 @@ function CategoryEditSheet({ category, onSave, onCancel }) {
           {/* the same grid the ingredient symbol uses */}
           <EmojiGrid value={emoji} onPick={setEmoji} onType={setEmoji}/>
         </div>
+        {/* Deleting lives here, so every screen that can edit a category
+            can also remove one without needing its own button for it. */}
+        {editing && onDelete && (
+          <Button tone="quiet" full
+            style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+            onClick={() => askDelete({
+              title: 'למחוק את הקטגוריה?',
+              body: <>הקטגוריה <strong style={{ color: 'var(--ink)' }}>{category.emoji} {category.label}</strong> תימחק.<br/>המתכונים עצמם יישארו.</>,
+              onConfirm: () => onDelete(category.id),
+            })}>
+            <IconTrash size={17} strokeWidth={2.2}/> מחיקת הקטגוריה
+          </Button>
+        )}
+        {confirmNode}
+      </div>
+    </Sheet>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// CategoryPickSheet — choosing a recipe's category, and looking
+// after the categories while you are there.
+//
+// This used to be a plain list with one "new category" button at the
+// bottom: the one screen in the app that shows you every category, and
+// the only one you could not fix a name or a symbol from. Now each row
+// carries an edit button, the same one the management screen has, and it
+// opens the same editor — which is also where deleting lives.
+// ───────────────────────────────────────────────────────────
+function CategoryPickSheet({ value, categories, onPick, onClose, onAdd, onEdit, onDelete }) {
+  const { useState: uS } = React;
+  const [editing, setEditing] = uS(null);   // a category, or 'new'
+
+  if (editing) {
+    return (
+      <CategoryEditSheet
+        category={editing === 'new' ? null : editing}
+        onCancel={() => setEditing(null)}
+        onDelete={onDelete ? (id) => { onDelete(id); setEditing(null); } : undefined}
+        onSave={(cat) => {
+          if (editing === 'new') { onAdd(cat); onPick(cat.id); }
+          else onEdit(cat.id, { label: cat.label, emoji: cat.emoji });
+          setEditing(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Sheet title="קטגוריה" onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+        {categories.map(c => {
+          const on = c.id === value;
+          return (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" onClick={() => { onPick(c.id); onClose(); }}
+                style={{
+                  flex: 1, minWidth: 0,
+                  border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+                }}>
+                <Radio on={on}/>
+                <span style={{ fontSize: 22, lineHeight: 1 }} aria-hidden="true">{c.emoji}</span>
+                <span style={{
+                  ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{c.label}</span>
+              </button>
+              {onEdit && (
+                <button type="button" onClick={() => setEditing(c)} aria-label={`עריכת ${c.label}`}
+                  style={{
+                    width: 44, height: 44, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                    background: 'var(--field-fill)', color: 'var(--ink-soft)',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}><IconEdit size={16} strokeWidth={2.2}/></button>
+              )}
+            </div>
+          );
+        })}
+        {onAdd && (
+          <button type="button" onClick={() => setEditing('new')}
+            style={{
+              border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+              padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
+              borderTop: categories.length ? '1px solid var(--line)' : 'none',
+              marginTop: categories.length ? 6 : 0,
+            }}>
+            <IconPlus size={22} strokeWidth={2.2}/>
+            <span style={{ ...TYPE.body, fontWeight: 700 }}>קטגוריה חדשה</span>
+          </button>
+        )}
       </div>
     </Sheet>
   );
@@ -1056,6 +1151,6 @@ Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
   FoodImage, RecipePhoto, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
-  BottomNav, CategoryDropdown, CategoryEditSheet, ManageCategoriesSheet, useConfirm,
+  BottomNav, CategoryDropdown, CategoryEditSheet, CategoryPickSheet, ManageCategoriesSheet, useConfirm,
   ConfirmDialog,
 });

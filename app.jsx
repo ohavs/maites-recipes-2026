@@ -531,7 +531,9 @@ function App() {
               onCancel={() => { formDirtyRef.current = false; navTo('home'); }}
               categories={categories}
               cuisines={cuisines}
-              onAddCategory={() => setShowAddCategory(true)}
+              onAddCategory={addCategory}
+              onEditCategory={editCategory}
+              onDeleteCategory={deleteCategory}
               onDirtyChange={(d) => { formDirtyRef.current = d; }}
               step={formStep}
               onStepChange={setFormStep}
@@ -580,7 +582,9 @@ function App() {
               onCancel={() => setEditingRecipeId(null)}
               categories={categories}
               cuisines={cuisines}
-              onAddCategory={() => setShowAddCategory(true)}
+              onAddCategory={addCategory}
+              onEditCategory={editCategory}
+              onDeleteCategory={deleteCategory}
               step={formStep}
               onStepChange={setFormStep}
             />
@@ -648,8 +652,6 @@ function App() {
           <AccountPanel
             user={currentUser}
             recipes={recipes}
-            categoryCount={categories.filter(c => c.id !== 'all').length}
-            onManageCategories={() => { setShowAccountPanel(false); setShowManageCategories(true); }}
             onExport={handleExport}
             onImport={handleImport}
             onSignIn={auth_signInWithGoogle}

@@ -614,7 +614,7 @@ const FORM_STEPS = [
   { id: 'how',   label: 'הכנה',    hint: 'זמנים, שלבים, הערות' },
 ];
 
-function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, cuisines = [], onAddCategory, onDirtyChange, step: stepProp, onStepChange }) {
+function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, cuisines = [], onAddCategory, onEditCategory, onDeleteCategory, onDirtyChange, step: stepProp, onStepChange }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -872,23 +872,14 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
       </div>
 
       {catSheet && (
-        <NPickSheet
-          title="קטגוריה"
+        <CategoryPickSheet
           value={category}
-          options={cats.map(c => ({ value: c.id, label: c.label, emoji: c.emoji }))}
+          categories={cats}
           onPick={setCategory}
           onClose={() => setCatSheet(false)}
-          footer={onAddCategory ? (
-            <button type="button" onClick={() => { setCatSheet(false); onAddCategory(); }}
-              style={{
-                border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
-                padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
-              }}>
-              <IconPlus size={22} strokeWidth={2.2}/>
-              <span style={{ ...TYPE.body, fontWeight: 700 }}>קטגוריה חדשה</span>
-            </button>
-          ) : null}
+          onAdd={onAddCategory}
+          onEdit={onEditCategory}
+          onDelete={onDeleteCategory}
         />
       )}
 
@@ -947,14 +938,16 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onCancel, categories, cuisines, onAddCategory, onDirtyChange, step, onStepChange }) {
+function AddRecipeScreen({ onAdd, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, onDirtyChange, step, onStepChange }) {
   return <RecipeFormScreen mode="add" onSave={onAdd} onCancel={onCancel} categories={categories} cuisines={cuisines}
-    onAddCategory={onAddCategory} onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
+    onAddCategory={onAddCategory} onEditCategory={onEditCategory} onDeleteCategory={onDeleteCategory}
+    onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAddCategory, step, onStepChange }) {
+function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, step, onStepChange }) {
   return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel}
-    categories={categories} cuisines={cuisines} onAddCategory={onAddCategory} step={step} onStepChange={onStepChange}/>;
+    categories={categories} cuisines={cuisines} onAddCategory={onAddCategory}
+    onEditCategory={onEditCategory} onDeleteCategory={onDeleteCategory} step={step} onStepChange={onStepChange}/>;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -1485,7 +1478,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare, onManageCategories, categoryCount = 0 }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
   const [confirmNode, confirm] = useConfirm();
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
@@ -1559,19 +1552,6 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   ]}
                 />
               </div>
-
-              {/* Categories were only reachable from a menu inside a
-                  dropdown on the home screen, which is not where anyone
-                  looks for a setting. */}
-              {onManageCategories && (
-                <div style={{ marginTop: 4 }}>
-                  <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>המתכונים</SectionLabel>
-                  <NRow label="קטגוריות"
-                    value={`${categoryCount} קטגוריות`}
-                    leading={<span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden="true">🗂️</span>}
-                    onClick={onManageCategories}/>
-                </div>
-              )}
 
               {typeof UpdateBlock === 'function' && <UpdateBlock/>}
 
