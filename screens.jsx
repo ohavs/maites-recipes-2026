@@ -764,8 +764,9 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
             <NRow label="קטגוריה"
               value={currentCat ? `${currentCat.emoji || ''} ${currentCat.label}`.trim() : '—'}
               onClick={() => setCatSheet(true)}/>
-            <NTagField label="סוג מטבח" value={cuisine} onChange={setCuisine}
-              options={cuisines}
+            <NPickOrType label="סוג מטבח" value={cuisine} onChange={setCuisine}
+              options={cuisines} emoji="🍽"
+              sheetTitle="סוג מטבח"
               placeholder="איטלקית, אסייתית…" hint="לא חובה"/>
             <PhotoStage
               recipeId={recipeId}
@@ -1036,42 +1037,12 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
   );
 }
 
-const FOOD_EMOJIS = [
-  '🍽️','🥕','🍎','🥚','🥛','🧀','🍞','🌾','🧂','🌿','🍯','🥩','🐟','🫙','🍾','🍫','☕','🥜',
-  '🍅','🥦','🧅','🧄','🥔','🌽','🥒','🍄','🥬','🫑','🥑','🍋','🍊','🍇','🍓','🫐','🍒','🍌',
-  '🥞','🧇','🥓','🍗','🍖','🦐','🦞','🍣','🍱','🌮','🍕','🫓','🍜','🍝','🥘','🍲','🌯','🥗',
-  '🧆','🍳','🥘','🫕','🍛','🧁','🍰','🎂','🍮','🍭','🍬','🍩','🍪','🌰','🍺','🍷','🍵','🧋',
-];
 
 function EmojiPickerPopover({ current, onPick, onClose }) {
-  const [custom, setCustom] = uS('');
   return (
     <Sheet title="סמל המצרך" onClose={onClose}>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8,
-        padding: '4px 4px 16px',
-      }}>
-        {FOOD_EMOJIS.map(e => (
-          <button key={e} type="button" onClick={() => onPick(e)}
-            style={{
-              height: 56, border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer', fontSize: 26,
-              background: e === current ? 'var(--field-fill-focus)' : 'var(--field-fill)',
-              boxShadow: e === current ? '0 0 0 2px var(--brand-strong) inset' : 'none',
-              transition: 'box-shadow var(--dur-fast)',
-            }}>{e}</button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', paddingBottom: 8 }}>
-        <NField label="סמל משלך" value={custom} onChange={setCustom} style={{ flex: 1 }}/>
-        <button type="button" onClick={() => { if (custom.trim()) onPick(custom.trim()); }}
-          disabled={!custom.trim()}
-          style={{
-            border: 'none', borderRadius: 'var(--r-md)', padding: '0 22px', minHeight: 'var(--field-h)',
-            cursor: custom.trim() ? 'pointer' : 'default', flexShrink: 0,
-            background: custom.trim() ? 'var(--ink)' : 'var(--field-fill)',
-            color: custom.trim() ? 'var(--bg)' : 'var(--ink-faint)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
-          }}>בחירה</button>
+      <div style={{ paddingBottom: 8 }}>
+        <EmojiGrid value={current} onPick={onPick}/>
       </div>
     </Sheet>
   );
@@ -1510,7 +1481,7 @@ function LoginScreen({ onSignIn }) {
 // ───────────────────────────────────────────────────────────
 // AccountPanel — bottom sheet: profile, sharing, sign out
 // ───────────────────────────────────────────────────────────
-function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare }) {
+function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSignOut, onSignIn, onUploadLocal, localCount = 0, themeMode = 'auto', onThemeChange, onExport, onImport, onInvite, onCancelInvite, onRevokeShare, onManageCategories, categoryCount = 0 }) {
   const [confirmNode, confirm] = useConfirm();
   const [inviteEmail, setInviteEmail] = uS('');
   const [inviting, setInviting] = uS(false);
@@ -1584,6 +1555,19 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   ]}
                 />
               </div>
+
+              {/* Categories were only reachable from a menu inside a
+                  dropdown on the home screen, which is not where anyone
+                  looks for a setting. */}
+              {onManageCategories && (
+                <div style={{ marginTop: 4 }}>
+                  <SectionLabel style={{ marginBottom: 8, paddingInlineStart: 2 }}>המתכונים</SectionLabel>
+                  <NRow label="קטגוריות"
+                    value={`${categoryCount} קטגוריות`}
+                    leading={<span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden="true">🗂️</span>}
+                    onClick={onManageCategories}/>
+                </div>
+              )}
 
               {typeof UpdateBlock === 'function' && <UpdateBlock/>}
 

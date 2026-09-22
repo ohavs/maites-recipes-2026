@@ -742,14 +742,6 @@ function DropRow({ emoji, label, count, checked, onClick }) {
   );
 }
 
-const CAT_EMOJIS_ALL = [
-  '🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳',
-  '🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦','🍅','🧅','🧄','🥔',
-  '🌽','🥒','🍄','🌿','🥬','🫑','🍠','🥚','🍳','🥛','🧈','🥓','🍗','🍖',
-  '🦐','🍣','🍱','🌯','🫔','🥫','🍛','🫕','🌭','🍔','🍟','🫓','🍿','🍦',
-  '🎂','🍮','🍭','🍫','🍩','🍯','🧂','🫙','🍷','☕','🍵','🧋','🥤','🍺',
-  '🥜','🌰','🍋','🍊','🍎','🍇','🍓','🍒','🍌','🍉','🥝','🍈','🍐','🥭',
-];
 
 // ───────────────────────────────────────────────────────────
 // CategoryEditSheet — one editor, used both to add a category
@@ -786,16 +778,8 @@ function CategoryEditSheet({ category, onSave, onCancel }) {
         <div>
           <div style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)',
                         marginBottom: 8, paddingInlineStart: 6 }}>סמל</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
-            {CAT_EMOJIS_ALL.map(e => (
-              <button key={e} type="button" onClick={() => setEmoji(e)} style={{
-                height: 46, border: 'none', borderRadius: 'var(--r-md)', fontSize: 'var(--t-title)',
-                cursor: 'pointer', padding: 0,
-                background: emoji === e ? 'var(--ink)' : 'var(--field-fill)',
-                transition: 'background var(--dur-fast)',
-              }}>{e}</button>
-            ))}
-          </div>
+          {/* the same grid the ingredient symbol uses */}
+          <EmojiGrid value={emoji} onPick={setEmoji}/>
         </div>
       </div>
     </Sheet>

@@ -216,50 +216,149 @@ function QtyPicker({ value, onPick, onClose }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// NTagField — one free-text value, but offered as tags.
+// NPickOrType — a row you tap, like the category one, but the list it
+// opens is built from what you have already written, and the last entry
+// lets you write something new.
 //
-// Kinds of cooking repeat across a recipe book, and typing "איטלקית"
-// for the ninth time is worse than tapping it. So the ones already in
-// use are listed underneath, most used first; tapping one sets the
-// value, tapping it again clears it. Anything new can still be typed,
-// and becomes a tag for next time by virtue of being saved.
+// This was a scatter of pills under a text field, which is the pattern
+// the whole form was rebuilt to get away from: it grew as the book grew,
+// it pushed everything below it down the screen, and it looked nothing
+// like the category row sitting directly above it asking the same kind
+// of question.
 // ───────────────────────────────────────────────────────────
-function NTagField({ label, value, onChange, options = [], placeholder, hint, max = 12 }) {
+function NPickOrType({ label, value, onChange, options = [], placeholder, hint, emoji, sheetTitle }) {
+  const [open, setOpen] = fS(false);
+  const [typing, setTyping] = fS(false);
+  const [draft, setDraft] = fS('');
   const cur = String(value || '').trim();
-  // Whatever is chosen stays visible even if it is not in the list yet.
-  const tags = [];
-  if (cur && !options.includes(cur)) tags.push(cur);
-  for (const o of options) { if (tags.length >= max) break; tags.push(o); }
+
+  const commit = () => {
+    const v = draft.trim();
+    onChange(v);
+    setDraft(''); setTyping(false); setOpen(false);
+  };
 
   return (
-    <div>
-      <NField label={label} value={value} onChange={onChange}
-        placeholder={placeholder} hint={tags.length ? undefined : hint}/>
-      {tags.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10, paddingInlineStart: 2 }}>
-          {tags.map(t => {
-            const on = cur === t;
-            return (
-              <button key={t} type="button"
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => {
-                  onChange(on ? '' : t);
-                  if (typeof hapticTap === 'function') hapticTap();
-                }}
-                style={{
-                  border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  borderRadius: 'var(--r-pill)', padding: '0 14px', minHeight: 38,
-                  ...TYPE.small, fontWeight: 700,
-                  background: on ? 'var(--ink)' : 'var(--field-fill)',
-                  color: on ? 'var(--bg)' : 'var(--ink)',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  transition: 'background var(--dur-fast), color var(--dur-fast)',
-                }}>
-                {t}
-                {on && <IconClose size={12} strokeWidth={3}/>}
-              </button>
-            );
-          })}
+    <>
+      <NRow label={label}
+        value={cur || '—'}
+        hint={hint}
+        leading={emoji && cur ? <span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden="true">{emoji}</span> : null}
+        onClick={() => { setDraft(cur); setTyping(options.length === 0); setOpen(true); }}/>
+
+      {open && (
+        <Sheet title={sheetTitle || label} onClose={() => { setOpen(false); setTyping(false); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+            {!typing && (
+              <>
+                {options.map(opt => {
+                  const on = opt === cur;
+                  return (
+                    <button key={opt} type="button"
+                      onClick={() => { onChange(on ? '' : opt); setOpen(false); }}
+                      style={{
+                        border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
+                        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+                      }}>
+                      <Radio on={on}/>
+                      <span style={{ ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1 }}>
+                        {opt}
+                      </span>
+                    </button>
+                  );
+                })}
+                {cur && (
+                  <button type="button" onClick={() => { onChange(''); setOpen(false); }}
+                    style={{
+                      border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+                      padding: '16px 18px', minHeight: 60, color: 'var(--ink-soft)',
+                    }}>
+                    <IconClose size={20} strokeWidth={2.2}/>
+                    <span style={{ ...TYPE.body, fontWeight: 700 }}>ללא</span>
+                  </button>
+                )}
+                <button type="button" onClick={() => setTyping(true)}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+                    display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+                    padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
+                    borderTop: options.length ? '1px solid var(--line)' : 'none',
+                  }}>
+                  <IconPlus size={22} strokeWidth={2.2}/>
+                  <span style={{ ...TYPE.body, fontWeight: 700 }}>משהו אחר</span>
+                </button>
+              </>
+            )}
+
+            {typing && (
+              <div style={{ display: 'grid', gap: 12, padding: '4px 2px' }}>
+                <NField label={label} value={draft} onChange={setDraft}
+                  placeholder={placeholder} autoFocus/>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {options.length > 0 && (
+                    <Button tone="quiet" onClick={() => setTyping(false)} style={{ flex: 1 }}>חזרה</Button>
+                  )}
+                  <Button tone="primary" onClick={commit} style={{ flex: 2 }}>אישור</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// EmojiGrid — picking a symbol, wherever a symbol is picked.
+//
+// There used to be two of these that did not match: the one for an
+// ingredient had 56px cells, a ring around the chosen one and a box for
+// typing a symbol of your own; the one for a category had 46px cells, a
+// filled chosen one, a different list of emoji and no box at all. Same
+// job, two answers. This is the one answer.
+// ───────────────────────────────────────────────────────────
+const EMOJI_CHOICES = [
+  '🍽️','🥘','🍲','🥣','🍛','🫕','🍜','🍝','🍕','🌮','🌯','🥙','🧆','🥗',
+  '🍳','🥞','🧇','🥐','🍞','🫓','🥨','🥯','🧀','🥚','🥓','🍗','🍖','🥩',
+  '🐟','🍣','🍱','🦐','🦞','🍤','🍔','🍟','🌭','🥪','🥫','🍚','🍙','🍘',
+  '🥕','🍅','🧅','🧄','🥔','🌽','🥒','🍄','🥬','🫑','🥦','🥑','🫛','🌶️',
+  '🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥝',
+  '🍰','🎂','🧁','🍮','🍪','🍩','🍫','🍭','🍬','🍯','🌰','🥜','🍧','🍦',
+  '☕','🍵','🧋','🥤','🧃','🍷','🍺','🥛','🫙','🧂','🌿','🫒','🧈','🥄',
+];
+
+function EmojiGrid({ value, onPick, custom = true, label = 'סמל משלך' }) {
+  const [own, setOwn] = fS('');
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+        {EMOJI_CHOICES.map(e => (
+          <button key={e} type="button" onClick={() => onPick(e)}
+            aria-label={e} aria-pressed={e === value}
+            style={{
+              height: 52, border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer',
+              fontSize: 25, padding: 0,
+              background: e === value ? 'var(--ink)' : 'var(--field-fill)',
+              transition: 'background var(--dur-fast)',
+            }}>{e}</button>
+        ))}
+      </div>
+      {custom && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+          <NField label={label} value={own} onChange={setOwn} style={{ flex: 1 }}/>
+          <button type="button" onClick={() => { if (own.trim()) { onPick(own.trim()); setOwn(''); } }}
+            disabled={!own.trim()}
+            style={{
+              border: 'none', borderRadius: 'var(--r-md)', padding: '0 22px', minHeight: 'var(--field-h)',
+              cursor: own.trim() ? 'pointer' : 'default', flexShrink: 0,
+              background: own.trim() ? 'var(--ink)' : 'var(--field-fill)',
+              color: own.trim() ? 'var(--bg)' : 'var(--ink-faint)',
+              fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
+            }}>בחירה</button>
         </div>
       )}
     </div>
@@ -613,7 +712,7 @@ function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
 }
 
 Object.assign(window, {
-  NField, NTagField, NRow, NPickSheet, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPicker, splitQty, joinQty,
+  NField, NRow, NPickSheet, NPickOrType, EmojiGrid, EMOJI_CHOICES, NStepper, NCards, NSwatches, NTabs, NAppBar, Radio, FormPager, QtyPicker, splitQty, joinQty,
 });
 
 // ───────────────────────────────────────────────────────────

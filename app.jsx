@@ -648,6 +648,8 @@ function App() {
           <AccountPanel
             user={currentUser}
             recipes={recipes}
+            categoryCount={categories.filter(c => c.id !== 'all').length}
+            onManageCategories={() => { setShowAccountPanel(false); setShowManageCategories(true); }}
             onExport={handleExport}
             onImport={handleImport}
             onSignIn={auth_signInWithGoogle}
