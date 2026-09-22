@@ -335,7 +335,7 @@ function EmojiGrid({ value, onPick, custom = true, label = 'סמל משלך' }) 
   const [own, setOwn] = fS('');
   return (
     <div style={{ display: 'grid', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+      <div data-emoji-grid="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
         {EMOJI_CHOICES.map(e => (
           <button key={e} type="button" onClick={() => onPick(e)}
             aria-label={e} aria-pressed={e === value}
