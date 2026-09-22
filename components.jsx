@@ -779,7 +779,7 @@ function CategoryEditSheet({ category, onSave, onCancel }) {
           <div style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)',
                         marginBottom: 8, paddingInlineStart: 6 }}>סמל</div>
           {/* the same grid the ingredient symbol uses */}
-          <EmojiGrid value={emoji} onPick={setEmoji}/>
+          <EmojiGrid value={emoji} onPick={setEmoji} onType={setEmoji}/>
         </div>
       </div>
     </Sheet>

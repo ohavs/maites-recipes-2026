@@ -988,6 +988,7 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
           {pickerOpen && (
             <EmojiPickerPopover current={emoji}
               onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
+              onType={(e) => onChange('icon', e)}
               onClose={() => setPickerOpen(false)}
             />
           )}
@@ -1038,11 +1039,14 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
 }
 
 
-function EmojiPickerPopover({ current, onPick, onClose }) {
+function EmojiPickerPopover({ current, onPick, onType, onClose }) {
   return (
     <Sheet title="סמל המצרך" onClose={onClose}>
       <div style={{ paddingBottom: 8 }}>
-        <EmojiGrid value={current} onPick={onPick}/>
+        <EmojiGrid value={current}
+          onPick={onPick}
+          onType={onType}
+          onConfirm={onClose} confirmLabel="סיום"/>
       </div>
     </Sheet>
   );

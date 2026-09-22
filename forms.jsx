@@ -331,13 +331,16 @@ const EMOJI_CHOICES = [
   '☕','🍵','🧋','🥤','🧃','🍷','🍺','🥛','🫙','🧂','🌿','🫒','🧈','🥄',
 ];
 
-function EmojiGrid({ value, onPick, custom = true, label = 'סמל משלך' }) {
+function EmojiGrid({ value, onPick, onType, custom = true, onConfirm, confirmLabel = 'בחירה' }) {
   const [own, setOwn] = fS('');
+  const inGrid = EMOJI_CHOICES.includes(value);
+
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div data-emoji-grid="true" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
         {EMOJI_CHOICES.map(e => (
-          <button key={e} type="button" onClick={() => onPick(e)}
+          <button key={e} type="button"
+            onClick={() => { setOwn(''); onPick(e); }}
             aria-label={e} aria-pressed={e === value}
             style={{
               height: 52, border: 'none', borderRadius: 'var(--r-md)', cursor: 'pointer',
@@ -347,18 +350,35 @@ function EmojiGrid({ value, onPick, custom = true, label = 'סמל משלך' }) 
             }}>{e}</button>
         ))}
       </div>
+
       {custom && (
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-          <NField label={label} value={own} onChange={setOwn} style={{ flex: 1 }}/>
-          <button type="button" onClick={() => { if (own.trim()) { onPick(own.trim()); setOwn(''); } }}
-            disabled={!own.trim()}
-            style={{
-              border: 'none', borderRadius: 'var(--r-md)', padding: '0 22px', minHeight: 'var(--field-h)',
-              cursor: own.trim() ? 'pointer' : 'default', flexShrink: 0,
-              background: own.trim() ? 'var(--ink)' : 'var(--field-fill)',
-              color: own.trim() ? 'var(--bg)' : 'var(--ink-faint)',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
-            }}>בחירה</button>
+          {/* What is actually going to be saved. Without this, typing a
+              symbol of your own gave no sign that it had taken — none of
+              the cells light up for it. */}
+          <div aria-hidden="true" style={{
+            width: 'var(--field-h)', height: 'var(--field-h)', flexShrink: 0,
+            borderRadius: 'var(--r-md)', background: 'var(--field-fill)',
+            display: 'grid', placeItems: 'center', fontSize: 26,
+            boxShadow: inGrid ? 'none' : '0 0 0 2px var(--brand-strong) inset',
+          }}>{value || '—'}</div>
+          <NField label="סמל משלך" value={own} style={{ flex: 1, minWidth: 0 }}
+            // Typed straight through, so there is never a draft sitting
+            // here that saving would quietly drop.
+            onChange={(v) => {
+              setOwn(v);
+              const t = v.trim();
+              if (t && onType) onType(t);
+            }}/>
+          {onConfirm && (
+            <button type="button" onClick={onConfirm}
+              style={{
+                border: 'none', borderRadius: 'var(--r-md)', padding: '0 20px', minHeight: 'var(--field-h)',
+                cursor: 'pointer', flexShrink: 0,
+                background: 'var(--ink)', color: 'var(--bg)',
+                fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
+              }}>{confirmLabel}</button>
+          )}
         </div>
       )}
     </div>
