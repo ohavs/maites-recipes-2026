@@ -608,7 +608,7 @@ function BottomNav({ active, onChange, onAdd, accent = 'var(--brand-strong)' }) 
 // `selected` is an array of category ids; an empty array means
 // "all". Opens a styled popover with checkable rows.
 // ───────────────────────────────────────────────────────────
-function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsProp, counts = {}, onAdd, onManage, total = 0 }) {
+function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsProp, counts = {}, onAdd, onManage, onEditCategory, total = 0 }) {
   const cats = (catsProp || CATEGORIES).filter(c => c.id !== 'all');
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -674,7 +674,8 @@ function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsPr
             <div style={{ height: 1, background: 'var(--surface-sunken)', margin: '5px 12px' }}/>
             {cats.map(c => (
               <DropRow key={c.id} emoji={c.emoji} label={c.label} count={counts[c.id] || 0}
-                checked={selected.includes(c.id)} onClick={() => onToggle(c.id)}/>
+                checked={selected.includes(c.id)} onClick={() => onToggle(c.id)}
+                onEdit={onEditCategory ? () => { setOpen(false); onEditCategory(c); } : undefined}/>
             ))}
             {cats.length === 0 && (
               <div style={{ padding: '14px 14px', fontSize: 'var(--t-small)', color: 'var(--ink-soft)', textAlign: 'center' }}>
@@ -714,8 +715,8 @@ const ddFootBtn = {
   boxShadow: 'var(--e1)',
 };
 
-function DropRow({ emoji, label, count, checked, onClick }) {
-  return (
+function DropRow({ emoji, label, count, checked, onClick, onEdit }) {
+  const row = (
     <button role="option" aria-selected={checked} onClick={onClick}
       style={{
         width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
@@ -739,6 +740,22 @@ function DropRow({ emoji, label, count, checked, onClick }) {
         color: 'var(--bg)', transition: 'background var(--dur-fast)',
       }}>{checked && <IconCheck size={12} strokeWidth={3}/>}</span>
     </button>
+  );
+
+  if (!onEdit) return row;
+  // A pencil on every row, so a name can be fixed where it is read rather
+  // than by going looking for the screen that owns it.
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>{row}</div>
+      <button type="button" aria-label={`עריכת ${label}`}
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        style={{
+          width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+          background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+        }}><IconEdit size={14} strokeWidth={2.2}/></button>
+    </div>
   );
 }
 

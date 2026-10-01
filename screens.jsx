@@ -33,7 +33,7 @@ function HomeAction({ children, label, onClick, on = false, pressed, disabled = 
   );
 }
 
-function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLoad, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
+function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLoad, onOpen, onToggleFav, density, onDensity, variant, category, onCategory, onClearCategory, sharedKey, categories, onAddCategory, onManageCategories, onEditCategory, currentUser, onOpenAccount, sharedWithMe, onOpenShared, onRemoveShared }) {
   const [q, setQ] = uS('');
   const [searching, setSearching] = uS(false);
   // Favourites used to be a screen of its own, which meant leaving home to
@@ -114,6 +114,7 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
           total={recipes.length}
           onAdd={onAddCategory}
           onManage={onManageCategories}
+          onEditCategory={onEditCategory}
         />
         <HomeAction label="חיפוש" on={searching || !!q} onClick={() => setSearching(s => !s)}>
           <IconSearch size={19} strokeWidth={2.2}/>
@@ -614,7 +615,7 @@ const FORM_STEPS = [
   { id: 'how',   label: 'הכנה',    hint: 'זמנים, שלבים, הערות' },
 ];
 
-function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, cuisines = [], onAddCategory, onEditCategory, onDeleteCategory, onDirtyChange, step: stepProp, onStepChange }) {
+function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories: catsProp, cuisines = [], onAddCategory, onEditCategory, onDeleteCategory, onRenameCuisine, onCountCuisine, onDirtyChange, step: stepProp, onStepChange }) {
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
@@ -767,6 +768,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
             <NPickOrType label="סוג מטבח" value={cuisine} onChange={setCuisine}
               options={cuisines} emoji="🍽"
               sheetTitle="סוג מטבח"
+              onRenameOption={onRenameCuisine}
+              onCountOption={onCountCuisine}
               placeholder="איטלקית, אסייתית…" hint="לא חובה"/>
             <PhotoStage
               recipeId={recipeId}
@@ -938,16 +941,18 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
 }
 
 // Backwards-compat aliases so old call sites work:
-function AddRecipeScreen({ onAdd, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, onDirtyChange, step, onStepChange }) {
+function AddRecipeScreen({ onAdd, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, onRenameCuisine, onCountCuisine, onDirtyChange, step, onStepChange }) {
   return <RecipeFormScreen mode="add" onSave={onAdd} onCancel={onCancel} categories={categories} cuisines={cuisines}
     onAddCategory={onAddCategory} onEditCategory={onEditCategory} onDeleteCategory={onDeleteCategory}
+    onRenameCuisine={onRenameCuisine} onCountCuisine={onCountCuisine}
     onDirtyChange={onDirtyChange} step={step} onStepChange={onStepChange}/>;
 }
 
-function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, step, onStepChange }) {
+function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAddCategory, onEditCategory, onDeleteCategory, onRenameCuisine, onCountCuisine, step, onStepChange }) {
   return <RecipeFormScreen mode="edit" existing={recipe} onSave={onSave} onCancel={onCancel}
     categories={categories} cuisines={cuisines} onAddCategory={onAddCategory}
-    onEditCategory={onEditCategory} onDeleteCategory={onDeleteCategory} step={step} onStepChange={onStepChange}/>;
+    onEditCategory={onEditCategory} onDeleteCategory={onDeleteCategory}
+    onRenameCuisine={onRenameCuisine} onCountCuisine={onCountCuisine} step={step} onStepChange={onStepChange}/>;
 }
 
 // ───────────────────────────────────────────────────────────

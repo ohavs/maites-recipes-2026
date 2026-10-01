@@ -226,17 +226,62 @@ function QtyPicker({ value, onPick, onClose }) {
 // like the category row sitting directly above it asking the same kind
 // of question.
 // ───────────────────────────────────────────────────────────
-function NPickOrType({ label, value, onChange, options = [], placeholder, hint, emoji, sheetTitle }) {
+function NPickOrType({ label, value, onChange, options = [], placeholder, hint, emoji, sheetTitle,
+                       onRenameOption, onCountOption }) {
   const [open, setOpen] = fS(false);
   const [typing, setTyping] = fS(false);
+  const [editing, setEditing] = fS(null);   // the option being renamed
   const [draft, setDraft] = fS('');
+  const [confirmNode, askConfirm] = useConfirm();
   const cur = String(value || '').trim();
 
-  const commit = () => {
-    const v = draft.trim();
-    onChange(v);
-    setDraft(''); setTyping(false); setOpen(false);
+  const close = () => { setOpen(false); setTyping(false); setEditing(null); };
+
+  const commitNew = () => {
+    onChange(draft.trim());
+    setDraft(''); close();
   };
+
+  const commitRename = () => {
+    const to = draft.trim();
+    const from = editing;
+    if (!to || to === from) { setEditing(null); return; }
+    const n = onCountOption ? onCountOption(from) : 0;
+    askConfirm({
+      emoji: '✏️',
+      title: 'לשנות בכל המתכונים?',
+      body: <>
+        <strong style={{ color: 'var(--ink)' }}>{from}</strong> ישתנה ל<strong style={{ color: 'var(--ink)' }}>{to}</strong>
+        {n > 0 && <><br/>זה יעדכן {n} {n === 1 ? 'מתכון' : 'מתכונים'}.</>}
+      </>,
+      confirmLabel: 'שינוי',
+      danger: false,
+      onConfirm: () => {
+        if (onRenameOption) onRenameOption(from, to);
+        if (cur === from) onChange(to);
+        setEditing(null); setDraft('');
+      },
+    });
+  };
+
+  const removeOption = (opt) => {
+    const n = onCountOption ? onCountOption(opt) : 0;
+    askConfirm({
+      title: 'למחוק את סוג המטבח?',
+      body: <>
+        <strong style={{ color: 'var(--ink)' }}>{opt}</strong> יוסר
+        {n > 0 ? <> מ־{n} {n === 1 ? 'מתכון' : 'מתכונים'}.</> : '.'}
+        <br/>המתכונים עצמם יישארו.
+      </>,
+      onConfirm: () => {
+        if (onRenameOption) onRenameOption(opt, '');
+        if (cur === opt) onChange('');
+        setEditing(null);
+      },
+    });
+  };
+
+  const canManage = !!onRenameOption;
 
   return (
     <>
@@ -247,30 +292,60 @@ function NPickOrType({ label, value, onChange, options = [], placeholder, hint, 
         onClick={() => { setDraft(cur); setTyping(options.length === 0); setOpen(true); }}/>
 
       {open && (
-        <Sheet title={sheetTitle || label} onClose={() => { setOpen(false); setTyping(false); }}>
+        <Sheet title={sheetTitle || label} onClose={close}>
           <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
-            {!typing && (
+
+            {/* renaming one of them, in place */}
+            {editing !== null && (
+              <div style={{ display: 'grid', gap: 12, padding: '4px 2px' }}>
+                <NField label={`שינוי השם של "${editing}"`} value={draft} onChange={setDraft} autoFocus/>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Button tone="quiet" onClick={() => { setEditing(null); setDraft(''); }} style={{ flex: 1 }}>ביטול</Button>
+                  <Button tone="primary" onClick={commitRename} disabled={!draft.trim()} style={{ flex: 2 }}>שמירה</Button>
+                </div>
+                <Button tone="quiet" full
+                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+                  onClick={() => removeOption(editing)}>
+                  <IconTrash size={17} strokeWidth={2.2}/> מחיקה
+                </Button>
+              </div>
+            )}
+
+            {editing === null && !typing && (
               <>
                 {options.map(opt => {
                   const on = opt === cur;
                   return (
-                    <button key={opt} type="button"
-                      onClick={() => { onChange(on ? '' : opt); setOpen(false); }}
-                      style={{
-                        border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
-                        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
-                      }}>
-                      <Radio on={on}/>
-                      <span style={{ ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1 }}>
-                        {opt}
-                      </span>
-                    </button>
+                    <div key={opt} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button type="button"
+                        onClick={() => { onChange(on ? '' : opt); close(); }}
+                        style={{
+                          flex: 1, minWidth: 0,
+                          border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
+                          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
+                          display: 'flex', alignItems: 'center', gap: 14,
+                          padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+                        }}>
+                        <Radio on={on}/>
+                        <span style={{
+                          ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{opt}</span>
+                      </button>
+                      {canManage && (
+                        <button type="button" aria-label={`עריכת ${opt}`}
+                          onClick={() => { setEditing(opt); setDraft(opt); }}
+                          style={{
+                            width: 44, height: 44, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                            background: 'var(--field-fill)', color: 'var(--ink-soft)',
+                            display: 'grid', placeItems: 'center', flexShrink: 0,
+                          }}><IconEdit size={16} strokeWidth={2.2}/></button>
+                      )}
+                    </div>
                   );
                 })}
                 {cur && (
-                  <button type="button" onClick={() => { onChange(''); setOpen(false); }}
+                  <button type="button" onClick={() => { onChange(''); close(); }}
                     style={{
                       border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
                       display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
@@ -280,12 +355,13 @@ function NPickOrType({ label, value, onChange, options = [], placeholder, hint, 
                     <span style={{ ...TYPE.body, fontWeight: 700 }}>ללא</span>
                   </button>
                 )}
-                <button type="button" onClick={() => setTyping(true)}
+                <button type="button" onClick={() => { setDraft(''); setTyping(true); }}
                   style={{
                     border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
                     padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
                     borderTop: options.length ? '1px solid var(--line)' : 'none',
+                    marginTop: options.length ? 6 : 0,
                   }}>
                   <IconPlus size={22} strokeWidth={2.2}/>
                   <span style={{ ...TYPE.body, fontWeight: 700 }}>משהו אחר</span>
@@ -293,7 +369,7 @@ function NPickOrType({ label, value, onChange, options = [], placeholder, hint, 
               </>
             )}
 
-            {typing && (
+            {editing === null && typing && (
               <div style={{ display: 'grid', gap: 12, padding: '4px 2px' }}>
                 <NField label={label} value={draft} onChange={setDraft}
                   placeholder={placeholder} autoFocus/>
@@ -301,11 +377,12 @@ function NPickOrType({ label, value, onChange, options = [], placeholder, hint, 
                   {options.length > 0 && (
                     <Button tone="quiet" onClick={() => setTyping(false)} style={{ flex: 1 }}>חזרה</Button>
                   )}
-                  <Button tone="primary" onClick={commit} style={{ flex: 2 }}>אישור</Button>
+                  <Button tone="primary" onClick={commitNew} disabled={!draft.trim()} style={{ flex: 2 }}>אישור</Button>
                 </div>
               </div>
             )}
           </div>
+          {confirmNode}
         </Sheet>
       )}
     </>

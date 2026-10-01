@@ -36,6 +36,7 @@ function App() {
   const [pendingNav, setPendingNav] = $S(null);
   const formDirtyRef = $R(false);
   const [showManageCategories, setShowManageCategories] = $S(false);
+  const [editingCategory, setEditingCategory] = $S(null);
   const [currentUser, setCurrentUser] = $S(null);
   const [authLoading, setAuthLoading] = $S(true);
   const [showClaimPrompt, setShowClaimPrompt] = $S(false);
@@ -212,6 +213,21 @@ function App() {
     return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'he'));
   }, [recipes]);
 
+  // Renaming a kind of cooking has to reach every recipe written under the
+  // old name, or the old one simply reappears in the list. Only the
+  // `cuisine` field is touched — nothing else on the recipe is read or
+  // written — and the caller says how many are affected before this runs.
+  const renameCuisine = (from, to) => {
+    const next = String(to || '').trim();
+    const hits = recipes.filter(r => (r.cuisine || '').trim() === from);
+    if (!hits.length) return;
+    setRecipes(rs => rs.map(r => (r.cuisine || '').trim() === from ? { ...r, cuisine: next } : r));
+    hits.forEach(r => persist({ ...r, cuisine: next }));
+  };
+
+  const countCuisine = (name) =>
+    recipes.filter(r => (r.cuisine || '').trim() === String(name || '').trim()).length;
+
   const addCategory = (cat) => {
     const next = [...categories, cat];
     setCategories(next);
@@ -381,6 +397,7 @@ function App() {
   if (showAccountPanel)    layers.push('account');
   if (showManageCategories)layers.push('managecats');
   if (showAddCategory)     layers.push('addcat');
+  if (editingCategory)     layers.push('editcat');
   if (showPrintSheet)      layers.push('printsheet');
   if (deletingRecipeId)    layers.push('delete');
   if (showNavGuard)        layers.push('navguard');
@@ -398,6 +415,7 @@ function App() {
       case 'delete':     setDeletingRecipeId(null); break;
       case 'printsheet': setShowPrintSheet(false); break;
       case 'addcat':     setShowAddCategory(false); break;
+      case 'editcat':    setEditingCategory(null); break;
       case 'managecats': setShowManageCategories(false); break;
       case 'account':    setShowAccountPanel(false); break;
       case 'share':      setSharingRecipe(null); break;
@@ -504,6 +522,7 @@ function App() {
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
               onManageCategories={() => setShowManageCategories(true)}
+              onEditCategory={(cat) => setEditingCategory(cat)}
               currentUser={currentUser}
               onOpenAccount={() => setShowAccountPanel(true)}
               sharedWithMe={sharedWithMe}
@@ -534,6 +553,8 @@ function App() {
               onAddCategory={addCategory}
               onEditCategory={editCategory}
               onDeleteCategory={deleteCategory}
+              onRenameCuisine={renameCuisine}
+              onCountCuisine={countCuisine}
               onDirtyChange={(d) => { formDirtyRef.current = d; }}
               step={formStep}
               onStepChange={setFormStep}
@@ -585,6 +606,8 @@ function App() {
               onAddCategory={addCategory}
               onEditCategory={editCategory}
               onDeleteCategory={deleteCategory}
+              onRenameCuisine={renameCuisine}
+              onCountCuisine={countCuisine}
               step={formStep}
               onStepChange={setFormStep}
             />
@@ -618,6 +641,14 @@ function App() {
           <CategoryEditSheet
             onSave={(cat) => { addCategory(cat); setShowAddCategory(false); }}
             onCancel={() => setShowAddCategory(false)}
+          />
+        )}
+        {editingCategory && (
+          <CategoryEditSheet
+            category={editingCategory}
+            onCancel={() => setEditingCategory(null)}
+            onDelete={(id) => { deleteCategory(id); setEditingCategory(null); }}
+            onSave={(cat) => { editCategory(cat.id, { label: cat.label, emoji: cat.emoji }); setEditingCategory(null); }}
           />
         )}
         {showManageCategories && (
