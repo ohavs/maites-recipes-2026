@@ -90,33 +90,69 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false,
 // all. Cropping them to a common shape ruins half of them: a cut-out cake
 // gets its edges sliced off, a wide pan loses the pan.
 //
-// So nothing is cropped. Every photo is shown whole, centred, at the
+// By default nothing is cropped. Every photo is shown whole, centred, at the
 // largest size that fits — and the space left around it is filled by a
 // blurred, enlarged copy of the photo itself, over the recipe's own
 // colour. A wide photo gets soft bands above and below in its own tones; a
 // tall one gets them at the sides; a cut-out sits on the recipe's colour
 // because a transparent picture has nothing to blur. Every card ends up
 // the same shape and the same weight, and no photo is cut.
+//
+// `fill` asks for the opposite treatment: the photo covers its block edge
+// to edge, cropped to the block's shape rather than letterboxed inside it.
+// It is never stretched — the aspect ratio is kept — and it is never blown
+// up past MAX_UPSCALE, because past that a photo starts showing its own
+// pixels; a picture too small to cover its block keeps the whole-photo
+// treatment above instead.
 // ───────────────────────────────────────────────────────────
-function RecipePhoto({ url, palette, radius = 'var(--r-lg)', alt = '', style, dim = false }) {
+const MAX_UPSCALE = 1.5;
+
+function RecipePhoto({ url, palette, radius = 'var(--r-lg)', alt = '', style, dim = false, fill = false }) {
+  const boxRef = useRef(null);
+  // "Too small to cover this block" is a question about this photo AND this
+  // block — the same picture covers a grid tile and would be stretched thin
+  // across a hero — so it is measured, not guessed from the file.
+  const [tooSmall, setTooSmall] = useState(false);
+  useEffect(() => {
+    setTooSmall(false);
+    if (!fill || !url) return undefined;
+    let alive = true;
+    const probe = new Image();
+    probe.onload = () => {
+      const box = boxRef.current;
+      if (!alive || !box) return;
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h || !probe.naturalWidth || !probe.naturalHeight) return;
+      const scale = Math.max(w / probe.naturalWidth, h / probe.naturalHeight);
+      if (scale > MAX_UPSCALE) setTooSmall(true);
+    };
+    probe.src = url;
+    return () => { alive = false; };
+  }, [url, fill]);
+
   if (!url) return null;
+  const cover = fill && !tooSmall;
   const tint = palette ? palette.bg2 || palette.bg : 'var(--surface-sunken)';
   return (
-    <div style={{
+    <div ref={boxRef} style={{
       position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: radius,
       background: tint, ...style,
     }}>
-      <div aria-hidden="true" style={{
-        position: 'absolute', inset: '-12%',
-        backgroundImage: `url("${url}")`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        filter: 'blur(22px) saturate(1.5)',
-        opacity: .85,
-        transform: 'scale(1.1)',
-      }}/>
+      {/* the blurred bed only has a job when the photo leaves space around it */}
+      {!cover && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: '-12%',
+          backgroundImage: `url("${url}")`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          filter: 'blur(22px) saturate(1.5)',
+          opacity: .85,
+          transform: 'scale(1.1)',
+        }}/>
+      )}
       <img src={url} alt={alt} loading="lazy" style={{
         position: 'absolute', inset: 0, width: '100%', height: '100%',
-        objectFit: 'contain', display: 'block',
+        objectFit: cover ? 'cover' : 'contain', objectPosition: 'center',
+        display: 'block',
       }}/>
       {dim && (
         <div aria-hidden="true" style={{
@@ -294,13 +330,12 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
-  const cardH    = 140;
+  // One shape for every card. The photo is the full height of the card
+  // inside its padding — tall enough to be worth looking at, and filled
+  // edge to edge rather than floated inside blurred bands.
+  const cardH    = 184;
   const padY     = 18;
-  // One shape for every card. The photo is a thumbnail beside the title,
-  // not the card's centrepiece: it used to be 146 across and hang past the
-  // card's edge, and it was a circle on some recipes and a rounded square
-  // on others, so a list of them never lined up.
-  const imgSize  = 104;
+  const imgSize  = cardH - padY * 2;
   const imgRadius= 'var(--r-md)';
   const titleSize= 26;
   const descClamp= 2;
@@ -368,7 +403,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
             position: 'relative', width: imgSize, height: imgSize, flexShrink: 0,
             borderRadius: imgRadius, overflow: 'hidden',
           }} data-shared-img={sharedId}>
-            <RecipePhoto url={photo} palette={p} radius={imgRadius} alt=""/>
+            <RecipePhoto url={photo} palette={p} radius={imgRadius} alt="" fill/>
           </div>}
         </div>
 
@@ -975,8 +1010,8 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
 // RecipeCardSkeleton — placeholder while recipes load
 // ───────────────────────────────────────────────────────────
 function RecipeCardSkeleton() {
-  const cardH   = 168;
-  const imgSize = 104;
+  const cardH   = 184;
+  const imgSize = cardH - 36;
   return (
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
       <div style={{
@@ -1014,7 +1049,9 @@ function RecipeCardSkeleton() {
 // Every tile in the grid is the same size, whether or not the recipe has a
 // photo and whatever shape that photo is — a grid of different-sized cards
 // reads as clutter.
-const GRID_TILE_H = 178;
+// Taller than it is wide, so the photo above the caption gets the larger
+// share of the tile.
+const GRID_TILE_H = 206;
 const GRID_CAPTION_H = 56;
 
 function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
@@ -1051,7 +1088,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
       }}>
         {hasPhoto && (
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            <RecipePhoto url={photo} palette={p} radius={0} alt=""/>
+            <RecipePhoto url={photo} palette={p} radius={0} alt="" fill/>
           </div>
         )}
 
