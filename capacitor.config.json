@@ -1,0 +1,23 @@
+{
+  "appId": "com.maites.recipes",
+  "appName": "Maites",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#fbeef2"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#fbeef2",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "FirebaseAuthentication": {
+      "_comment": "skipNativeAuth belongs on when the app drives Firebase through the JavaScript SDK, which this one does: with it off the plugin signs in on the native layer instead and the JS SDK — the one the whole app watches — never learns about it.",
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

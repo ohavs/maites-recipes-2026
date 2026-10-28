@@ -1,3 +1,83 @@
+# Maites
+
+A Hebrew recipe app: a PWA today, an Android app in progress.
+
+## Running it
+
+The sources at the root are plain files — no install, no watcher. Serve the
+folder and open it:
+
+    python3 -m http.server 8899
+
+In development the browser compiles the `.jsx` files itself (Babel is loaded
+from `vendor/`), so a change is live on reload.
+
+## Building and deploying
+
+What ships is compiled ahead of time, because a 2.4 MB Babel download and a
+compile pause on every cold start is the whole first impression on a phone:
+
+    node build.js            # → dist/
+    node build.js --test     # → dist/, including the smoke-test harness
+
+`dist/` is generated and never committed. Firebase Hosting serves it:
+
+    node build.js
+    firebase deploy --only hosting
+
+The service worker's cache name is a hash of what was built, so every deploy
+invalidates the old cache on its own — there is no version number to remember.
+
+`build.js` reads the list of sources, and their order, out of `index.html`, so
+a new file is added in one place.
+
+## The Android app
+
+The same code. Capacitor puts `dist/` inside a WebView, and `native.jsx` is
+the one place that knows the difference — camera, vibration, system bars,
+the hardware back button and Google sign-in each have a native path and a
+web fallback. Nothing above that file asks which it is running on.
+
+    node build.js && npx cap sync android    # or: npm run sync
+
+The APK is built by `.github/workflows/android.yml`, not locally: the
+Android SDK is a few gigabytes, and a release has to be signed by the same
+key every time or it will not install over the copy already on the phone.
+
+Three ways to start a build, all equivalent:
+
+- create a branch named `release/1.2.3`
+- push a tag `v1.2.3`
+- run the workflow from the Actions page with a version number
+
+The branch is the one an assistant working here can do on its own: pushing
+tags and dispatching workflows both need permissions it does not have,
+while creating a branch is a plain write. The branch deletes itself once
+the build has tagged the commit.
+
+A copy of the workflow lives on `main` as well, because GitHub only
+recognises `create` and `workflow_dispatch` for workflows on the default
+branch. The build itself always runs the file at the ref it was started
+from.
+
+Five repository secrets feed it: `GOOGLE_SERVICES_JSON`,
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
+and `ANDROID_KEY_PASSWORD`. None of them are in this repository, and the
+build stops with a clear message if one is missing.
+
+`vendor/capacitor.js` is Capacitor's own JavaScript, bundled once because
+it ships as ES modules and this project has no bundler. Regenerate it after
+changing `src/capacitor-entry.js`:
+
+    npm run vendor:cap
+
+## The test harness
+
+`__test.html` and `__stub.jsx` run the app against a stubbed backend, for
+screenshots and smoke tests. They are gitignored and never deployed.
+
+---
+
 # CODING AGENTS: READ THIS FIRST
 
 This is a **handoff bundle** from Claude Design (claude.ai/design).

@@ -1,16 +1,12 @@
-// app.jsx — root App, screen routing, tweaks, transitions
+// app.jsx — root App, screen routing, transitions
 
 const { useState: $S, useRef: $R, useEffect: $E, useMemo: $M } = React;
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "density": "comfy",
-  "anim": "normal",
-  "cardVariant": "block",
-  "showHints": true
-}/*EDITMODE-END*/;
+// The card style used to be one of three, switchable from a designer's
+// panel that shipped with the app. There is one now, and it is this one.
+const CARD_VARIANT = 'block';
 
 function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   const [recipes, setRecipes] = $S([]);
   const [recipesLoaded, setRecipesLoaded] = $S(false);
@@ -19,31 +15,52 @@ function App() {
     catch { return CATEGORIES; }
   });
   const [tab, setTab] = $S('home');
-  const [category, setCategory] = $S('all');
+  // Category filter — array of ids; empty means "all"
+  const [catFilter, setCatFilter] = $S([]);
+  const toggleCatFilter = (id) =>
+    setCatFilter(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
   const [showAddCategory, setShowAddCategory] = $S(false);
   const [openRecipeId, setOpenRecipeId] = $S(null);
   const [cookRecipeId, setCookRecipeId] = $S(null);
+  const [cookServings, setCookServings] = $S(0);
   const [editingRecipeId, setEditingRecipeId] = $S(null);
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
   const [density, setDensity] = $S(() => {
-    try { return localStorage.getItem('maites.density') || t.density || 'comfy'; }
-    catch { return t.density || 'comfy'; }
+    // Two layouts: stacked cards, or a grid of tiles. 'compact' was a
+    // third, in between, and anyone still on it lands on the cards.
+    try { return localStorage.getItem('maites.density') === 'grid' ? 'grid' : 'comfy'; }
+    catch { return 'comfy'; }
   });
   const [showNavGuard, setShowNavGuard] = $S(false);
   const [pendingNav, setPendingNav] = $S(null);
   const formDirtyRef = $R(false);
   const [showManageCategories, setShowManageCategories] = $S(false);
+  const [editingCategory, setEditingCategory] = $S(null);
   const [currentUser, setCurrentUser] = $S(null);
   const [authLoading, setAuthLoading] = $S(true);
   const [showClaimPrompt, setShowClaimPrompt] = $S(false);
   const [claiming, setClaiming] = $S(false);
   const [showAccountPanel, setShowAccountPanel] = $S(false);
+  // Which of the recipe form's four passes is showing. It lives here so
+  // the phone's back gesture walks back through them one at a time.
+  const [formStep, setFormStep] = $S(0);
   const [sharesInfo, setSharesInfo] = $S({ asOwner: [], asGuest: [] });
   const [pendingInvites, setPendingInvites] = $S([]);
   const [sharedOwnerUids, setSharedOwnerUids] = $S([]);
   const [sharedWithMe, setSharedWithMe] = $S([]);
   const [sharingRecipe, setSharingRecipe] = $S(null);
+  // Recipe book tab
+  const [bookRecipeId, setBookRecipeId] = $S(null);
+  const [showPrintSheet, setShowPrintSheet] = $S(false);
+  const [printJob, setPrintJob] = $S(null);   // array of recipes being exported
+  const [loadError, setLoadError] = $S(null);
+  const [online, setOnline] = $S(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [syncMeta, setSyncMeta] = $S({ fromCache: false, hasPendingWrites: false });
+  const recipesUnsubRef = $R(null);
+  const [themeMode, setThemeMode] = useTheme();
+  const saveState = useSaveState();
+  const retryLastSave = $R(null);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = $S(null);
@@ -82,12 +99,16 @@ function App() {
   }, []);
 
   const openRecipe     = recipes.find(r => r.id === openRecipeId)     || null;
-  const cookRecipe     = recipes.find(r => r.id === cookRecipeId)     || null;
+  // Steps can be opened from a shared recipe too, which never lives in `recipes`.
+  const cookRecipe     = recipes.find(r => r.id === cookRecipeId)
+                      || sharedWithMe.find(r => r.id === cookRecipeId)
+                      || null;
   const editingRecipe  = recipes.find(r => r.id === editingRecipeId)  || null;
   const deletingRecipe = recipes.find(r => r.id === deletingRecipeId) || null;
 
   const loadUserData = async (user) => {
     setRecipesLoaded(false);
+    setLoadError(null);
     try {
       // Accept any pending share invites for this user
       const accepted = await db_checkAndAcceptInvites(user.uid, user.email);
@@ -106,10 +127,22 @@ function App() {
       // Load recipes shared with me individually
       const shared = await db_getSharedWithMe(user.email);
       setSharedWithMe(shared);
-      // Load recipes (own + shared accounts)
-      const recs = await db_loadRecipes(user.uid, ownerUids);
-      setRecipes(recs || []);
-      setRecipesLoaded(true);
+      // Photos: re-read the store now that we are definitely signed in, in
+      // case the first read happened before the session was known.
+      if (typeof db_refreshImageSlots === 'function') {
+        db_refreshImageSlots().catch(err => reportError('refresh-images', err));
+      }
+      // Live recipes (own + shared accounts). Emits from the local cache
+      // first, so the list is on screen with no connection at all.
+      if (recipesUnsubRef.current) recipesUnsubRef.current();
+      recipesUnsubRef.current = db_watchRecipes(user.uid, ownerUids,
+        (recs, meta) => {
+          setRecipes(recs || []);
+          setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites });
+          setRecipesLoaded(true);
+          setLoadError(null);
+        },
+        (err) => { reportError('watch-recipes', err); setLoadError(err); setRecipesLoaded(true); });
       // Claim prompt (one-time migration)
       const claimedKey = `maites.claimed.${user.uid}`;
       if (!localStorage.getItem(claimedKey)) {
@@ -117,14 +150,29 @@ function App() {
         if (has) setShowClaimPrompt(true);
         else localStorage.setItem(claimedKey, '1');
       }
-    } catch { setRecipesLoaded(true); }
+    } catch (err) {
+      reportError('load-recipes', err);
+      setLoadError(err);
+      setRecipesLoaded(true);
+    }
     db_loadCategories().then(cats => {
       if (cats && cats.length > 0) {
         setCategories(cats);
         try { localStorage.setItem('maites.cats', JSON.stringify(cats)); } catch {}
       }
-    }).catch(() => {});
+    }).catch(() => { /* offline with a cold cache — the localStorage copy stands */ });
   };
+
+  // Connection state — drives the offline banner and the sync copy.
+  $E(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down); };
+  }, []);
+
+  $E(() => () => { if (recipesUnsubRef.current) recipesUnsubRef.current(); }, []);
 
   // Auth state listener
   $E(() => {
@@ -135,30 +183,70 @@ function App() {
     const unsub = auth_onAuthStateChanged(user => {
       setCurrentUser(user);
       setAuthLoading(false);
-      if (user) loadUserData(user);
+      if (user) {
+        loadUserData(user);
+      } else {
+        // No account: the notebook on this device is the whole library.
+        if (recipesUnsubRef.current) { recipesUnsubRef.current(); recipesUnsubRef.current = null; }
+        setRecipes(typeof guestRead === 'function' ? guestRead() : []);
+        setSharedWithMe([]);
+        setSharesInfo({ asOwner: [], asGuest: [] });
+        setPendingInvites([]);
+        setRecipesLoaded(true);
+        setLoadError(null);
+      }
     });
-    return () => unsub();
+    // Never spin forever: with no connection and no stored session the
+    // sign-in screen is the honest answer.
+    const bail = setTimeout(() => setAuthLoading(false), 6000);
+    return () => { clearTimeout(bail); unsub(); };
   }, []);
+
+  // Every kind of cooking already written down, most used first — the
+  // form offers these as tags rather than making you retype them.
+  const cuisines = $M(() => {
+    const counts = {};
+    recipes.forEach(r => {
+      const c = (r.cuisine || '').trim();
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b, 'he'));
+  }, [recipes]);
+
+  // Renaming a kind of cooking has to reach every recipe written under the
+  // old name, or the old one simply reappears in the list. Only the
+  // `cuisine` field is touched — nothing else on the recipe is read or
+  // written — and the caller says how many are affected before this runs.
+  const renameCuisine = (from, to) => {
+    const next = String(to || '').trim();
+    const hits = recipes.filter(r => (r.cuisine || '').trim() === from);
+    if (!hits.length) return;
+    setRecipes(rs => rs.map(r => (r.cuisine || '').trim() === from ? { ...r, cuisine: next } : r));
+    hits.forEach(r => persist({ ...r, cuisine: next }));
+  };
+
+  const countCuisine = (name) =>
+    recipes.filter(r => (r.cuisine || '').trim() === String(name || '').trim()).length;
 
   const addCategory = (cat) => {
     const next = [...categories, cat];
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   const editCategory = (id, updates) => {
     const next = categories.map(c => c.id === id ? { ...c, ...updates } : c);
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   const deleteCategory = (id) => {
     const next = categories.filter(c => c.id !== id);
     setCategories(next);
     try { localStorage.setItem('maites.cats', JSON.stringify(next)); } catch {}
-    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(() => {});
+    if (typeof db_saveCategories !== 'undefined') db_saveCategories(next).catch(err => reportError('save-categories', err));
   };
 
   // Auto-create a category if it doesn't exist yet.
@@ -175,21 +263,34 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      if (changed) persist(changed);
       return updated;
     });
+
+  // One door for every write. With an account it is Firestore; without
+  // one it is the notebook on this device. Nothing else has to know which.
+  const persist = (rec) => {
+    if (!currentUser) {
+      if (!guestSave(rec)) showToast('השמירה על המכשיר נכשלה', 'danger');
+      return;
+    }
+    if (typeof db_saveRecipe !== 'undefined') {
+      retryLastSave.current = () => db_saveRecipe(rec);
+      db_saveRecipe(rec).catch(err => reportError('save-recipe', err));
+    }
+  };
 
   const addRecipe = (rec) => {
     ensureCategoryExists(rec.category, categories, rec._catInfo);
     setRecipes(rs => [rec, ...rs]);
-    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
+    persist(rec);
     setTab('home');
     showToast(`"${rec.title}" נוסף לאוסף 🎉`);
   };
 
   const updateRecipe = (rec) => {
     setRecipes(rs => rs.map(r => r.id === rec.id ? { ...r, ...rec } : r));
-    if (typeof db_saveRecipe !== 'undefined') db_saveRecipe(rec).catch(() => {});
+    persist(rec);
     setEditingRecipeId(null);
     showToast(`עודכן: "${rec.title}"`);
   };
@@ -198,21 +299,24 @@ function App() {
     setRecipes(rs => {
       const updated = rs.map(r => r.id === id ? { ...r, notes } : r);
       const changed = updated.find(r => r.id === id);
-      if (changed && typeof db_saveRecipe !== 'undefined') db_saveRecipe(changed).catch(() => {});
+      if (changed) persist(changed);
       return updated;
     });
 
   const deleteRecipe = (id) => {
     setRecipes(rs => rs.filter(r => r.id !== id));
-    if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(() => {});
+    if (!currentUser) guestDelete(id);
+    else if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
     setOpenRecipeId(null);
     setDeletingRecipeId(null);
     showToast('המתכון נמחק');
   };
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2400);
+  const toastTimer = $R(0);
+  const showToast = (msg, tone = 'neutral') => {
+    clearTimeout(toastTimer.current);
+    setToast({ msg, tone });
+    toastTimer.current = setTimeout(() => setToast(null), tone === 'danger' ? 4000 : 2400);
   };
 
   const handleExport = (kind) => {
@@ -229,7 +333,7 @@ function App() {
     const f = e.target.files?.[0];
     if (!f) return;
     importFromFile(f, (err, recs) => {
-      if (err) { showToast(err.message || 'שגיאה בקריאת הקובץ'); return; }
+      if (err) { reportError('import-file', err); showToast(err.message || 'שגיאה בקריאת הקובץ', 'danger'); return; }
       if (!recs?.length) { showToast('לא נמצאו מתכונים בקובץ'); return; }
 
       // Auto-create categories for incoming recipes (uses current categories state)
@@ -242,7 +346,7 @@ function App() {
         const dupCount = recs.length - newRecs.length;
 
         if (newRecs.length > 0 && typeof db_saveRecipe !== 'undefined') {
-          newRecs.forEach(r => db_saveRecipe(r).catch(() => {}));
+          newRecs.forEach(r => db_saveRecipe(r).catch(err => reportError('import-save', err)));
         }
 
         const msg = newRecs.length === 0
@@ -257,6 +361,11 @@ function App() {
     e.target.value = '';
   };
 
+  const TABS = ['home', 'book', 'add'];
+  const goTab = (id) => {
+    setTab(TABS.includes(id) ? id : 'home');
+    if (id !== 'book') setBookRecipeId(null);
+  };
   const navTo = (id) => {
     if (tab === 'add' && id !== 'add' && formDirtyRef.current) {
       setPendingNav(id);
@@ -264,33 +373,111 @@ function App() {
       return;
     }
     formDirtyRef.current = false;
-    if (id === 'add')            setTab('add');
-    else if (id === 'favorites') setTab('favorites');
-    else                         setTab('home');
+    goTab(id);
   };
   const confirmNavLeave = () => {
     const id = pendingNav;
     setShowNavGuard(false); setPendingNav(null); formDirtyRef.current = false;
-    if (id === 'add') setTab('add');
-    else if (id === 'favorites') setTab('favorites');
-    else setTab('home');
+    goTab(id);
   };
 
-  const openMs = t.anim === 'off' ? 0 : t.anim === 'fast' ? 240 : t.anim === 'slow' ? 600 : 380;
-  const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe);
+  // ── Back-gesture support ─────────────────────────────────
+  // Every overlay / non-home tab is mirrored as a browser history entry, so
+  // the Android back gesture (and the hardware back button) pops one layer
+  // instead of closing the app.
+  const layers = [];
+  if (tab !== 'home')      layers.push('tab');
+  if (openRecipeId)        layers.push('recipe');
+  if (bookRecipeId)        layers.push('bookpage');
+  if (editingRecipeId)     layers.push('edit');
+  const formOpen = tab === 'add' || !!editingRecipeId;
+  if (formOpen) for (let i = 0; i < formStep; i++) layers.push('formstep');
+  if (cookRecipe)          layers.push('cook');
+  if (sharingRecipe)       layers.push('share');
+  if (showAccountPanel)    layers.push('account');
+  if (showManageCategories)layers.push('managecats');
+  if (showAddCategory)     layers.push('addcat');
+  if (editingCategory)     layers.push('editcat');
+  if (showPrintSheet)      layers.push('printsheet');
+  if (deletingRecipeId)    layers.push('delete');
+  if (showNavGuard)        layers.push('navguard');
+
+  const layersRef = $R(layers);
+  layersRef.current = layers;
+  const pushedRef = $R(0);
+  const ignorePopRef = $R(0);
+
+  const closeTopLayer = () => {
+    const ls = layersRef.current;
+    const top = ls[ls.length - 1];
+    switch (top) {
+      case 'navguard':   setShowNavGuard(false); setPendingNav(null); break;
+      case 'delete':     setDeletingRecipeId(null); break;
+      case 'printsheet': setShowPrintSheet(false); break;
+      case 'addcat':     setShowAddCategory(false); break;
+      case 'editcat':    setEditingCategory(null); break;
+      case 'managecats': setShowManageCategories(false); break;
+      case 'account':    setShowAccountPanel(false); break;
+      case 'share':      setSharingRecipe(null); break;
+      case 'cook':       setCookRecipeId(null); break;
+      case 'formstep':   setFormStep(n => Math.max(0, n - 1)); break;
+      case 'edit':       setEditingRecipeId(null); break;
+      case 'bookpage':   setBookRecipeId(null); break;
+      case 'recipe':     setOpenRecipeId(null); break;
+      case 'tab':        navTo('home'); break;
+      default: break;
+    }
+  };
+
+  $E(() => {
+    try { history.replaceState({ maites: 0 }, ''); } catch {}
+    const onPop = () => {
+      // Entries we popped ourselves (when a layer was closed from the UI).
+      if (ignorePopRef.current > 0) { ignorePopRef.current--; return; }
+      if (layersRef.current.length === 0) return;  // at root → let the app close
+      pushedRef.current = Math.max(0, pushedRef.current - 1);
+      closeTopLayer();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const layerKey = layers.join('|');
+  $E(() => {
+    const next = layers.length;
+    const prev = pushedRef.current;
+    if (next > prev) {
+      for (let i = prev; i < next; i++) {
+        try { history.pushState({ maites: i + 1 }, ''); } catch {}
+      }
+      pushedRef.current = next;
+    } else if (next < prev) {
+      const diff = prev - next;
+      pushedRef.current = next;
+      ignorePopRef.current += diff;
+      try { history.go(-diff); } catch { ignorePopRef.current -= diff; }
+    }
+  }, [layerKey]);
+
+  $E(() => { if (!formOpen) setFormStep(0); }, [formOpen]);
+
+  const openMs = 380;
+  // Writing a recipe down takes over the screen: the tab bar would sit on
+  // top of the form's own controls, and leaving mid-sentence by tapping a
+  // tab is not something anyone means to do. You leave with ביטול.
+  const anyOverlay = !!(openRecipe || cookRecipe || editingRecipe || tab === 'add');
 
   const handleClaimRecipes = async () => {
     if (!currentUser) return;
     setClaiming(true);
     try {
       const count = await db_claimUnownedRecipes(currentUser.uid);
-      const recs = await db_loadRecipes(currentUser.uid);
-      setRecipes(recs || []);
       localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
       setShowClaimPrompt(false);
       if (count > 0) showToast(`${count} מתכונים שויכו לחשבון שלך ✓`);
     } catch (e) {
-      showToast('שגיאה בשיוך המתכונים');
+      reportError('claim-recipes', e);
+      showToast('שגיאה בשיוך המתכונים', 'danger');
     } finally {
       setClaiming(false);
     }
@@ -305,19 +492,14 @@ function App() {
       }}>
         <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
           <img src="/maites-logo.png" alt="Maites" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }}/>
-          <div style={{ fontSize: 15 }}>טוענת…</div>
+          <div style={{ fontSize: 'var(--t-body)' }}>טוענת…</div>
         </div>
       </div>
     );
   }
 
-  // Not signed in → show login screen
-  if (!currentUser) {
-    return <LoginScreen onSignIn={auth_signInWithGoogle} />;
-  }
-
   return (
-    <AnimSpeedContext.Provider value={t.anim}>
+    <AnimSpeedContext.Provider value="normal">
       <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
 
         {/* Main tab screens */}
@@ -326,48 +508,59 @@ function App() {
             <HomeScreen
               recipes={recipes}
               recipesLoaded={recipesLoaded}
+              loadError={loadError}
+              onRetryLoad={() => currentUser && loadUserData(currentUser)}
               onOpen={r => setOpenRecipeId(r.id)}
               onToggleFav={toggleFav}
               density={density}
-              onDensity={(d) => { setDensity(d); setTweak('density', d); try { localStorage.setItem('maites.density', d); } catch {} }}
-              variant={t.cardVariant}
-              category={category}
-              onCategory={setCategory}
-              sharedKey={`${t.cardVariant}-${density}`}
+              onDensity={(d) => { setDensity(d); try { localStorage.setItem('maites.density', d); } catch {} }}
+              variant={CARD_VARIANT}
+              category={catFilter}
+              onCategory={toggleCatFilter}
+              onClearCategory={() => setCatFilter([])}
+              sharedKey={density}
               categories={categories}
               onAddCategory={() => setShowAddCategory(true)}
               onManageCategories={() => setShowManageCategories(true)}
+              onEditCategory={(cat) => setEditingCategory(cat)}
               currentUser={currentUser}
               onOpenAccount={() => setShowAccountPanel(true)}
               sharedWithMe={sharedWithMe}
               onOpenShared={r => setOpenRecipeId(r._shareId ? r._shareId + '__shared' : r.id)}
               onRemoveShared={async (shareId) => {
-                await db_removeSharedRecipe(shareId).catch(() => {});
+                await db_removeSharedRecipe(shareId).catch(err => reportError('remove-share', err));
                 setSharedWithMe(s => s.filter(r => r._shareId !== shareId));
               }}
             />
           )}
-          {tab === 'favorites' && (
-            <FavoritesScreen
+          {tab === 'book' && (
+            <BookScreen
               recipes={recipes}
-              onOpen={r => setOpenRecipeId(r.id)}
-              onToggleFav={toggleFav}
-              density={density}
-              variant={t.cardVariant}
-              onNav={navTo}
+              categories={categories}
+              openId={bookRecipeId}
+              onOpenPage={(id) => setBookRecipeId(id)}
+              onClosePage={() => setBookRecipeId(null)}
+              onPrint={(list) => { setShowPrintSheet(false); setPrintJob(list); }}
+              onSelectPrint={() => setShowPrintSheet(true)}
             />
           )}
           {tab === 'add' && (
             <AddRecipeScreen
               onAdd={addRecipe}
-              onExport={handleExport}
-              onImport={handleImport}
+              onCancel={() => { formDirtyRef.current = false; navTo('home'); }}
               categories={categories}
-              onAddCategory={() => setShowAddCategory(true)}
+              cuisines={cuisines}
+              onAddCategory={addCategory}
+              onEditCategory={editCategory}
+              onDeleteCategory={deleteCategory}
+              onRenameCuisine={renameCuisine}
+              onCountCuisine={countCuisine}
               onDirtyChange={(d) => { formDirtyRef.current = d; }}
+              step={formStep}
+              onStepChange={setFormStep}
             />
           )}
-          {!anyOverlay && <BottomNav active={tab} onChange={navTo} />}
+          {!anyOverlay && <BottomNav active={tab} onChange={navTo} onAdd={() => navTo('add')} />}
         </div>
 
         {/* Overlay: recipe detail (own recipe) */}
@@ -376,7 +569,7 @@ function App() {
             recipe={openRecipe}
             onClose={() => setOpenRecipeId(null)}
             onToggleFav={toggleFav}
-            onOpenSteps={(r) => setCookRecipeId(r.id)}
+            onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 1); }}
             onEdit={(r) => setEditingRecipeId(r.id)}
             onDelete={(r) => setDeletingRecipeId(r.id)}
             onUpdateNotes={updateNotes}
@@ -394,7 +587,7 @@ function App() {
               recipe={shared}
               onClose={() => setOpenRecipeId(null)}
               onToggleFav={() => {}}
-              onOpenSteps={(r) => setCookRecipeId(r.id)}
+              onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 1); }}
               readOnly={true}
               openMs={openMs}
             />
@@ -403,20 +596,28 @@ function App() {
 
         {/* Overlay: edit recipe */}
         {editingRecipe && (
-          <div style={{ position: 'absolute', inset: 0, background: '#fbeef2', zIndex: 10 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', zIndex: 24 }}>
             <EditRecipeScreen
               recipe={editingRecipe}
               onSave={updateRecipe}
               onCancel={() => setEditingRecipeId(null)}
               categories={categories}
-              onAddCategory={() => setShowAddCategory(true)}
+              cuisines={cuisines}
+              onAddCategory={addCategory}
+              onEditCategory={editCategory}
+              onDeleteCategory={deleteCategory}
+              onRenameCuisine={renameCuisine}
+              onCountCuisine={countCuisine}
+              step={formStep}
+              onStepChange={setFormStep}
             />
           </div>
         )}
 
         {/* Overlay: cooking steps */}
         {cookRecipe && (
-          <StepsScreen recipe={cookRecipe} onClose={() => setCookRecipeId(null)} />
+          <CookScreen recipe={cookRecipe} servings={cookServings}
+            onClose={() => setCookRecipeId(null)} />
         )}
 
         {/* Overlay: delete confirmation */}
@@ -428,23 +629,26 @@ function App() {
           />
         )}
 
-        {/* Toast */}
-        {toast && (
-          <div style={{
-            position: 'absolute', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(28,22,32,.95)', color: '#fff',
-            padding: '12px 18px', borderRadius: 999,
-            fontSize: 13.5, fontWeight: 600, zIndex: 50,
-            boxShadow: '0 12px 30px rgba(0,0,0,.3)',
-            animation: 'toastIn .3s cubic-bezier(.2,1.3,.4,1)',
-            whiteSpace: 'nowrap', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>{toast}</div>
-        )}
+        {/* Transient message, the save indicator, and the offline notice */}
+        {toast && <Toast message={toast.msg} tone={toast.tone} onDismiss={() => setToast(null)} />}
+        <SaveState
+          state={!online && (syncMeta.hasPendingWrites || saveState.pending) ? 'offline' : saveState.state}
+          pending={saveState.pending}
+          onRetry={() => { if (retryLastSave.current) retryLastSave.current(); }} />
+        {!online && <OfflineBanner pending={syncMeta.hasPendingWrites} />}
 
         {showAddCategory && (
-          <AddCategorySheet
-            onAdd={(cat) => { addCategory(cat); setShowAddCategory(false); }}
+          <CategoryEditSheet
+            onSave={(cat) => { addCategory(cat); setShowAddCategory(false); }}
             onCancel={() => setShowAddCategory(false)}
+          />
+        )}
+        {editingCategory && (
+          <CategoryEditSheet
+            category={editingCategory}
+            onCancel={() => setEditingCategory(null)}
+            onDelete={(id) => { deleteCategory(id); setEditingCategory(null); }}
+            onSave={(cat) => { editCategory(cat.id, { label: cat.label, emoji: cat.emoji }); setEditingCategory(null); }}
           />
         )}
         {showManageCategories && (
@@ -470,7 +674,7 @@ function App() {
                 showToast(count === 1
                   ? `"${selectedRecipes[0].title}" שותף עם ${email} ✓`
                   : `${count} מתכונים שותפו עם ${email} ✓`);
-              } catch { showToast('שגיאה בשיתוף'); }
+              } catch (err) { reportError('share-recipe', err); showToast('שגיאה בשיתוף', 'danger'); }
             }}
             onClose={() => setSharingRecipe(null)}
           />
@@ -479,6 +683,26 @@ function App() {
           <AccountPanel
             user={currentUser}
             recipes={recipes}
+            onExport={handleExport}
+            onImport={handleImport}
+            onSignIn={auth_signInWithGoogle}
+            localCount={typeof guestCount === 'function' ? guestCount() : 0}
+            onUploadLocal={async () => {
+              if (!currentUser) return;
+              try {
+                const res = await guestUpload(currentUser.uid, recipes.map(r => r.id));
+                showToast(res.uploaded
+                  ? `${res.uploaded} מתכונים הועלו לחשבון ✓`
+                  : 'הכול כבר נמצא בחשבון');
+                // The device copy stays until it is safely in the account.
+                if (res.uploaded || res.skipped) guestClear();
+              } catch (err) {
+                reportError('guest-upload', err);
+                showToast('ההעלאה נכשלה — המתכונים עדיין על המכשיר', 'danger');
+              }
+            }}
+            themeMode={themeMode}
+            onThemeChange={setThemeMode}
             sharesInfo={sharesInfo}
             pendingInvites={pendingInvites}
             onClose={() => setShowAccountPanel(false)}
@@ -493,13 +717,13 @@ function App() {
                 const inv = await db_getMyInvites(currentUser.uid);
                 setPendingInvites(inv);
                 showToast(`הזמנה נשלחה ל-${email} ✓`);
-              } catch { showToast('שגיאה בשליחת ההזמנה'); }
+              } catch (err) { reportError('invite', err); showToast('שגיאה בשליחת ההזמנה', 'danger'); }
             }}
             onCancelInvite={async (inviteId) => {
               try {
                 await db_cancelInvite(inviteId);
                 setPendingInvites(p => p.filter(i => i.id !== inviteId));
-              } catch { showToast('שגיאה'); }
+              } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
             }}
             onRevokeShare={async (shareId) => {
               try {
@@ -508,11 +732,21 @@ function App() {
                 setSharesInfo(shares);
                 const ownerUids = shares.asGuest.map(s => s.ownerUid);
                 setSharedOwnerUids(ownerUids);
-                const recs = await db_loadRecipes(currentUser.uid, ownerUids);
-                setRecipes(recs || []);
+                if (recipesUnsubRef.current) recipesUnsubRef.current();
+                recipesUnsubRef.current = db_watchRecipes(currentUser.uid, ownerUids,
+                  (recs, meta) => { setRecipes(recs || []); setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites }); },
+                  (err) => reportError('watch-recipes', err));
                 showToast('השיתוף בוטל');
-              } catch { showToast('שגיאה'); }
+              } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
             }}
+          />
+        )}
+        {showPrintSheet && (
+          <PrintSelectSheet
+            recipes={recipes}
+            categories={categories}
+            onPrint={(list) => { setShowPrintSheet(false); setPrintJob(list); }}
+            onClose={() => setShowPrintSheet(false)}
           />
         )}
         {showNavGuard && (
@@ -545,36 +779,34 @@ function App() {
         {showClaimPrompt && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 70,
-            background: 'rgba(28,22,32,.6)', backdropFilter: 'blur(10px)',
+            background: 'var(--overlay)', backdropFilter: 'blur(10px)',
             display: 'grid', placeItems: 'center', padding: 24,
           }}>
+            {/* Built from the shared primitives like every other dialog:
+                it used to carry its own radii, its own type sizes, a
+                background token that was never defined, and white text on
+                --ink, which is near-white in dark mode. */}
             <div style={{
-              background: 'var(--cream)', borderRadius: 28,
-              padding: '32px 28px', textAlign: 'center', maxWidth: 340,
-              boxShadow: '0 24px 60px rgba(0,0,0,.25)',
+              background: 'var(--surface)', borderRadius: 'var(--r-lg)',
+              padding: '32px 28px', textAlign: 'center', maxWidth: 340, width: '100%',
+              boxShadow: 'var(--e3)',
             }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>🍽️</div>
-              <h2 style={{ margin: '0 0 10px', fontSize: 22, fontFamily: 'var(--font-display)', fontWeight: 800 }}>
+              <h2 style={{ margin: '0 0 10px', ...TYPE.title }}>
                 נמצאו מתכונים!
               </h2>
-              <p style={{ margin: '0 0 24px', fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+              <p style={{ margin: '0 0 24px', ...TYPE.body, color: 'var(--ink-soft)' }}>
                 יש מתכונים שלא משויכים לאף חשבון.
                 האם לשייך אותם לחשבון שלך?
               </p>
-              <button onClick={handleClaimRecipes} disabled={claiming} style={{
-                width: '100%', border: 'none', borderRadius: 16, padding: '14px 0',
-                background: 'var(--ink)', color: '#fff',
-                fontFamily: 'inherit', fontWeight: 700, fontSize: 16, cursor: 'pointer',
-                marginBottom: 10, opacity: claiming ? .7 : 1,
-              }}>{claiming ? 'מעביר…' : 'כן, שייך אליי'}</button>
-              <button onClick={() => {
+              <Button tone="primary" size="lg" full disabled={claiming}
+                onClick={handleClaimRecipes} style={{ marginBottom: 10 }}>
+                {claiming ? 'מעביר…' : 'כן, שייך אליי'}
+              </Button>
+              <Button tone="quiet" full onClick={() => {
                 localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
                 setShowClaimPrompt(false);
-              }} style={{
-                width: '100%', border: 'none', borderRadius: 16, padding: '12px 0',
-                background: 'rgba(0,0,0,.07)', color: 'var(--ink-soft)',
-                fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-              }}>דלג בינתיים</button>
+              }}>דלג בינתיים</Button>
             </div>
           </div>
         )}
@@ -584,36 +816,19 @@ function App() {
         `}</style>
       </div>
 
-      {/* Tweaks panel — position:fixed, floats above the app */}
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="כרטיסים" />
-        <TweakRadio label="גודל"
-          value={density}
-          options={[
-            { value: 'compact', label: 'קומפקטי' },
-            { value: 'comfy',   label: 'נוח' },
-            { value: 'grid',    label: 'גריד' },
-          ]}
-          onChange={v => { setDensity(v); setTweak('density', v); }}/>
-        <TweakSelect label="סגנון"
-          value={t.cardVariant}
-          options={[
-            { value: 'block', label: 'בלוק צבע (TikTok)' },
-            { value: 'soft',  label: 'גרדיאנט רך' },
-            { value: 'bleed', label: 'בלוק פלאט' },
-          ]}
-          onChange={v => setTweak('cardVariant', v)}/>
-        <TweakSection label="אנימציות" />
-        <TweakRadio label="מהירות"
-          value={t.anim}
-          options={[
-            { value: 'slow',   label: 'איטי' },
-            { value: 'normal', label: 'רגיל' },
-            { value: 'fast',   label: 'מהיר' },
-            { value: 'off',    label: 'כבוי' },
-          ]}
-          onChange={v => setTweak('anim', v)}/>
-      </TweaksPanel>
+      {printJob && (
+        <PdfBook
+          recipes={printJob}
+          categories={categories}
+          onDone={() => { setPrintJob(null); showToast('קובץ ה-PDF הורד ✓'); }}
+          onError={(err) => {
+            setPrintJob(null);
+            reportError('pdf-export', err);
+            showToast(navigator.onLine ? 'יצירת ה-PDF נכשלה' : 'צריך חיבור לאינטרנט ליצירת PDF');
+          }}
+        />
+      )}
+
     </AnimSpeedContext.Provider>
   );
 }
@@ -624,11 +839,13 @@ function FirstHint({ onDismiss }) {
       position: 'absolute', inset: 0, zIndex: 30, pointerEvents: 'auto',
       animation: 'hintFade .4s ease',
     }}>
+      {/* Sits above the navigation bar rather than over the first card:
+          a hint that hides the thing it is pointing at is no hint. */}
       <div style={{
-        position: 'absolute', top: 220, left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(28,22,32,.94)', color: '#fff',
-        padding: '12px 16px', borderRadius: 18, fontSize: 13, fontWeight: 600,
-        boxShadow: '0 12px 30px rgba(0,0,0,.35)',
+        position: 'absolute', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+        background: 'var(--ink)', color: 'var(--bg)',
+        padding: '12px 16px', borderRadius: 'var(--r-pill)',
+        fontSize: 'var(--t-small)', fontWeight: 700,
         display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
       }}>
         ✨ הקישו על כרטיס לצפייה במתכון
@@ -646,9 +863,9 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
       animation: 'installSlide .4s cubic-bezier(.2,1.2,.4,1)',
     }}>
       <div style={{
-        background: 'var(--cream)',
-        borderRadius: 28,
-        boxShadow: '0 -4px 40px rgba(64,33,50,.18), 0 20px 60px rgba(64,33,50,.18)',
+        background: 'var(--surface)',
+        borderRadius: 'var(--r-lg)',
+        boxShadow: 'var(--e3)',
         padding: '20px 20px 18px',
         display: 'flex', flexDirection: 'column', gap: 14,
       }}>
@@ -667,7 +884,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
             </div>
           </div>
           <button onClick={onDismiss} style={{
-            background: 'rgba(0,0,0,.06)', border: 'none', borderRadius: 999,
+            background: 'var(--surface-sunken)', border: 'none', borderRadius: 'var(--r-pill)',
             width: 30, height: 30, fontSize: 18, color: 'var(--ink-soft)',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
           }}>×</button>
@@ -675,7 +892,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
 
         {isIOS ? (
           <div style={{
-            background: 'rgba(247,168,184,.15)', borderRadius: 16, padding: '12px 14px',
+            background: 'rgba(247,168,184,.15)', borderRadius: 'var(--r-md)', padding: '12px 14px',
             fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.7, textAlign: 'right',
           }}>
             בספארי: לחצי על <strong>שתף</strong> (□↑) ← <strong>"הוסף למסך הבית"</strong>
@@ -692,7 +909,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
           </button>
         ) : (
           <div style={{
-            background: 'rgba(247,168,184,.15)', borderRadius: 16, padding: '12px 14px',
+            background: 'rgba(247,168,184,.15)', borderRadius: 'var(--r-md)', padding: '12px 14px',
             fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.7, textAlign: 'right',
           }}>
             בכרום: תפריט (⋮) ← <strong>"הוסף למסך הבית"</strong> / <strong>"התקן אפליקציה"</strong>
@@ -704,4 +921,14 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppErrorBoundary>
+    <App/>
+  </AppErrorBoundary>
+);
+// Tells the boot watchdog in index.html that the app is up.
+window.dispatchEvent(new Event('maites-ready'));
+
+// …and, on a phone, takes down the splash screen, colours the system bars
+// and hands the hardware back button to the app's own layer stack.
+if (typeof startNative === 'function') startNative();

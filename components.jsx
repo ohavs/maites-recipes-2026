@@ -8,185 +8,34 @@ const AnimSpeedContext = createContext('normal');
 const SPEED_MULTIPLIER = { slow: 1.7, normal: 1, fast: 0.55, off: 0 };
 function useAnimMs(base) {
   const speed = useContext(AnimSpeedContext);
+  const enabled = useAnimEnabled();
+  if (!enabled) return 0;
   const m = SPEED_MULTIPLIER[speed] ?? 1;
   return Math.round(base * m);
 }
+// The OS "reduce motion" setting wins over the in-app animation speed.
+const prefersReducedMotion = () => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch { return false; }
+};
 function useAnimEnabled() {
-  return useContext(AnimSpeedContext) !== 'off';
-}
-
-// ───────────────────────────────────────────────────────────
-// Tilt wrapper — perspective tilt on pointer move / scroll
-// ───────────────────────────────────────────────────────────
-function Tilt({ children, max = 8, scale = 1.0, style, perspective = 1100, ...rest }) {
-  const ref = useRef(null);
-  const rafRef = useRef(0);
-  const enabled = useAnimEnabled();
-
-  const apply = useCallback((rx, ry, s = 1) => {
-    if (!ref.current) return;
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      if (!ref.current) return;
-      ref.current.style.transform =
-        `perspective(${perspective}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
-    });
-  }, [perspective]);
-
-  const onMove = (e) => {
-    if (!enabled || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width;
-    const py = (e.clientY - r.top) / r.height;
-    apply((0.5 - py) * max, (px - 0.5) * max, scale);
-  };
-  const onLeave = () => apply(0, 0, 1);
-
-  return (
-    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
-      style={{
-        transformStyle: 'preserve-3d',
-        transition: 'transform .4s cubic-bezier(.2,.8,.2,1)',
-        willChange: 'transform',
-        ...style,
-      }} {...rest}>
-      {children}
-    </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// FoodArt — stylized SVG illustration per recipe (default art
-// before user drops a real photo via the slot).
-// ───────────────────────────────────────────────────────────
-function FoodArt({ id, size = 200 }) {
-  const styleBase = { width: size, height: size, display: 'block' };
-  switch (id) {
-    case 'cheesecake': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <defs>
-          <radialGradient id="cc-g" cx="50%" cy="40%" r="70%">
-            <stop offset="0" stopColor="#fffbe9"/><stop offset="1" stopColor="#ffe89d"/>
-          </radialGradient>
-        </defs>
-        <circle cx="100" cy="100" r="86" fill="url(#cc-g)"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#e08c2c" strokeWidth="14"/>
-        {[0,45,90,135,180,225,270,315].map(a => (
-          <line key={a} x1="100" y1="100"
-            x2={100 + 80*Math.cos(a*Math.PI/180)}
-            y2={100 + 80*Math.sin(a*Math.PI/180)}
-            stroke="#fff" strokeWidth="4" opacity="0.85"/>
-        ))}
-        <circle cx="60"  cy="70"  r="6" fill="#fff094" stroke="#e0a83a" strokeWidth="2"/>
-        <circle cx="140" cy="135" r="7" fill="#fff094" stroke="#e0a83a" strokeWidth="2"/>
-        <path d="M70 130 q4 -8 12 -4" stroke="#7bbb4a" strokeWidth="3" fill="none" strokeLinecap="round"/>
-        <path d="M120 60 q6 -4 10 4" stroke="#7bbb4a" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      </svg>
-    );
-    case 'shakshuka': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#c84a26"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#7a2912" strokeWidth="10"/>
-        <ellipse cx="78"  cy="80"  rx="20" ry="16" fill="#fff7d9"/>
-        <ellipse cx="78"  cy="80"  rx="9"  ry="7"  fill="#ffc34a"/>
-        <ellipse cx="130" cy="95"  rx="22" ry="17" fill="#fff7d9"/>
-        <ellipse cx="130" cy="95"  rx="10" ry="8"  fill="#ffc34a"/>
-        <ellipse cx="95"  cy="135" rx="20" ry="15" fill="#fff7d9"/>
-        <ellipse cx="95"  cy="135" rx="9"  ry="7"  fill="#ffc34a"/>
-        <path d="M50 50 q5 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-        <path d="M155 130 q-5 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-      </svg>
-    );
-    case 'macaroons': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#f0e8df"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#a78b6f" strokeWidth="8"/>
-        {[
-          {x:65, y:75, c:'#ff7b6e'},
-          {x:115,y:65, c:'#b6e07a'},
-          {x:140,y:105,c:'#ffd255'},
-          {x:75, y:120,c:'#f7a8b8'},
-          {x:115,y:125,c:'#c9b8e8'},
-        ].map((m, i) => (
-          <g key={i}>
-            <ellipse cx={m.x} cy={m.y-6} rx="22" ry="9" fill={m.c}/>
-            <rect x={m.x-22} y={m.y-6} width="44" height="8" fill="#fff5d8"/>
-            <ellipse cx={m.x} cy={m.y+6} rx="22" ry="9" fill={m.c}/>
-          </g>
-        ))}
-      </svg>
-    );
-    case 'greek-salad': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#f8f4ea"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#7bbb4a" strokeWidth="10"/>
-        <rect x="80" y="85" width="40" height="30" fill="#fff" stroke="#cfc7b3" strokeWidth="2"/>
-        <circle cx="60"  cy="75"  r="11" fill="#e74c3c"/>
-        <circle cx="135" cy="65"  r="10" fill="#e74c3c"/>
-        <circle cx="145" cy="125" r="10" fill="#7bbb4a"/>
-        <circle cx="55"  cy="125" r="9"  fill="#7bbb4a"/>
-        <circle cx="115" cy="140" r="8"  fill="#3a2a4a"/>
-        <circle cx="75"  cy="55"  r="7"  fill="#3a2a4a"/>
-        <path d="M100 50 q4 4 0 10" stroke="#2c8a52" strokeWidth="3" fill="none"/>
-      </svg>
-    );
-    case 'mushroom-pasta': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#fff4e0"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#a07a4a" strokeWidth="10"/>
-        {/* pasta swirls */}
-        <g stroke="#f0c060" strokeWidth="4" fill="none" strokeLinecap="round">
-          <path d="M60 70 q15 20 0 40 q-15 20 0 40"/>
-          <path d="M85 60 q15 22 0 45 q-12 18 0 35"/>
-          <path d="M115 60 q15 20 0 42 q-12 20 0 40"/>
-          <path d="M140 70 q15 22 0 42 q-15 18 0 38"/>
-        </g>
-        {/* mushrooms */}
-        <g>
-          <ellipse cx="72" cy="115" rx="14" ry="8" fill="#8b5a3c"/>
-          <rect x="68" y="115" width="8" height="9" fill="#e8d4b8"/>
-        </g>
-        <g>
-          <ellipse cx="125" cy="100" rx="16" ry="9" fill="#a07252"/>
-          <rect x="121" y="100" width="8" height="11" fill="#e8d4b8"/>
-        </g>
-        <circle cx="100" cy="140" r="4" fill="#2c8a52"/>
-        <circle cx="90" cy="60" r="3" fill="#2c8a52"/>
-      </svg>
-    );
-    case 'cupcakes': return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#3a2a4a"/>
-        <circle cx="100" cy="100" r="86" fill="none" stroke="#1f1530" strokeWidth="8"/>
-        {[
-          {x:65, y:80,  c:'#f7a8b8'},
-          {x:105,y:70,  c:'#c9b8e8'},
-          {x:140,y:90,  c:'#fff094'},
-          {x:75, y:125, c:'#9adfb1'},
-          {x:115,y:130, c:'#ffb494'},
-          {x:145,y:135, c:'#f7a8b8'},
-        ].map((m,i) => (
-          <g key={i}>
-            <ellipse cx={m.x} cy={m.y+10} rx="14" ry="6" fill="#6e4b2a"/>
-            <path d={`M${m.x-12} ${m.y+8} Q${m.x} ${m.y-14} ${m.x+12} ${m.y+8} Z`} fill={m.c}/>
-            <circle cx={m.x-4} cy={m.y-6} r="2" fill="#fff" opacity=".6"/>
-          </g>
-        ))}
-      </svg>
-    );
-    default: return (
-      <svg viewBox="0 0 200 200" style={styleBase}>
-        <circle cx="100" cy="100" r="86" fill="#fff" stroke="#aaa" strokeWidth="6"/>
-      </svg>
-    );
-  }
+  const speed = useContext(AnimSpeedContext);
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const on = () => setReduced(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return speed !== 'off' && !reduced;
 }
 
 // ───────────────────────────────────────────────────────────
 // FoodImage — circular slot the user can drag a real photo into.
 // Falls back to FoodArt SVG when empty.
 // ───────────────────────────────────────────────────────────
-function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }) {
+function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false,
+                    shape = 'circle', radius = 20, fit = 'contain', width, height }) {
   const slotRef = useRef(null);
   useEffect(() => {
     const el = slotRef.current;
@@ -211,22 +60,158 @@ function FoodImage({ recipeId, size = 200, slotIdSuffix = '', readonly = false }
     inject();
     const t = setTimeout(inject, 80);
     return () => clearTimeout(t);
-  }, [readonly]);
+  }, [readonly, shape, fit]);
 
+  const w = width || size, h = height || size;
   return (
     <div style={{
-      position: 'relative', width: size, height: size, flexShrink: 0,
+      position: 'relative', width: w, height: h, flexShrink: 0,
       ...(readonly ? { pointerEvents: 'none', touchAction: 'pan-y' } : {}),
     }}>
       <image-slot ref={slotRef}
         id={`food-${recipeId}${slotIdSuffix}`}
-        shape="circle"
-        fit="contain"
+        shape={shape}
+        radius={radius}
+        fit={fit}
         placeholder=""
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
       ></image-slot>
     </div>
   );
+}
+
+// Returns the stored data-URL for a recipe's main photo, or null.
+// Used by the recipe book / print views, which need a plain <img>.
+// ───────────────────────────────────────────────────────────
+// RecipePhoto — one treatment for every photograph.
+//
+// The pictures are never alike. Some are wide, some tall, some square.
+// Some are photographs with a background, some are cut-outs on nothing at
+// all. Cropping them to a common shape ruins half of them: a cut-out cake
+// gets its edges sliced off, a wide pan loses the pan.
+//
+// By default nothing is cropped. Every photo is shown whole, centred, at the
+// largest size that fits — and the space left around it is filled by a
+// blurred, enlarged copy of the photo itself, over the recipe's own
+// colour. A wide photo gets soft bands above and below in its own tones; a
+// tall one gets them at the sides; a cut-out sits on the recipe's colour
+// because a transparent picture has nothing to blur. Every card ends up
+// the same shape and the same weight, and no photo is cut.
+//
+// `fill` asks for the opposite treatment: the photo covers its block edge
+// to edge, cropped to the block's shape rather than letterboxed inside it.
+// It is never stretched — the aspect ratio is kept — and it is never blown
+// up past MAX_UPSCALE, because past that a photo starts showing its own
+// pixels; a picture too small to cover its block keeps the whole-photo
+// treatment above instead.
+// ───────────────────────────────────────────────────────────
+const MAX_UPSCALE = 1.5;
+
+function RecipePhoto({ url, palette, radius = 'var(--r-lg)', alt = '', style, dim = false, fill = false }) {
+  const boxRef = useRef(null);
+  // "Too small to cover this block" is a question about this photo AND this
+  // block — the same picture covers a grid tile and would be stretched thin
+  // across a hero — so it is measured, not guessed from the file.
+  const [tooSmall, setTooSmall] = useState(false);
+  useEffect(() => {
+    setTooSmall(false);
+    if (!fill || !url) return undefined;
+    let alive = true;
+    const probe = new Image();
+    probe.onload = () => {
+      const box = boxRef.current;
+      if (!alive || !box) return;
+      const w = box.clientWidth, h = box.clientHeight;
+      if (!w || !h || !probe.naturalWidth || !probe.naturalHeight) return;
+      const scale = Math.max(w / probe.naturalWidth, h / probe.naturalHeight);
+      if (scale > MAX_UPSCALE) setTooSmall(true);
+    };
+    probe.src = url;
+    return () => { alive = false; };
+  }, [url, fill]);
+
+  if (!url) return null;
+  const cover = fill && !tooSmall;
+  const tint = palette ? palette.bg2 || palette.bg : 'var(--surface-sunken)';
+  return (
+    <div ref={boxRef} style={{
+      position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: radius,
+      background: tint, ...style,
+    }}>
+      {/* the blurred bed only has a job when the photo leaves space around it */}
+      {!cover && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: '-12%',
+          backgroundImage: `url("${url}")`,
+          backgroundSize: 'cover', backgroundPosition: 'center',
+          filter: 'blur(22px) saturate(1.5)',
+          opacity: .85,
+          transform: 'scale(1.1)',
+        }}/>
+      )}
+      <img src={url} alt={alt} loading="lazy" style={{
+        position: 'absolute', inset: 0, width: '100%', height: '100%',
+        objectFit: cover ? 'cover' : 'contain', objectPosition: 'center',
+        display: 'block',
+      }}/>
+      {dim && (
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.35) 100%)',
+        }}/>
+      )}
+    </div>
+  );
+}
+
+function getRecipePhoto(recipe, slot) {
+  if (!recipe || !window.__getImageSlot) return null;
+  const s = slot || recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main';
+  const d = window.__getImageSlot(`food-${recipe.id}-${s}`);
+  return d && d.u ? d.u : null;
+}
+
+// Live view of a recipe's photo. The store hydrates asynchronously, so this
+// subscribes to it rather than guessing when it has arrived — a card that
+// hides itself when there is no photo must never be the reason the store
+// was never read.
+function useRecipePhoto(recipe, slot) {
+  const [url, setUrl] = useState(() => getRecipePhoto(recipe, slot));
+  useEffect(() => {
+    let alive = true;
+    const read = () => { if (alive) setUrl(getRecipePhoto(recipe, slot)); };
+    if (window.__loadImageSlots) window.__loadImageSlots().then(read).catch(read);
+    read();
+    if (window.__onImageSlots) return () => { alive = false; };
+    // Older image-slot.js without a subscription: fall back to a few probes.
+    const ts = [200, 700, 1800, 4000].map(ms => setTimeout(read, ms));
+    return () => { alive = false; ts.forEach(clearTimeout); };
+  }, [recipe && recipe.id, slot]);
+
+  useEffect(() => {
+    if (!window.__onImageSlots) return undefined;
+    return window.__onImageSlots(() => setUrl(getRecipePhoto(recipe, slot)));
+  }, [recipe && recipe.id, slot]);
+
+  return url;
+}
+
+// True once the photo store has been read, so a view can tell "no photo"
+// apart from "not loaded yet".
+function useImageSlotsReady() {
+  const [ready, setReady] = useState(() => !!(window.__imageSlotsReady && window.__imageSlotsReady()));
+  useEffect(() => {
+    if (ready) return undefined;
+    let alive = true;
+    const check = () => {
+      if (alive && window.__imageSlotsReady && window.__imageSlotsReady()) setReady(true);
+    };
+    if (window.__loadImageSlots) window.__loadImageSlots().then(check).catch(check);
+    const off = window.__onImageSlots ? window.__onImageSlots(check) : null;
+    const t = setTimeout(check, 2500);
+    return () => { alive = false; clearTimeout(t); if (off) off(); };
+  }, [ready]);
+  return ready;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -327,7 +312,7 @@ function useScrollPhysics(ref, opts = {}) {
 // Three variants via Tweaks: 'block' (TikTok), 'bleed', 'soft'.
 // ───────────────────────────────────────────────────────────
 function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block', onToggleFav, sharedId }) {
-  const p = PALETTES[recipe.palette];
+  const p = paletteOf(recipe.palette);
   const enterMs = useAnimMs(550);
   const enabled = useAnimEnabled();
   const cardRef = useRef(null);
@@ -339,16 +324,22 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   // Scroll-based physics (tilt / scale / fade / velocity-skew + tap bounce)
   useScrollPhysics(cardRef);
 
-  // Card geometry — comfy: tall, the circle pokes out hard.
-  // compact: thinner row, smaller protruding circle.
-  const isCompact = density === 'compact';
-  const cardH    = isCompact ? 116 : 168;
-  const imgSize  = isCompact ? 132 : 198;
-  const titleSize= isCompact ? 19 : 26;
-  const descClamp= isCompact ? 1 : 2;
-  const padX     = isCompact ? 20 : 24;
-  // How far the circle reaches past the card's start edge (RTL = right).
-  const imgPokeOut = Math.round(imgSize * (isCompact ? 0.18 : 0.22));
+  // With no photo at all the card is its colour and its words — but only
+  // once the photo store has actually been read, so a slow load can never
+  // masquerade as "this recipe has no picture".
+  const photo = useRecipePhoto(recipe);
+  const slotsReady = useImageSlotsReady();
+  const hasPhoto = !!photo || !slotsReady;
+  // The photo IS the card: it covers the whole rectangle, and the title
+  // sits on top of it over a scrim dark enough to read against any
+  // picture. A card without a photo keeps the recipe's own colour and its
+  // own ink, so the list stays one list.
+  const cardH    = 208;
+  const titleSize= 26;
+  const descClamp= 2;
+  const padX     = 24;
+  const padY     = 20;
+  const ink      = hasPhoto ? '#fff' : p.ink;
 
   const wrapperStyle = {
     position: 'relative',
@@ -369,60 +360,62 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
         style={{
           position: 'relative',
           borderRadius: 'var(--radius-card)',
-          minHeight: cardH,
+          height: cardH,
           cursor: 'pointer',
           background: cardBg,
           boxShadow: 'var(--shadow-card)',
-          overflow: 'visible', // CRITICAL — lets the circle escape
+          overflow: 'hidden', // nothing escapes the card now
           transformStyle: 'preserve-3d',
           // Smooth out the scroll-physics transform between rAF frames
           transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05), opacity .25s ease-out, box-shadow .25s ease',
         }}>
-        {/* shine — clipped to card so it doesn't bleed onto the protruding image */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          borderRadius: 'var(--radius-card)',
-          background: 'linear-gradient(160deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,.04) 100%)',
-          pointerEvents: 'none',
-          overflow: 'hidden',
-        }} />
-
-        {/* RTL row: text on right, big circle photo on left poking out */}
-        <div style={{
-          position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${isCompact ? 14 : 18}px ${padX}px`, gap: 8, alignItems: 'center',
-        }}>
-          {/* text */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="display" style={{
-              fontWeight: 700, fontSize: titleSize, lineHeight: 1.1, color: p.ink,
-              textWrap: 'balance',
-            }}>{recipe.title}</div>
-            {!isCompact && (
-              <div style={{
-                fontSize: 13.5, lineHeight: 1.45,
-                color: p.ink, opacity: .75, fontWeight: 400,
-                display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-              }}>{recipe.description}</div>
-            )}
+        {/* the photo, corner to corner */}
+        {hasPhoto && (
+          <div style={{ position: 'absolute', inset: 0 }} data-shared-img={sharedId}>
+            <RecipePhoto url={photo} palette={p} radius={'var(--radius-card)'} alt="" fill/>
           </div>
+        )}
 
-          {/* circle photo — sits on the inline-START side (RTL → right) of
-             the card and pokes OUT past that edge. */}
+        {/* Words over a photograph need their own floor. The scrim is
+            nothing where the picture is at its best — the top two fifths —
+            and deepens to near-black behind the text. */}
+        {hasPhoto && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.46) 26%, rgba(0,0,0,.04) 56%, rgba(0,0,0,.14) 100%)',
+          }}/>
+        )}
+
+        {/* shine — only on a bare card; over a photo it just greys it */}
+        {!hasPhoto && (
           <div style={{
-            position: 'relative',
-            width: imgSize - imgPokeOut, // space the row reserves
-            height: imgSize,
-            flexShrink: 0,
-          }} data-shared-img={sharedId}>
+            position: 'absolute', inset: 0,
+            borderRadius: 'var(--radius-card)',
+            background: 'linear-gradient(160deg, var(--sheen) 0%, transparent 38%, rgba(0,0,0,.04) 100%)',
+            pointerEvents: 'none',
+          }} />
+        )}
+
+        {/* text — along the bottom of the card, RTL */}
+        <div style={{
+          position: 'absolute', insetInline: 0, bottom: 0,
+          padding: `${padY}px ${padX}px`,
+          display: 'flex', flexDirection: 'column', gap: 6,
+          textAlign: 'start',
+        }}>
+          <div className="display" style={{
+            fontWeight: 700, fontSize: titleSize, lineHeight: 1.15, color: ink,
+            textWrap: 'balance',
+            textShadow: hasPhoto ? '0 1px 12px rgba(0,0,0,.55)' : 'none',
+          }}>{recipe.title}</div>
+          {recipe.description && (
             <div style={{
-              position: 'absolute',
-              top: '50%', insetInlineStart: -imgPokeOut,
-              transform: 'translateY(-50%)',
-            }}>
-              <FoodImage recipeId={recipe.id} size={imgSize} slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`} readonly />
-            </div>
-          </div>
+              fontSize: 'var(--t-small)', lineHeight: 1.45,
+              color: ink, opacity: hasPhoto ? .9 : .75, fontWeight: 400,
+              textShadow: hasPhoto ? '0 1px 10px rgba(0,0,0,.6)' : 'none',
+              display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>{recipe.description}</div>
+          )}
         </div>
 
         {/* favorite button — anchored to the OPPOSITE side (left in RTL = inline-end) */}
@@ -431,11 +424,11 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           aria-label="הוסף למועדפים"
           style={{
             position: 'absolute', top: 12, insetInlineEnd: 12,
-            width: 36, height: 36, borderRadius: 999,
+            width: 36, height: 36, borderRadius: 'var(--r-pill)',
             display: 'grid', placeItems: 'center',
-            background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(6px)',
-            border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,.12)',
-            cursor: 'pointer', color: recipe.favorite ? '#e34466' : p.ink,
+            background: 'var(--glass)',
+            border: 'none', boxShadow: 'var(--e1)',
+            cursor: 'pointer', color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
             zIndex: 2,
           }}>
           <FavHeart filled={recipe.favorite} />
@@ -446,10 +439,25 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
 }
 
 // ───────────────────────────────────────────────────────────
-// ImageGallery — horizontal swipeable carousel of FoodImage
-// circles. Shows dots underneath. Used on the recipe detail.
+// ImageGallery — the recipe's photographs, one to a screen,
+// swiped sideways. Each picture covers the whole panel it is
+// given, corner to corner, the way it covers a card; the dots
+// ride on top of it. The gallery fills its parent, so the
+// parent decides the shape.
 // ───────────────────────────────────────────────────────────
-function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
+function GallerySlide({ recipeId, slot, palette }) {
+  const url = useRecipePhoto({ id: recipeId }, slot);
+  return (
+    <div style={{
+      flex: '0 0 100%', position: 'relative', scrollSnapAlign: 'center',
+      background: palette ? palette.bg : 'var(--surface-sunken)',
+    }}>
+      <RecipePhoto url={url} palette={palette} radius={0} alt="" fill/>
+    </div>
+  );
+}
+
+function ImageGallery({ recipeId, slots = ['main'], palette }) {
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
   const [slotsWithImages, setSlotsWithImages] = useState(new Set());
@@ -488,72 +496,37 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
   const slotsWithDots = slots.filter(slot => slotsWithImages.has(slot));
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={scrollRef} onScroll={onScroll} style={{
+        position: 'absolute', inset: 0,
         display: 'flex', overflowX: 'auto', overflowY: 'hidden',
         scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
         msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch',
       }}>
-        {slots.map((slot, i) => (
-          <div key={slot} style={{
-            flex: '0 0 100%', display: 'grid', placeItems: 'center',
-            scrollSnapAlign: 'center', padding: '8px 0',
-          }}>
-            <FoodImage recipeId={recipeId} size={size} slotIdSuffix={`-${slot}`} readonly />
-          </div>
+        {slots.map(slot => (
+          <GallerySlide key={slot} recipeId={recipeId} slot={slot} palette={palette}/>
         ))}
-        {onAddSlot && (
-          <div style={{
-            flex: '0 0 100%', display: 'grid', placeItems: 'center',
-            scrollSnapAlign: 'center', padding: '8px 0',
-          }}>
-            <button onClick={onAddSlot} style={{
-              width: size, height: size, borderRadius: '50%',
-              border: '2px dashed rgba(0,0,0,.25)',
-              background: 'rgba(255,255,255,.4)', cursor: 'pointer',
-              display: 'grid', placeItems: 'center', gap: 8,
-              fontFamily: 'inherit', color: 'var(--ink-soft)',
-            }}>
-              <IconPlus size={28} strokeWidth={2.2}/>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>הוסיפו תמונה</span>
-            </button>
-          </div>
-        )}
       </div>
-      {/* dots — only when more than 1 slot actually has an image */}
+      {/* dots — only when more than 1 slot actually has an image. They sit
+          on the photograph itself, so they carry their own shadow. */}
       {slotsWithDots.length > 1 && (
         <div style={{
+          position: 'absolute', insetInline: 0, bottom: 46,
           display: 'flex', gap: 6, justifyContent: 'center',
-          marginTop: 4,
         }}>
           {slots.map((slot, i) => slotsWithImages.has(slot) ? (
             <button key={i} onClick={() => goTo(i)} aria-label={`תמונה ${i+1}`}
               style={{
-                width: i === index ? 22 : 7, height: 7, borderRadius: 999,
-                background: i === index ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.5)',
+                width: i === index ? 22 : 7, height: 7, borderRadius: 'var(--r-pill)',
+                background: i === index ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.55)',
                 border: 'none', cursor: 'pointer', padding: 0,
+                boxShadow: '0 1px 4px rgba(0,0,0,.35)',
                 transition: 'width .25s, background .25s',
               }}/>
           ) : null)}
         </div>
       )}
     </div>
-  );
-}
-
-// ───────────────────────────────────────────────────────────
-// Pill — small chip with icon
-// ───────────────────────────────────────────────────────────
-function Pill({ children, color = '#fff', ink = '#222', strong = false }) {
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: 12.5, fontWeight: strong ? 700 : 600,
-      color: ink,
-      background: color,
-      padding: '5px 10px', borderRadius: 999,
-      boxShadow: '0 1px 0 rgba(255,255,255,.6) inset, 0 2px 4px rgba(0,0,0,.05)',
-    }}>{children}</span>
   );
 }
 
@@ -586,7 +559,7 @@ function FavHeart({ filled }) {
             return (
               <span key={i} style={{
                 position: 'absolute', left: '50%', top: '50%',
-                width: 4, height: 4, borderRadius: 999, background: '#e34466',
+                width: 4, height: 4, borderRadius: 'var(--r-pill)', background: 'var(--brand-strong)',
                 transform: `translate(-50%,-50%) translate(${Math.cos(angle)*22}px,${Math.sin(angle)*22}px) scale(0)`,
                 animation: 'pop .6s cubic-bezier(.2,.9,.4,1) forwards',
               }} />
@@ -602,19 +575,23 @@ function FavHeart({ filled }) {
 // ───────────────────────────────────────────────────────────
 // BottomNav — three pill buttons floating above content
 // ───────────────────────────────────────────────────────────
-function BottomNav({ active, onChange, accent = '#e34466' }) {
+function BottomNav({ active, onChange, onAdd, accent = 'var(--brand-strong)' }) {
   const items = [
-    { id: 'home',      icon: IconHome,     label: 'בית' },
-    { id: 'favorites', icon: IconHeart,    label: 'מועדפים' },
-    { id: 'add',       icon: IconPlus,     label: 'הוספה' },
+    { id: 'home', icon: IconHome, label: 'בית' },
+    { id: 'book', icon: IconBook, label: 'ספר' },
   ];
   return (
     <div style={{
       position: 'absolute', bottom: 18, left: 18, right: 18, zIndex: 5,
-      background: 'rgba(255,255,255,.85)',
-      backdropFilter: 'blur(20px) saturate(160%)',
-      borderRadius: 999,
-      boxShadow: '0 12px 40px -10px rgba(64,33,50,.35), 0 1px 0 rgba(255,255,255,.7) inset',
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+    <div style={{
+      flex: 1,
+      // Solid, like every other control. The one shadow it keeps is the
+      // one that says it floats over the list rather than sits in it.
+      background: 'var(--surface-raised)',
+      borderRadius: 'var(--r-pill)',
+      boxShadow: 'var(--e2)',
       padding: 6,
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
     }}>
@@ -623,390 +600,438 @@ function BottomNav({ active, onChange, accent = '#e34466' }) {
         const I = it.icon;
         return (
           <button key={it.id} onClick={() => onChange(it.id)} aria-label={it.label}
+            aria-current={isActive ? 'page' : undefined}
             style={{
               flex: 1, height: 46, border: 'none', cursor: 'pointer', background: 'transparent',
-              borderRadius: 999, position: 'relative',
+              borderRadius: 'var(--r-pill)', position: 'relative', minWidth: 0, padding: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              color: isActive ? '#fff' : 'var(--ink)',
-              fontWeight: 700, fontSize: 13,
-              transition: 'color .2s',
+              color: isActive ? 'var(--on-brand)' : 'var(--ink-soft)',
+              fontFamily: 'inherit',
+              fontWeight: 700, fontSize: 'var(--t-small)',
+              transition: 'color var(--dur-fast)',
             }}>
+            {/* The pill stacks at 0 with the label above it at 1, rather
+                than at -1: a negative index paints it behind the bar's own
+                background, which used to be translucent and now is not. */}
             {isActive && (
               <span style={{
-                position: 'absolute', inset: 0, borderRadius: 999, background: accent, zIndex: -1,
-                boxShadow: `0 8px 18px -6px ${accent}`,
+                position: 'absolute', inset: 0, borderRadius: 'var(--r-pill)', background: accent, zIndex: 0,
                 animation: 'navPop .35s cubic-bezier(.2,1.4,.4,1)',
               }} />
             )}
-            <I size={20} strokeWidth={isActive ? 2.4 : 2}/>
-            {isActive && <span>{it.label}</span>}
+            <span style={{
+              position: 'relative', zIndex: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <I size={20} strokeWidth={isActive ? 2.4 : 2}/>
+              {/* Both labels stay put, so the bar does not resize as you
+                  move between them. */}
+              <span style={{ whiteSpace: 'nowrap' }}>{it.label}</span>
+            </span>
           </button>
         );
       })}
       <style>{`@keyframes navPop{0%{transform:scale(.6);opacity:.4}100%{transform:scale(1);opacity:1}}`}</style>
     </div>
+    <button onClick={onAdd} aria-label="מתכון חדש"
+      style={{
+        width: 58, height: 58, flexShrink: 0, borderRadius: 'var(--r-pill)',
+        border: 'none', cursor: 'pointer', background: accent, color: 'var(--on-brand)',
+        boxShadow: 'var(--e3)', display: 'grid', placeItems: 'center',
+      }}>
+      <IconPlus size={26} strokeWidth={2.6}/>
+    </button>
+    </div>
   );
 }
 
 // ───────────────────────────────────────────────────────────
-// CategoryStrip — horizontally scrolling pills
+// CategoryDropdown — multi-select filter menu.
+// `selected` is an array of category ids; an empty array means
+// "all". Opens a styled popover with checkable rows.
 // ───────────────────────────────────────────────────────────
-function CategoryStrip({ active, onChange, categories: catsProp, onAdd, onManage }) {
-  const cats = catsProp || CATEGORIES;
-  const btnBase = {
-    flex: '0 0 auto', border: 'none', cursor: 'pointer',
-    width: 40, height: 40, borderRadius: 999, fontFamily: 'inherit',
-    background: 'rgba(255,255,255,.7)', color: 'var(--ink-soft)',
-    boxShadow: '0 2px 6px rgba(0,0,0,.07)',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all .2s', fontSize: 17,
-  };
+function CategoryDropdown({ selected = [], onToggle, onClear, categories: catsProp, counts = {}, onAdd, onManage, onEditCategory, total = 0 }) {
+  const cats = (catsProp || CATEGORIES).filter(c => c.id !== 'all');
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const chosen = cats.filter(c => selected.includes(c.id));
+  const label = chosen.length === 0
+    ? 'כל הקטגוריות'
+    : chosen.length === 1
+      ? chosen[0].label
+      : `${chosen[0].label} +${chosen.length - 1}`;
+  const emojis = chosen.length ? chosen.slice(0, 3).map(c => c.emoji).join(' ') : '🍽️';
+
   return (
-    <div className="scroll-y" style={{
-      display: 'flex', flexDirection: 'row-reverse', gap: 10,
-      padding: '4px 22px 18px', overflowX: 'auto', overflowY: 'hidden',
-      scrollbarWidth: 'none',
-    }}>
-      {cats.map(c => {
-        const isActive = active === c.id;
-        return (
-          <button key={c.id} onClick={() => onChange(c.id)}
-            style={{
-              flex: '0 0 auto', border: 'none', cursor: 'pointer',
-              padding: '10px 16px', borderRadius: 999,
-              fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
-              background: isActive ? 'var(--ink)' : 'rgba(255,255,255,.7)',
-              color: isActive ? '#fff' : 'var(--ink)',
-              boxShadow: isActive ? '0 8px 18px -6px rgba(0,0,0,.4)' : '0 2px 6px rgba(0,0,0,.07)',
-              transition: 'all .2s',
-              display: 'inline-flex', alignItems: 'center', gap: 6,
+    <div ref={wrapRef} style={{ position: 'relative', flex: '1 1 auto', minWidth: 0 }}>
+      <button onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox" aria-expanded={open}
+        style={{
+          width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 9,
+          // Same height and same corner as the actions beside it.
+          padding: '0 14px 0 12px', height: 52, borderRadius: 'var(--r-md)',
+          background: open || chosen.length ? 'var(--ink)' : 'var(--surface-raised)',
+          color: open || chosen.length ? 'var(--bg)' : 'var(--ink)',
+          transition: 'background var(--dur-fast), color var(--dur-fast)',
+        }}>
+        <span style={{ fontSize: 'var(--t-body)', lineHeight: 1, flexShrink: 0 }}>{emojis}</span>
+        <span style={{
+          fontSize: 'var(--t-small)', fontWeight: 700, flex: 1, textAlign: 'start',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>{label}</span>
+        {chosen.length > 1 && (
+          <span style={{
+            fontSize: 'var(--t-caption)', fontWeight: 800, borderRadius: 'var(--r-pill)', padding: '2px 7px',
+            background: 'var(--surface-sunken)', flexShrink: 0,
+          }}>{chosen.length}</span>
+        )}
+        <span style={{
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+          transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .22s',
+        }}><IconChevronDown size={16} strokeWidth={2.4}/></span>
+      </button>
+
+      {open && (
+        <div role="listbox" style={{
+          position: 'absolute', top: 60, insetInlineStart: 0, minWidth: '100%', width: 'max(100%, 230px)',
+          background: 'var(--surface-raised)',
+          borderRadius: 'var(--r-lg)', zIndex: 40, overflow: 'hidden',
+          boxShadow: 'var(--e3)',
+          animation: 'ddIn .2s cubic-bezier(.2,1.1,.4,1)', transformOrigin: 'top center',
+        }}>
+          <div className="scroll-y" style={{ maxHeight: 300, padding: 6 }}>
+            <DropRow emoji="🍽️" label="הכל" count={total} checked={selected.length === 0}
+              onClick={() => { onClear(); }} />
+            <div style={{ height: 1, background: 'var(--surface-sunken)', margin: '5px 12px' }}/>
+            {cats.map(c => (
+              <DropRow key={c.id} emoji={c.emoji} label={c.label} count={counts[c.id] || 0}
+                checked={selected.includes(c.id)} onClick={() => onToggle(c.id)}
+                onEdit={onEditCategory ? () => { setOpen(false); onEditCategory(c); } : undefined}/>
+            ))}
+            {cats.length === 0 && (
+              <div style={{ padding: '14px 14px', fontSize: 'var(--t-small)', color: 'var(--ink-soft)', textAlign: 'center' }}>
+                אין עדיין קטגוריות
+              </div>
+            )}
+          </div>
+          {(onAdd || onManage) && (
+            <div style={{
+              display: 'flex', gap: 8, padding: 10, borderTop: '1px solid var(--line)',
+              background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
             }}>
-            <span style={{ fontSize: 16 }}>{c.emoji}</span>{c.label}
-          </button>
-        );
-      })}
-      {onAdd && <button onClick={onAdd} style={btnBase}>+</button>}
-      {onManage && (
-        <button onClick={onManage} style={btnBase} title="ניהול קטגוריות">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </button>
+              {onAdd && (
+                <button onClick={() => { setOpen(false); onAdd(); }} style={ddFootBtn}>
+                  <IconPlus size={14} strokeWidth={2.6}/> קטגוריה
+                </button>
+              )}
+              {onManage && (
+                <button onClick={() => { setOpen(false); onManage(); }} style={ddFootBtn}>
+                  <IconEdit size={13} strokeWidth={2.4}/> ניהול
+                </button>
+              )}
+            </div>
+          )}
+          <style>{`@keyframes ddIn{0%{opacity:0;transform:translateY(-8px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}`}</style>
+        </div>
       )}
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────
-// ManageCategoriesSheet — edit emoji/name + add + delete
-// ───────────────────────────────────────────────────────────
-const CAT_EMOJIS_ALL = [
-  '🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳',
-  '🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦','🍅','🧅','🧄','🥔',
-  '🌽','🥒','🍄','🌿','🥬','🫑','🍠','🥚','🍳','🥛','🧈','🥓','🍗','🍖',
-  '🦐','🍣','🍱','🌯','🫔','🥫','🍛','🫕','🌭','🍔','🍟','🫓','🍿','🍦',
-  '🎂','🍮','🍭','🍫','🍩','🍯','🧂','🫙','🍷','☕','🍵','🧋','🥤','🍺',
-  '🥜','🌰','🍋','🍊','🍎','🍇','🍓','🍒','🍌','🍉','🥝','🍈','🍐','🥭',
-];
+const ddFootBtn = {
+  flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+  padding: '9px 10px', borderRadius: 'var(--r-pill)', background: 'var(--glass)',
+  color: 'var(--ink)', fontSize: 'var(--t-caption)', fontWeight: 700,
+  boxShadow: 'var(--e1)',
+};
 
-function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose }) {
-  const { useState: uS } = React;
-  const [editingEmoji, setEditingEmoji] = uS(null); // catId whose emoji picker is open
-  const [addMode, setAddMode] = uS(false);
-  const [newName, setNewName] = uS('');
-  const [newEmoji, setNewEmoji] = uS('🍽️');
-
-  const confirmAdd = () => {
-    const n = newName.trim();
-    if (!n) return;
-    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji: newEmoji });
-    setNewName(''); setNewEmoji('🍽️'); setAddMode(false);
-  };
-
-  return (
-    <div onClick={onClose} style={{
-      position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'flex-end',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--cream)',
-        borderRadius: '28px 28px 0 0',
-        padding: '24px 22px 40px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
-        maxHeight: '80vh', overflowY: 'auto',
-        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
+function DropRow({ emoji, label, count, checked, onClick, onEdit }) {
+  const row = (
+    <button role="option" aria-selected={checked} onClick={onClick}
+      style={{
+        width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+        display: 'flex', alignItems: 'center', gap: 10, textAlign: 'start',
+        padding: '9px 10px', borderRadius: 'var(--r-sm)', background: checked ? 'color-mix(in srgb, var(--brand) 24%, transparent)' : 'transparent',
+        color: 'var(--ink)', transition: 'background .15s',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>ניהול קטגוריות</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
-        </div>
+      <span style={{
+        width: 30, height: 30, borderRadius: 'var(--r-sm)', flexShrink: 0,
+        display: 'grid', placeItems: 'center', fontSize: 'var(--t-body)',
+        background: checked ? 'var(--surface-raised)' : 'var(--surface-sunken)',
+      }}>{emoji}</span>
+      <span style={{ flex: 1, fontSize: 'var(--t-small)', fontWeight: checked ? 800 : 600, minWidth: 0,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+      <span style={{ fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)', flexShrink: 0 }}>{count}</span>
+      <span style={{
+        width: 20, height: 20, borderRadius: 7, flexShrink: 0,
+        display: 'grid', placeItems: 'center',
+        background: checked ? 'var(--ink)' : 'transparent',
+        boxShadow: checked ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
+        color: 'var(--bg)', transition: 'background var(--dur-fast)',
+      }}>{checked && <IconCheck size={12} strokeWidth={3}/>}</span>
+    </button>
+  );
 
-        {/* Existing categories */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-          {categories.map(cat => (
-            <div key={cat.id} style={{ position: 'relative' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
-                background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: '12px 14px',
-                boxShadow: '0 2px 8px rgba(0,0,0,.06)',
-              }}>
-                {/* Emoji button — opens picker */}
-                <button onClick={() => setEditingEmoji(editingEmoji === cat.id ? null : cat.id)}
-                  style={{
-                    width: 44, height: 44, borderRadius: 12, border: 'none', cursor: 'pointer',
-                    background: editingEmoji === cat.id ? 'var(--ink)' : 'rgba(0,0,0,.06)',
-                    fontSize: 24, display: 'grid', placeItems: 'center',
-                    flexShrink: 0, transition: 'all .15s',
-                  }}>{cat.emoji}</button>
-                <span style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--ink)', textAlign: 'right' }}>{cat.label}</span>
-                <button onClick={() => onDelete(cat.id)}
-                  style={{
-                    width: 32, height: 32, borderRadius: 10, border: 'none', cursor: 'pointer',
-                    background: 'rgba(220,53,69,.1)', color: '#dc3545',
-                    display: 'grid', placeItems: 'center', flexShrink: 0,
-                  }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                  </svg>
-                </button>
-              </div>
-              {/* Inline emoji picker */}
-              {editingEmoji === cat.id && (
-                <div style={{
-                  marginTop: 8, background: '#fff', borderRadius: 16, padding: 12,
-                  boxShadow: '0 8px 24px rgba(0,0,0,.14)',
-                  display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse',
-                }}>
-                  {CAT_EMOJIS_ALL.map(e => (
-                    <button key={e} onClick={() => { onEdit(cat.id, { emoji: e }); setEditingEmoji(null); }}
-                      style={{
-                        width: 40, height: 40, border: 'none', borderRadius: 10, fontSize: 22,
-                        cursor: 'pointer', background: e === cat.emoji ? 'var(--ink)' : 'rgba(0,0,0,.05)',
-                        transition: 'all .12s',
-                      }}>{e}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add new */}
-        {!addMode ? (
-          <button onClick={() => setAddMode(true)} style={{
-            width: '100%', border: '1.5px dashed rgba(0,0,0,.2)', borderRadius: 16,
-            padding: '12px 0', cursor: 'pointer', background: 'transparent',
-            fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: 'var(--ink-soft)',
-          }}>+ קטגוריה חדשה</button>
-        ) : (
-          <div style={{ background: 'rgba(255,255,255,.8)', borderRadius: 16, padding: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flexDirection: 'row-reverse', marginBottom: 14 }}>
-              {CAT_EMOJIS_ALL.slice(0, 24).map(e => (
-                <button key={e} onClick={() => setNewEmoji(e)} style={{
-                  width: 38, height: 38, border: 'none', borderRadius: 10, fontSize: 20,
-                  cursor: 'pointer', background: newEmoji === e ? 'var(--ink)' : 'rgba(0,0,0,.05)',
-                  transition: 'all .12s',
-                }}>{e}</button>
-              ))}
-            </div>
-            <input value={newName} onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && confirmAdd()}
-              placeholder="שם הקטגוריה" autoFocus
-              style={{
-                width: '100%', border: 'none', borderRadius: 12, padding: '10px 14px',
-                fontSize: 15, background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
-                fontFamily: 'inherit', outline: 'none', textAlign: 'right',
-                marginBottom: 10, boxSizing: 'border-box',
-              }}/>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={confirmAdd} disabled={!newName.trim()} style={{
-                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
-                background: newName.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
-                color: newName.trim() ? '#fff' : 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
-              }}>הוסיפי</button>
-              <button onClick={() => setAddMode(false)} style={{
-                flex: 1, border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer',
-                background: 'rgba(0,0,0,.06)', color: 'var(--ink-soft)', fontFamily: 'inherit', fontWeight: 700,
-              }}>ביטול</button>
-            </div>
-          </div>
-        )}
-      </div>
+  if (!onEdit) return row;
+  // A pencil on every row, so a name can be fixed where it is read rather
+  // than by going looking for the screen that owns it.
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>{row}</div>
+      <button type="button" aria-label={`עריכת ${label}`}
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        style={{
+          width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+          background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+        }}><IconEdit size={14} strokeWidth={2.2}/></button>
     </div>
   );
 }
 
-// ───────────────────────────────────────────────────────────
-// AddCategorySheet — bottom sheet for creating a new category
-// ───────────────────────────────────────────────────────────
-const CAT_EMOJIS = ['🥩','🐟','🥕','🥑','🍝','🍲','🌮','🍕','🥞','🍜','🥘','🧆','🥙','🍳','🍰','🍪','🧁','🍞','🥗','🫐','🧀','🥨','🍱','🥦'];
 
-function AddCategorySheet({ onAdd, onCancel }) {
+// ───────────────────────────────────────────────────────────
+// CategoryEditSheet — one editor, used both to add a category
+// and to change an existing one. There used to be two sheets that
+// did nearly the same thing, and neither of them could rename.
+// ───────────────────────────────────────────────────────────
+function CategoryEditSheet({ category, onSave, onCancel, onDelete }) {
   const { useState: uS } = React;
-  const [name, setName] = uS('');
-  const [emoji, setEmoji] = uS('🍽️');
+  const editing = !!category;
+  const [name, setName] = uS(category ? category.label : '');
+  const [emoji, setEmoji] = uS(category ? (category.emoji || '🍽️') : '🍽️');
+  const [confirmNode, askDelete] = useConfirm();
 
   const confirm = () => {
     const n = name.trim();
     if (!n) return;
-    onAdd({ id: `cat_${Date.now().toString(36)}`, label: n, emoji });
+    onSave(editing
+      ? { ...category, label: n, emoji }
+      : { id: `cat_${Date.now().toString(36)}`, label: n, emoji });
   };
 
   return (
-    <div onClick={onCancel} style={{
-      position: 'absolute', inset: 0, zIndex: 55,
-      background: 'rgba(28,22,32,.5)', backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'flex-end',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: '100%', background: 'var(--cream)',
-        borderRadius: '28px 28px 0 0',
-        padding: '24px 22px 40px',
-        boxShadow: '0 -8px 40px rgba(0,0,0,.18)',
-        animation: 'catSlide .35s cubic-bezier(.2,1.2,.4,1)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)' }}>קטגוריה חדשה</h2>
-          <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 22, color: 'var(--ink-soft)', cursor: 'pointer' }}>×</button>
+    <Sheet title={editing ? 'עריכת קטגוריה' : 'קטגוריה חדשה'} onClose={onCancel}
+      footer={
+        <>
+          <Button tone="quiet" onClick={onCancel} style={{ flex: 1 }}>ביטול</Button>
+          <Button tone="primary" onClick={confirm} disabled={!name.trim()} style={{ flex: 2 }}>
+            {editing ? 'שמירה' : 'הוספה'}
+          </Button>
+        </>
+      }>
+      <div style={{ display: 'grid', gap: 18, paddingBottom: 8 }}>
+        <NField label="שם הקטגוריה" value={name} onChange={setName}
+          placeholder="לדוגמה: נשנושים, ממרחים…"/>
+        <div>
+          <div style={{ ...TYPE.small, fontWeight: 700, color: 'var(--ink-soft)',
+                        marginBottom: 8, paddingInlineStart: 6 }}>סמל</div>
+          {/* the same grid the ingredient symbol uses */}
+          <EmojiGrid value={emoji} onPick={setEmoji} onType={setEmoji}/>
         </div>
+        {/* Deleting lives here, so every screen that can edit a category
+            can also remove one without needing its own button for it. */}
+        {editing && onDelete && (
+          <Button tone="quiet" full
+            style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+            onClick={() => askDelete({
+              title: 'למחוק את הקטגוריה?',
+              body: <>הקטגוריה <strong style={{ color: 'var(--ink)' }}>{category.emoji} {category.label}</strong> תימחק.<br/>המתכונים עצמם יישארו.</>,
+              onConfirm: () => onDelete(category.id),
+            })}>
+            <IconTrash size={17} strokeWidth={2.2}/> מחיקת הקטגוריה
+          </Button>
+        )}
+        {confirmNode}
+      </div>
+    </Sheet>
+  );
+}
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 10, letterSpacing: '.08em' }}>בחרי אמוג׳י</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flexDirection: 'row-reverse' }}>
-            {CAT_EMOJIS.map(e => (
-              <button key={e} onClick={() => setEmoji(e)} style={{
-                width: 42, height: 42, border: 'none', borderRadius: 12, fontSize: 22,
-                cursor: 'pointer',
-                background: emoji === e ? 'var(--ink)' : 'rgba(0,0,0,.06)',
-                boxShadow: emoji === e ? '0 4px 12px rgba(0,0,0,.25)' : 'none',
-                transition: 'all .15s',
-              }}>{e}</button>
-            ))}
-          </div>
-        </div>
+// ───────────────────────────────────────────────────────────
+// CategoryPickSheet — choosing a recipe's category, and looking
+// after the categories while you are there.
+//
+// This used to be a plain list with one "new category" button at the
+// bottom: the one screen in the app that shows you every category, and
+// the only one you could not fix a name or a symbol from. Now each row
+// carries an edit button, the same one the management screen has, and it
+// opens the same editor — which is also where deleting lives.
+// ───────────────────────────────────────────────────────────
+function CategoryPickSheet({ value, categories, onPick, onClose, onAdd, onEdit, onDelete }) {
+  const { useState: uS } = React;
+  const [editing, setEditing] = uS(null);   // a category, or 'new'
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 8, letterSpacing: '.08em' }}>שם הקטגוריה</div>
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && confirm()}
-            placeholder="לדוגמה: נשנושים, ממרחים…"
-            autoFocus
+  if (editing) {
+    return (
+      <CategoryEditSheet
+        category={editing === 'new' ? null : editing}
+        onCancel={() => setEditing(null)}
+        onDelete={onDelete ? (id) => { onDelete(id); setEditing(null); } : undefined}
+        onSave={(cat) => {
+          if (editing === 'new') { onAdd(cat); onPick(cat.id); }
+          else onEdit(cat.id, { label: cat.label, emoji: cat.emoji });
+          setEditing(null);
+        }}
+      />
+    );
+  }
+
+  return (
+    <Sheet title="קטגוריה" onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+        {categories.map(c => {
+          const on = c.id === value;
+          return (
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button type="button" onClick={() => { onPick(c.id); onClose(); }}
+                style={{
+                  flex: 1, minWidth: 0,
+                  border: 'none', background: on ? 'var(--field-fill)' : 'transparent',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
+                }}>
+                <Radio on={on}/>
+                <span style={{ fontSize: 22, lineHeight: 1 }} aria-hidden="true">{c.emoji}</span>
+                <span style={{
+                  ...TYPE.body, fontWeight: on ? 700 : 500, color: 'var(--ink)', flex: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{c.label}</span>
+              </button>
+              {onEdit && (
+                <button type="button" onClick={() => setEditing(c)} aria-label={`עריכת ${c.label}`}
+                  style={{
+                    width: 44, height: 44, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                    background: 'var(--field-fill)', color: 'var(--ink-soft)',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}><IconEdit size={16} strokeWidth={2.2}/></button>
+              )}
+            </div>
+          );
+        })}
+        {onAdd && (
+          <button type="button" onClick={() => setEditing('new')}
             style={{
-              width: '100%', border: 'none', borderRadius: 16,
-              padding: '12px 16px', fontSize: 15,
-              background: 'rgba(0,0,0,.06)', color: 'var(--ink)',
-              fontFamily: 'inherit', outline: 'none', textAlign: 'right',
-            }}
-          />
-        </div>
-
-        <button onClick={confirm} disabled={!name.trim()} style={{
-          width: '100%', border: 'none', borderRadius: 18,
-          padding: '14px 0',
-          background: name.trim() ? 'var(--ink)' : 'rgba(0,0,0,.12)',
-          color: name.trim() ? '#fff' : 'var(--ink-soft)',
-          fontSize: 15, fontWeight: 700,
-          fontFamily: 'var(--font-display)', cursor: name.trim() ? 'pointer' : 'default',
-          transition: 'all .2s',
-        }}>הוסיפי קטגוריה</button>
+              border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+              padding: '16px 18px', minHeight: 60, color: 'var(--brand-strong)',
+              borderTop: categories.length ? '1px solid var(--line)' : 'none',
+              marginTop: categories.length ? 6 : 0,
+            }}>
+            <IconPlus size={22} strokeWidth={2.2}/>
+            <span style={{ ...TYPE.body, fontWeight: 700 }}>קטגוריה חדשה</span>
+          </button>
+        )}
       </div>
-      <style>{`@keyframes catSlide{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:translateY(0)}}`}</style>
-    </div>
+    </Sheet>
   );
 }
 
 // ───────────────────────────────────────────────────────────
-// StatusBar — top of phone screen, dynamic ink color
+// ManageCategoriesSheet — the list of them, each editable.
 // ───────────────────────────────────────────────────────────
-function StatusBar({ ink = '#2c1d27', time = '9:30' }) {
+function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose }) {
+  const { useState: uS } = React;
+  const [editing, setEditing] = uS(null);   // a category, or 'new'
+  const [confirmNode, confirm] = useConfirm();
+
+  if (editing) {
+    return (
+      <CategoryEditSheet
+        category={editing === 'new' ? null : editing}
+        onCancel={() => setEditing(null)}
+        onSave={(cat) => {
+          if (editing === 'new') onAdd(cat);
+          else onEdit(cat.id, { label: cat.label, emoji: cat.emoji });
+          setEditing(null);
+        }}
+      />
+    );
+  }
+
   return (
-    <div style={{
-      height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 22px', fontSize: 13, fontWeight: 600, color: ink, position: 'relative', flexShrink: 0,
-    }}>
-      <span style={{ flex: 1 }}>{time}</span>
-      <div style={{
-        position: 'absolute', left: '50%', top: 8, transform: 'translateX(-50%)',
-        width: 18, height: 18, borderRadius: '50%', background: '#1b1620',
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
-        <svg width="16" height="11" viewBox="0 0 16 11" fill={ink}><path d="M8 11L.7 3.7a10.4 10.4 0 0 1 14.6 0L8 11z"/></svg>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill={ink}><path d="M13 13V1L1 13h12z"/></svg>
-        <span style={{ fontSize: 12 }}>86%</span>
-        <svg width="22" height="11" viewBox="0 0 22 11" fill="none" stroke={ink} strokeWidth="1.2">
-          <rect x="1" y="1" width="18" height="9" rx="2"/>
-          <rect x="2.5" y="2.5" width="14" height="6" rx="1" fill={ink} stroke="none"/>
-          <rect x="20" y="3.5" width="1.5" height="4" rx=".5" fill={ink} stroke="none"/>
-        </svg>
+    <Sheet title="ניהול קטגוריות" onClose={onClose}
+      footer={<Button tone="primary" full onClick={() => setEditing('new')}>
+        <IconPlus size={18} strokeWidth={2.4}/> קטגוריה חדשה
+      </Button>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8 }}>
+        {categories.length === 0 && (
+          <div style={{ ...TYPE.small, color: 'var(--ink-faint)', textAlign: 'center', padding: '24px 0' }}>
+            עוד אין קטגוריות.
+          </div>
+        )}
+        {categories.map(cat => (
+          <div key={cat.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexDirection: 'row-reverse',
+            background: 'var(--field-fill)', borderRadius: 'var(--r-md)', padding: 8,
+          }}>
+            <span style={{
+              width: 44, height: 44, borderRadius: 'var(--r-sm)', flexShrink: 0,
+              background: 'var(--surface-raised)', fontSize: 'var(--t-title)',
+              display: 'grid', placeItems: 'center',
+            }}>{cat.emoji}</span>
+            <span style={{
+              flex: 1, minWidth: 0, ...TYPE.body, fontWeight: 700, color: 'var(--ink)',
+              textAlign: 'start', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{cat.label}</span>
+            <button type="button" onClick={() => setEditing(cat)} aria-label={`עריכת ${cat.label}`}
+              style={{
+                width: 40, height: 40, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                background: 'var(--surface-raised)', color: 'var(--ink)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}><IconEdit size={16} strokeWidth={2.2}/></button>
+            <button type="button" aria-label={`מחיקת ${cat.label}`}
+              onClick={() => confirm({
+                title: 'למחוק את הקטגוריה?',
+                body: <>הקטגוריה <strong style={{ color: 'var(--ink)' }}>{cat.emoji} {cat.label}</strong> תימחק.<br/>המתכונים עצמם יישארו.</>,
+                onConfirm: () => onDelete(cat.id),
+              })}
+              style={{
+                width: 40, height: 40, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                background: 'var(--danger-soft)', color: 'var(--danger)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}><IconTrash size={16} strokeWidth={2.2}/></button>
+          </div>
+        ))}
       </div>
-    </div>
+      {confirmNode}
+    </Sheet>
   );
 }
 
-// ───────────────────────────────────────────────────────────
-// Phone frame — fixed-aspect device shell with status bar
-// ───────────────────────────────────────────────────────────
-function Phone({ children, statusInk = '#2c1d27', bg = 'transparent', width = 390, height = 844 }) {
-  return (
-    <div style={{
-      width, height, borderRadius: 48,
-      background: bg,
-      boxShadow: '0 50px 100px -30px rgba(40,15,30,.55), 0 0 0 12px #1c1620, 0 0 0 13px #3a2e36',
-      overflow: 'hidden', position: 'relative',
-      display: 'flex', flexDirection: 'column',
-    }}>
-      <StatusBar ink={statusInk} />
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>{children}</div>
-      {/* home indicator */}
-      <div style={{
-        position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-        width: 130, height: 5, borderRadius: 999, background: statusInk, opacity: .35,
-        zIndex: 100, pointerEvents: 'none',
-      }} />
-    </div>
-  );
-}
 
 // ───────────────────────────────────────────────────────────
 // RecipeCardSkeleton — placeholder while recipes load
 // ───────────────────────────────────────────────────────────
-function RecipeCardSkeleton({ density = 'comfy' }) {
-  const isCompact = density === 'compact';
-  const cardH   = isCompact ? 116 : 168;
-  const imgSize = isCompact ? 132 : 198;
-  const imgPoke = Math.round(imgSize * 0.22);
+function RecipeCardSkeleton() {
+  const cardH = 208;
   return (
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
       <div style={{
-        borderRadius: 'var(--radius-card)', minHeight: cardH,
-        background: 'rgba(255,255,255,.55)',
-        boxShadow: 'var(--shadow-card)', overflow: 'visible',
+        position: 'relative', height: cardH,
+        borderRadius: 'var(--radius-card)', overflow: 'hidden',
+        background: 'var(--glass)', boxShadow: 'var(--shadow-card)',
       }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--surface-sunken)' }}/>
         <div style={{
-          position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${isCompact ? 14 : 18}px 24px`, gap: 8, alignItems: 'center',
+          position: 'absolute', insetInline: 0, bottom: 0, padding: '20px 24px',
+          display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ height: isCompact ? 18 : 24, width: '55%', borderRadius: 8, background: 'rgba(0,0,0,.09)' }}/>
-            {!isCompact && <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'rgba(0,0,0,.06)' }}/>}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ height: 26, width: 64, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
-              <div style={{ height: 26, width: 44, borderRadius: 999, background: 'rgba(0,0,0,.07)' }}/>
-            </div>
-          </div>
-          <div style={{ width: imgSize - imgPoke, height: imgSize, flexShrink: 0, position: 'relative' }}>
-            <div style={{
-              position: 'absolute', top: '50%', insetInlineStart: -imgPoke,
-              transform: 'translateY(-50%)',
-              width: imgSize, height: imgSize, borderRadius: '50%',
-              background: 'rgba(0,0,0,.07)',
-            }}/>
-          </div>
+          <div style={{ height: 24, width: '55%', borderRadius: 8, background: 'var(--glass)' }}/>
+          <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--glass)' }}/>
         </div>
       </div>
       <style>{`@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
@@ -1015,11 +1040,13 @@ function RecipeCardSkeleton({ density = 'comfy' }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// RecipeCardGrid — 2-column square card with image poking out
-// from the top center. Used in 'grid' density mode.
-// ───────────────────────────────────────────────────────────
+// Every tile in the grid is the same size, whether or not the recipe has a
+// photo and whatever shape that photo is — a grid of different-sized cards
+// reads as clutter. Taller than it is wide: a tile is mostly photograph.
+const GRID_TILE_H = 212;
+
 function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
-  const p = PALETTES[recipe.palette];
+  const p = paletteOf(recipe.palette);
   const enabled = useAnimEnabled();
   const enterMs = useAnimMs(500);
   const [mounted, setMounted] = useState(false);
@@ -1030,57 +1057,64 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   }, []);
   useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
 
-  const imgSize = 110;
+  const photo = useRecipePhoto(recipe);
+  const slotsReady = useImageSlotsReady();
+  const hasPhoto = !!photo || !slotsReady;
 
   return (
     <div style={{
-      position: 'relative',
-      paddingTop: imgSize / 2,
+      height: GRID_TILE_H,
       opacity: mounted ? 1 : 0,
       transform: mounted ? 'translateY(0) scale(1)' : 'translateY(22px) scale(.96)',
       transition: `opacity ${enterMs}ms ease, transform ${enterMs}ms cubic-bezier(.2,.9,.25,1.1)`,
     }}>
-      {/* image circle — centered at the top edge of the card */}
-      <div style={{
-        position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-        zIndex: 2, pointerEvents: 'none',
-      }}>
-        <FoodImage
-          recipeId={recipe.id} size={imgSize}
-          slotIdSuffix={`-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`}
-          readonly
-        />
-      </div>
-
-      {/* card body */}
       <div ref={cardRef} onClick={() => onOpen(recipe)} style={{
-        borderRadius: 22,
-        paddingTop: imgSize / 2 + 10,
-        paddingBottom: 16,
-        paddingInline: 10,
-        boxShadow: 'var(--shadow-card)',
-        cursor: 'pointer',
-        position: 'relative',
-        textAlign: 'center',
+        height: '100%', position: 'relative', cursor: 'pointer',
+        borderRadius: 'var(--r-lg)', overflow: 'hidden',
+        boxShadow: 'var(--e2)',
         background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
-        transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05)',
+        transition: 'transform var(--dur-fast) cubic-bezier(.2,.8,.2,1.05)',
       }}>
+        {/* the photo, corner to corner — same treatment as the list card */}
+        {hasPhoto && (
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <RecipePhoto url={photo} palette={p} radius={'var(--r-lg)'} alt="" fill/>
+          </div>
+        )}
+        {hasPhoto && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.46) 28%, rgba(0,0,0,.04) 58%, rgba(0,0,0,.16) 100%)',
+          }}/>
+        )}
+
+        {/* With a photo the title is a caption along the bottom; with no
+            photo it is the whole tile, so it gets to be large and centred. */}
         <div style={{
-          fontWeight: 700, fontSize: 14, lineHeight: 1.25,
-          color: p.ink,
-          display: '-webkit-box', WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>{recipe.title}</div>
-        {/* fav button */}
-        <button onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
+          position: 'absolute', inset: hasPhoto ? 'auto 0 0 0' : 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: hasPhoto ? '14px 12px 13px' : '36px 14px',
+          fontWeight: 700, color: hasPhoto ? '#fff' : p.ink,
+          fontSize: hasPhoto ? 'var(--t-small)' : 'var(--t-heading)',
+          lineHeight: hasPhoto ? 1.28 : 1.3,
+          textShadow: hasPhoto ? '0 1px 10px rgba(0,0,0,.6)' : 'none',
+        }}>
+          <span style={{
+            display: '-webkit-box', WebkitLineClamp: hasPhoto ? 2 : 4,
+            WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            textAlign: 'center', width: '100%', textWrap: 'balance',
+          }}>{recipe.title}</span>
+        </div>
+
+        <button type="button" onClick={e => { e.stopPropagation(); onToggleFav(recipe.id); }}
           aria-label="מועדפים"
           style={{
-            position: 'absolute', top: 7, insetInlineEnd: 7,
-            width: 28, height: 28, borderRadius: 999,
-            background: 'rgba(255,255,255,.78)', border: 'none',
+            position: 'absolute', top: 8, insetInlineEnd: 8, zIndex: 3,
+            width: 32, height: 32, borderRadius: 'var(--r-pill)', padding: 0, lineHeight: 0,
+            background: 'var(--glass)', border: 'none',
             cursor: 'pointer', display: 'grid', placeItems: 'center',
-            color: recipe.favorite ? '#e34466' : p.ink,
-            boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+            color: recipe.favorite ? 'var(--brand-strong)' : p.ink,
+            boxShadow: 'var(--e1)',
           }}>
           <FavHeart filled={recipe.favorite}/>
         </button>
@@ -1093,51 +1127,71 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
 // ConfirmDialog — reusable destructive-action confirmation
 // emoji: big icon shown in badge, confirmColor: button color
 // ───────────────────────────────────────────────────────────
-function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', confirmColor = '#e34466', onConfirm, onCancel }) {
+// useConfirm — nothing is deleted, and nothing that was typed is thrown
+// away, without being asked first. Returns the dialog to render and the
+// function that raises it, so a component can guard several actions
+// without wiring up a dialog and a piece of state for each one.
+//
+//   const [confirmNode, confirm] = useConfirm();
+//   ...
+//   <button onClick={() => confirm({ title: 'למחוק?', onConfirm: doIt })}/>
+//   {confirmNode}
+function useConfirm() {
+  const [req, setReq] = useState(null);
+  const ask = (opts) => setReq(opts || {});
+  const node = req ? (
+    <ConfirmDialog
+      emoji={req.emoji}
+      title={req.title}
+      body={req.body}
+      confirmLabel={req.confirmLabel || 'מחיקה'}
+      cancelLabel={req.cancelLabel || 'ביטול'}
+      danger={req.danger !== false}
+      onCancel={() => setReq(null)}
+      onConfirm={() => { const go = req.onConfirm; setReq(null); if (go) go(); }}
+    />
+  ) : null;
+  return [node, ask];
+}
+
+function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'אישור', cancelLabel = 'ביטול', danger = true, onConfirm, onCancel }) {
+  // The colour comes from the tone, never from a caller passing a hex — a
+  // hardcoded white on a state colour is unreadable the moment the theme
+  // flips, which is exactly what happened here.
+  const confirmColor = danger ? 'var(--danger)' : 'var(--brand-strong)';
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 90,
-      background: 'rgba(28,22,32,.65)',
+      background: 'var(--overlay)',
       backdropFilter: 'blur(14px)',
       display: 'grid', placeItems: 'center',
       padding: 24,
     }} onClick={onCancel}>
       <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--cream)',
+        background: 'var(--surface)',
         borderRadius: 36, padding: '36px 28px 28px',
         maxWidth: 340, width: '100%',
-        boxShadow: '0 40px 100px -20px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.7) inset',
+        boxShadow: 'var(--e3)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
         textAlign: 'center',
         animation: 'delPop .38s cubic-bezier(.2,1.35,.4,1)',
       }}>
         <div style={{
-          width: 76, height: 76, borderRadius: 999,
+          width: 76, height: 76, borderRadius: 'var(--r-pill)',
           background: `${confirmColor}18`,
           display: 'grid', placeItems: 'center',
           fontSize: 36,
-          boxShadow: `0 14px 30px -8px ${confirmColor}44, 0 1px 0 rgba(255,255,255,.6) inset`,
+          boxShadow: 'var(--e2)',
         }}>{emoji}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <h2 className="display" style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{title}</h2>
-          {body && <p style={{ margin: 0, fontSize: 15, color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
+          <h2 className="display" style={{ margin: 0, fontSize: 'var(--t-title)', fontWeight: 700, color: 'var(--ink)' }}>{title}</h2>
+          {body && <p style={{ margin: 0, fontSize: 'var(--t-body)', color: 'var(--ink-soft)', lineHeight: 1.6 }}>{body}</p>}
         </div>
         <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: '16px', border: 'none', borderRadius: 20,
-            background: 'rgba(0,0,0,.07)', color: 'var(--ink)',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-          }}>{cancelLabel}</button>
-          <button onClick={onConfirm} style={{
-            flex: 1.5, padding: '16px', border: 'none', borderRadius: 20,
-            background: confirmColor, color: '#fff',
-            fontFamily: 'inherit', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-            boxShadow: `0 10px 24px -8px ${confirmColor}88`,
-          }}
-            onMouseDown={e => e.currentTarget.style.transform = 'scale(.97)'}
-            onMouseUp={e => e.currentTarget.style.transform = ''}
-            onMouseLeave={e => e.currentTarget.style.transform = ''}
-          >{confirmLabel}</button>
+          <Button tone="quiet" size="lg" onClick={onCancel} style={{ flex: 1 }}>{cancelLabel}</Button>
+          <Button tone={danger ? 'danger' : 'primary'} size="lg" onClick={onConfirm} style={{ flex: 1.5 }}>
+            {confirmLabel}
+          </Button>
         </div>
       </div>
     </div>
@@ -1146,8 +1200,8 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 
 Object.assign(window, {
   AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
-  Tilt, FoodArt, FoodImage, ImageGallery, RecipeCardSkeleton,
-  RecipeCard, RecipeCardGrid, Pill, FavHeart,
-  BottomNav, CategoryStrip, AddCategorySheet, ManageCategoriesSheet, StatusBar, Phone,
+  FoodImage, RecipePhoto, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
+  RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
+  BottomNav, CategoryDropdown, CategoryEditSheet, CategoryPickSheet, ManageCategoriesSheet, useConfirm,
   ConfirmDialog,
 });

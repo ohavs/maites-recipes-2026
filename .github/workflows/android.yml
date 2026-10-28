@@ -72,8 +72,14 @@ jobs:
             *[!0-9.]*|'') echo "::error::'$NAME' is not a version number"; exit 1 ;;
           esac
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          # The build number must only ever go up, so it is the run number.
-          echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          # The build number comes from the version itself — 1.2.0 is 10200 —
+          # so it rises exactly as the version does. A run counter would reset
+          # if this workflow were ever renamed, and a version code that goes
+          # backwards makes Android refuse to install the update.
+          MAJOR=$(echo "$NAME" | cut -d. -f1); MINOR=$(echo "$NAME" | cut -d. -f2); PATCH=$(echo "$NAME" | cut -d. -f3)
+          CODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "version $NAME → versionCode $CODE"
 
       - run: npm ci
 
@@ -91,6 +97,13 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))" \
             || { echo "::error::google-services.json is not valid JSON"; exit 1; }
+
+      # Whether the file can support Google sign-in at all. Sign-in failing
+      # on a device tells you nothing about which half is wrong, and this
+      # answers it before the build even starts. Shapes and counts only —
+      # no values are printed.
+      - name: Can it sign in?
+        run: node tools/check-google-services.js
 
       - name: Copy the web layer into the app
         run: npx cap sync android

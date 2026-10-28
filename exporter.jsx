@@ -13,6 +13,22 @@
 // ──────────────────────────────────────────────
 // Generic helpers
 // ──────────────────────────────────────────────
+
+// SheetJS is ~860KB and only Excel import/export needs it, so it is loaded
+// the first time one of those runs — from the local copy, so it works offline.
+function ensureXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!window.__xlsxLoading) {
+    window.__xlsxLoading = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = '/vendor/xlsx.full.min.js';
+      el.onload = () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX missing')));
+      el.onerror = () => reject(new Error('XLSX failed to load'));
+      document.head.appendChild(el);
+    });
+  }
+  return window.__xlsxLoading;
+}
 function saveBlob(filename, blob) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -152,11 +168,11 @@ function parseCategoryLabel(raw) {
 }
 
 // Pick a palette deterministically from a string so colors are spread.
-const PALETTE_KEYS = ['peach','sky','mint','lavender','pink','yellow'];
 function pickPalette(seed) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return PALETTE_KEYS[h % PALETTE_KEYS.length];
+  const keys = PALETTE_KEYS;
+  return keys[h % keys.length];
 }
 
 // Make a clean id from a Hebrew title.
@@ -178,6 +194,7 @@ const COL_ALIASES = {
   desc:       ['תיאור','description','desc','about'],
   ingredients:['מרכיבים','מצרכים','חומרים','ingredients','ingredient'],
   steps:      ['הוראות הכנה','שלבים','הוראות','אופן ההכנה','אופן הכנה','ביצוע','דרך הכנה','הכנת המנה','instructions','steps','directions','method','preparation'],
+  servings:   ['מנות','כמות מנות','מספר מנות','למנות','servings','serves','portions','yield'],
   notes:      ['הערות','הערה','notes','remarks','tips'],
   mainImage:  ['תמונות ראשיות','תמונה ראשית','תמונה','main image','image','photo'],
   gallery:    ['גלריית תמונות','גלריה','gallery','images'],
@@ -255,7 +272,9 @@ function rowToRecipe(row, map) {
     _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
-    servings: 4,
+    // 0 means "not stated" — the app treats that as a single portion
+    // rather than inventing a number the recipe never had.
+    servings: parseTime(get('servings')),
     level: 'קל',
     favorite: false,
     notes,
@@ -326,6 +345,7 @@ function sheetToRecipe(sheetName, rows) {
   const catRaw     = get('קטגוריה','סוג מנה','סוג','category','type');
   const catInfo    = catRaw ? parseCategoryLabel(catRaw) : parseCategoryLabel(guessCategory(cuisine));
   const level      = get('רמת קושי','רמת קשיים','רמת קשיות') || 'קל';
+  const servings   = parseTime(get('מנות','כמות מנות','מספר מנות','servings','serves'));
   const prepTime   = parseTime(get('זמן הכנה','prep','זמן'));
   const cookTime   = parseTime(get('זמן בישול','cook','בישול'));
   const desc       = get('תיאור','description','desc','about','הסבר');
@@ -377,7 +397,7 @@ function sheetToRecipe(sheetName, rows) {
     _catInfo: catInfo,
     prepTime, cookTime,
     time: prepTime + cookTime,
-    servings: 4, level,
+    servings, level,
     favorite: false, notes,
     gallery, ingredients,
     steps: [],
@@ -386,7 +406,11 @@ function sheetToRecipe(sheetName, rows) {
 }
 
 function importFromFile(file, onDone) {
-  if (!window.XLSX) { onDone(new Error('SheetJS not loaded'), null); return; }
+  ensureXLSX().then(() => importFromFileWithXLSX(file, onDone))
+    .catch(() => onDone(new Error('לא ניתן לטעון את מנוע ה-Excel'), null));
+}
+
+function importFromFileWithXLSX(file, onDone) {
   const isCSV = /\.csv$/i.test(file.name) || file.type === 'text/csv';
 
   const fr = new FileReader();
@@ -442,10 +466,10 @@ function importFromFile(file, onDone) {
 // Cells with multiple lines (ingredients/steps) are joined by \n.
 // ──────────────────────────────────────────────
 function exportExcel(recipes) {
-  if (!window.XLSX) {
-    alert('Excel library not loaded');
-    return;
-  }
+  return ensureXLSX().then(() => exportExcelWithXLSX(recipes));
+}
+
+function exportExcelWithXLSX(recipes) {
   const headers = [
     'שם המתכון','סוג מטבח','זמן הכנה','זמן בישול','מנות','קטגוריה',
     'תיאור','מרכיבים','הוראות הכנה','הערות','צבע',
@@ -516,7 +540,7 @@ function recipesToWordHTML(recipes) {
     .notes { background: #fff7e8; padding: 12px 16px; border-radius: 12px; font-size: 11.5pt; line-height: 1.55; }
   `;
   const colorFor = pk => {
-    const p = PALETTES[pk] || PALETTES.peach;
+    const p = paletteHexOf(pk);
     return { bg: p.bg, bg2: p.bg2, ink: p.ink };
   };
   const recipeHtml = (r, idx) => {
@@ -583,5 +607,5 @@ function exportWord(recipes) {
 }
 
 Object.assign(window, {
-  exportExcel, exportWord, importFromFile, stripHTML,
+  exportExcel, exportWord, importFromFile, stripHTML, ensureXLSX,
 });

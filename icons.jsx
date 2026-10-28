@@ -1,7 +1,8 @@
 // icons.jsx — small stroke icon set
 const Icon = ({ d, size = 24, fill = 'none', stroke = 'currentColor', strokeWidth = 2, children, viewBox = '0 0 24 24', style }) => (
   <svg width={size} height={size} viewBox={viewBox} fill={fill} stroke={stroke}
-       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+       style={{ display: 'block', ...style }}>
     {d ? <path d={d} /> : children}
   </svg>
 );
@@ -54,26 +55,6 @@ const IconUsers = (p) => (
     <path d="M3 21c0-3.866 4.03-6 9-6s9 2.134 9 6" />
   </Icon>
 );
-const IconFire = (p) => (
-  <Icon {...p}>
-    <path d="M12 22c4.5 0 8-3 8-7 0-3-2-5-3-7-1.5-3-1-5-1-5s-3 1.5-4.5 5C10 11 8 11 7 14c-.7 2 0 8 5 8z" />
-  </Icon>
-);
-const IconChef = (p) => (
-  <Icon {...p} strokeWidth={p.strokeWidth || 2.2}>
-    <path d="M7 21h10M8 21v-6M16 21v-6M6 15h12M7 15c-2 0-3-1.5-3-3.5C4 9 6 8 7 8c0-2.5 2-4 5-4s5 1.5 5 4c1 0 3 1 3 3.5 0 2-1 3.5-3 3.5" />
-  </Icon>
-);
-const IconFilter = (p) => (
-  <Icon {...p}>
-    <path d="M3 5h18M6 12h12M10 19h4" />
-  </Icon>
-);
-const IconDownload = (p) => (
-  <Icon {...p}>
-    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-  </Icon>
-);
 const IconUpload = (p) => (
   <Icon {...p}>
     <path d="M12 21V9M7 14l5-5 5 5M5 3h14" />
@@ -90,18 +71,6 @@ const IconShare = (p) => (
     <circle cx="18" cy="6" r="2" />
     <circle cx="18" cy="18" r="2" />
     <path d="M7.7 11l8.6-4M7.7 13l8.6 4" />
-  </Icon>
-);
-const IconBookmark = ({ filled = false, ...p }) => (
-  <Icon {...p} fill={filled ? 'currentColor' : 'none'}>
-    <path d="M6 3h12v18l-6-4-6 4V3z" />
-  </Icon>
-);
-const IconDots = (p) => (
-  <Icon {...p}>
-    <circle cx="5" cy="12" r="1.5" />
-    <circle cx="12" cy="12" r="1.5" />
-    <circle cx="19" cy="12" r="1.5" />
   </Icon>
 );
 const IconExcel = (p) => (
@@ -124,19 +93,6 @@ const IconEdit = (p) => (
 const IconNote = (p) => (
   <Icon {...p}>
     <path d="M5 4h11l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM15 4v5h5M8 13h8M8 17h5" />
-  </Icon>
-);
-const IconChevronLeft = (p) => (
-  <Icon {...p}><path d="M15 6l-6 6 6 6"/></Icon>
-);
-const IconChevronRight = (p) => (
-  <Icon {...p}><path d="M9 6l6 6-6 6"/></Icon>
-);
-const IconImage = (p) => (
-  <Icon {...p}>
-    <rect x="3" y="4" width="18" height="16" rx="2"/>
-    <circle cx="9" cy="10" r="2"/>
-    <path d="M21 16l-5-5-9 9"/>
   </Icon>
 );
 const IconTrash = (p) => (
@@ -287,18 +243,74 @@ const ING_ICONS = {
   nuts:       { emoji:'🥜',  label:'אגוזים' },
 };
 
+const IconBook = (p) => (
+  <Icon {...p}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></Icon>
+);
+const IconChevronDown = (p) => (
+  <Icon {...p}><path d="M6 9l6 6 6-6"/></Icon>
+);
+const IconCamera = (p) => (
+  <Icon {...p}>
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+    <circle cx="12" cy="13" r="4"/>
+  </Icon>
+);
+const IconImage = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <path d="M21 15l-5-5L5 21"/>
+  </Icon>
+);
+const IconFilePdf = (p) => (
+  <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 0 0 0-3H9v6"/><path d="M14 18h1.5a1.5 1.5 0 0 0 1.5-1.5v-2A1.5 1.5 0 0 0 15.5 13H14z"/></Icon>
+);
+
 function IngredientIcon({ kind = '🍽️', size = 20 }) {
   const emoji = ING_KEY_EMOJI[kind] || kind || '🍽️';
   return <span style={{ fontSize: Math.round(size * 0.95), lineHeight: 1, display: 'inline-block' }}>{emoji}</span>;
 }
 
+// Guesses an ingredient's icon from its name, so a recipe written in a
+// hurry still arrives with icons instead of twenty identical plates. The
+// guess is only ever a starting point — tapping the icon overrides it.
+const ING_GUESS = [
+  ['drop',     ['שמן','מים','חומץ','רוטב','סויה','מיץ','ציר','מרק','יין','ברנדי','וודקה','בירה','ליקר']],
+  ['bottle',   ['סודה','משקה','קולה','שמפניה']],
+  ['veg',      ['עגבני','מלפפון','בצל','שום','גזר','פלפל','חציל','קישוא','תפוח אדמה','בטטה','כרוב','כרובית','ברוקולי','חסה','סלרי','פטריו','פטריה','תירס','אפונה','זית','שעועית','דלעת','לפת','צנון','נבטים']],
+  ['herb',     ['פטרוזיליה','כוסברה','בזיליקום','נענע','שמיר','רוזמרין','טימין','אורגנו','עירית','טרגון','מרווה','דפנה']],
+  ['fruit',    ['תפוח','בננה','תות','אבוקדו','לימון','תפוז','ענב','אגס','אפרסק','מנגו','אננס','רימון','שזיף','דובדבן','אוכמני','תמר','צימוק','משמש','קלמנטינ','מלון','אבטיח']],
+  ['egg',      ['ביצה','ביצים','חלמון','חלבון']],
+  ['dairy',    ['חלב','שמנת','יוגורט','חמאה','לבן','קצפת','מסקרפונה','ריקוטה','גבינת שמנת']],
+  ['cheese',   ['גבינה','גבינת','פטה','מוצרלה','פרמז','צהובה','בולגרית','קשקבל']],
+  ['bread',    ['לחם','פיתה','לחמני','בגט','טוסט','חלה','קרקר','מצה']],
+  ['grain',    ['קמח','אורז','פסטה','ספגטי','קוסקוס','בורגול','קינואה','שיבולת','שועל','גריסים','עדשים','חומוס','פתיתים','אטריות','נודלס','סולת','שמרים','אבקת אפייה','סודה לשתייה','קורנפלור']],
+  ['spice',    ['מלח','פלפל שחור','פפריקה','כמון','כורכום','קינמון','הל','ציפורן','מוסקט','זעתר','צ׳ילי','חריף','תבלין','קארי','אבקת שום','אבקת בצל']],
+  ['sweet',    ['סוכר','דבש','סילאן','ממתיק','סירופ','אגבה','וניל']],
+  ['meat',     ['בשר','עוף','הודו','כבש','בקר','שניצל','קציצ','נקניק','פרגית','כנפיים','אנטריקוט','טחון','חזה עוף','שוקיים']],
+  ['fish',     ['דג','סלמון','טונה','בקלה','אמנון','סרדינ','שרימפס','פירות ים']],
+  ['nuts',     ['אגוז','שקד','בוטנ','פיסטוק','קשיו','פקאן','גרעינ','שומשום','חמניות','צנוברים','טחינה']],
+  ['chocolate',['שוקולד','קקאו','נוטלה']],
+  ['coffee',   ['קפה','אספרסו','נס קפה','תה']],
+];
+
+function guessIngredientIcon(name) {
+  const n = String(name || '').trim();
+  if (!n) return null;
+  for (const [key, words] of ING_GUESS) {
+    if (words.some(w => n.includes(w))) return key;
+  }
+  return null;
+}
+
 Object.assign(window, {
   Icon, IconBack, IconForward, IconHome, IconSearch, IconHeart, IconPlus, IconClose,
-  IconClock, IconUsers, IconFire, IconChef, IconFilter, IconDownload, IconUpload,
-  IconCheck, IconShare, IconBookmark, IconDots, IconExcel, IconWord,
-  IconEdit, IconNote, IconChevronLeft, IconChevronRight, IconImage, IconTrash,
+  guessIngredientIcon,
+  IconClock, IconUsers, IconUpload,
+  IconCheck, IconShare, IconExcel, IconWord, IconCamera, IconImage,
+  IconEdit, IconNote, IconTrash,
   IconGrid, IconRows, IconColumns2,
-  IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
+  IconBook, IconChevronDown, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,
   ING_ICONS, ING_KEY_EMOJI, IngredientIcon,

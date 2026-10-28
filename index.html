@@ -13,64 +13,18 @@
 <link rel="apple-touch-icon" href="/maites-icon.png?v=2" />
 <link rel="icon" type="image/png" href="/maites-icon.png?v=2" />
 
-<!-- Fonts: Quicksand display + Heebo for Hebrew -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Heebo:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Fonts: Rubik (display) + Heebo (body), self-hosted so the app looks
+     the same with no network. -->
+<link rel="stylesheet" href="/vendor/fonts/fonts.css">
 
-<style>
-  :root{
-    --bg: #fbeef2;          /* soft pink page bg behind cards */
-    --ink: #2c1d27;
-    --ink-soft: #5b4452;
-    --cream: #fff7e8;
-    --c-yellow: #ffd255;
-    --c-yellow-2: #ffe28a;
-    --c-sky: #8fd6e7;
-    --c-sky-2: #b6e4ed;
-    --c-pink: #f7a8b8;
-    --c-pink-2: #ffc7d1;
-    --c-mint: #b3e4c3;
-    --c-mint-2: #d2efd9;
-    --c-lavender: #c9b8e8;
-    --c-lavender-2: #ddd0f0;
-    --c-peach: #ffb494;
-    --c-peach-2: #ffd0b9;
-    --shadow-card: 0 10px 28px -8px rgba(64, 33, 50, .25), 0 22px 60px -20px rgba(64, 33, 50, .22), 0 1px 0 rgba(255,255,255,.7) inset;
-    --shadow-card-lift: 0 22px 50px -10px rgba(64, 33, 50, .32), 0 40px 80px -28px rgba(64, 33, 50, .25);
-    --radius-card: 28px;
-    --font-display: 'Rubik', 'Quicksand', 'Heebo', system-ui, sans-serif;
-    --font-body: 'Heebo', 'Rubik', system-ui, sans-serif;
-  }
-  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  button, a, [role="button"] { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-  html, body{
-    margin: 0; padding: 0; min-height: 100vh;
-    font-family: var(--font-body);
-    color: var(--ink);
-    background:
-      radial-gradient(1200px 700px at 20% 0%, #ffe5d3 0%, transparent 60%),
-      radial-gradient(1100px 700px at 80% 100%, #e0d3f5 0%, transparent 55%),
-      linear-gradient(180deg, #f5e7ef 0%, #efe1ec 100%);
-    overflow: hidden;
-  }
-  body{ display: block; }
+<link rel="stylesheet" href="/theme.css">
 
-  /* hide scrollbars inside the phone */
-  .scroll-y{ overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; }
-  .scroll-y::-webkit-scrollbar{ display: none; }
-
-  /* utility */
-  .display{ font-family: var(--font-display); letter-spacing: -.01em; }
-  .stack{ display: flex; flex-direction: column; }
-  button{ font-family: inherit; }
-  @keyframes delPop{0%{transform:scale(.82);opacity:0}100%{transform:scale(1);opacity:1}}
-</style>
-
-<!-- React + Babel -->
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- React + Babel — bundled locally: the app must boot with no network.
+     Production React builds; Babel compiles the .jsx files in the browser. -->
+<script src="/vendor/capacitor.js"></script>
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/babel.min.js"></script>
 
 <!-- Capture beforeinstallprompt early, before React loads -->
 <script>
@@ -80,30 +34,106 @@
     window.__deferredInstall = e;
   });
 </script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="/vendor/firebase-app-compat.js"></script>
+<script src="/vendor/firebase-firestore-compat.js"></script>
+<script src="/vendor/firebase-auth-compat.js"></script>
 <script src="image-slot.js"></script>
-<!-- SheetJS (xlsx) for Excel import/export -->
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<!-- SheetJS (xlsx) is loaded on demand by exporter.jsx, not at startup. -->
 </head>
 <body>
   <div id="root"></div>
 
-  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="errors.jsx"></script>
+  <script type="text/babel" src="native.jsx"></script>
   <script type="text/babel" src="data.jsx"></script>
   <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="ui.jsx"></script>
   <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="forms.jsx"></script>
   <script type="text/babel" src="exporter.jsx"></script>
   <script type="text/babel" src="db.jsx"></script>
+  <script type="text/babel" src="guest.jsx"></script>
+  <script type="text/babel" src="updates.jsx"></script>
+  <script type="text/babel" src="backup.jsx"></script>
   <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="cooking.jsx"></script>
+  <script type="text/babel" src="book.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
+  <!-- A blank screen is never an acceptable answer: if the app has not
+       mounted a few seconds after load, say what happened and offer a way out. -->
+  <div id="boot-fallback" hidden>
+    <div style="max-width:320px">
+      <div class="bf-emoji">🍳</div>
+      <h1>Maites לא הצליחה לעלות</h1>
+      <p id="boot-reason">נראה שחלק מהקבצים לא נטענו.</p>
+      <button type="button" onclick="location.reload()">נסו שוב</button>
+    </div>
+  </div>
+
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js');
-      });
-    }
+    (function () {
+      // Watchdog — React mounts into #root; if nothing is there, show the
+      // fallback instead of an empty page.
+      var t = setTimeout(function () {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          var reason = document.getElementById('boot-reason');
+          if (reason && !navigator.onLine) {
+            reason.textContent = 'אין חיבור לאינטרנט, והאפליקציה עוד לא נשמרה במכשיר. התחברי לרשת פעם אחת וזה יעבוד גם בלי חיבור.';
+          }
+          document.getElementById('boot-fallback').hidden = false;
+        }
+      }, 9000);
+      window.addEventListener('maites-ready', function () { clearTimeout(t); });
+
+      // Inside the Android app there must be no service worker. Every file
+      // it would cache is already in the APK, so it adds nothing — and its
+      // cache outlives the app's own update, so after installing a new
+      // version the worker keeps serving the old one. That is exactly the
+      // "I updated and nothing changed" everyone hits. Any worker left over
+      // from an earlier build is removed here, with its caches.
+      var inNativeApp = location.protocol === 'capacitor:'
+        || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
+        || /\bwv\b/.test(navigator.userAgent) && location.hostname === 'localhost';
+
+      if (inNativeApp && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { caches.delete(k); });
+          }).catch(function () {});
+        }
+      }
+
+      if (!inNativeApp && 'serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            // Look for a newer version on every launch, so a deploy reaches
+            // the phone on the next open rather than days later.
+            if (navigator.onLine) reg.update().catch(function () {});
+            // Ask the worker to keep the Excel / PDF engines around too.
+            var warm = function () {
+              if (navigator.serviceWorker.controller && navigator.onLine) {
+                navigator.serviceWorker.controller.postMessage('warm-optional');
+              }
+            };
+            setTimeout(warm, 4000);
+            reg.addEventListener('updatefound', function () {
+              var sw = reg.installing;
+              if (!sw) return;
+              sw.addEventListener('statechange', function () {
+                // A new version is ready; it takes over on the next launch.
+                if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.__maitesUpdateReady = true;
+                }
+              });
+            });
+          }).catch(function () {});
+        });
+      }
+    })();
   </script>
 </body>
 </html>

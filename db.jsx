@@ -16,8 +16,27 @@ if (!firebase.apps.length) {
 const _db   = firebase.firestore();
 const _auth = firebase.auth();
 
+// Offline-first: writes are kept locally and replayed when the connection
+// comes back, and the last-known data is readable with no network at all.
+// (Fails harmlessly when several tabs are open, or in private mode.)
+_db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  if (err && err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+    if (typeof reportError === 'function') reportError('persistence', err);
+  }
+});
+
+// Every write goes through here, so the UI can always say what happened.
+const track = (label, promise) =>
+  (typeof saveTracker !== 'undefined' ? saveTracker.track(label, promise) : promise);
+
 // ── Auth ──────────────────────────────────────────────────────
 async function auth_signInWithGoogle() {
+  // Inside the Android app the popup cannot work — Google refuses OAuth in
+  // an embedded browser — so the native sheet runs instead and Firebase is
+  // handed the credential it produces.
+  if (typeof isNative === 'function' && isNative()) {
+    return signInWithGoogleNative();
+  }
   const provider = new firebase.auth.GoogleAuthProvider();
   return _auth.signInWithPopup(provider);
 }
@@ -78,18 +97,100 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
 // Hooks into image-slot.js so images persist to Firestore.
 // image-slot.js checks window.__imageSlotBridge before falling
 // back to omelette/fetch.
+// Resolves once Firebase has decided whether somebody is signed in. Reads
+// must wait for it: the security rules reject anonymous requests, and a
+// rejected read used to be cached as "this user has no photos".
+let _authReadyPromise = null;
+function authReady() {
+  if (_authReadyPromise) return _authReadyPromise;
+  _authReadyPromise = new Promise((resolve) => {
+    let done = false;
+    const finish = (u) => { if (!done) { done = true; resolve(u || null); } };
+    const unsub = _auth.onAuthStateChanged((u) => { try { unsub(); } catch {} finish(u); });
+    setTimeout(() => finish(_auth.currentUser), 10000);
+  });
+  return _authReadyPromise;
+}
+
 (function initImageBridge() {
-  // Promise resolving to { slotId: {u, s, x, y}, ... }
-  const loadPromise = _db.collection('image_slots').get()
-    .then(snap => {
-      const result = {};
-      snap.forEach(doc => { result[doc.id] = doc.data(); });
-      return result;
-    })
-    .catch(() => ({}));
+  // Read the photo store lazily, after sign-in, with a couple of retries —
+  // a transient failure must not become a permanent "no photos".
+  let slotsPromise = null;
+
+  const readSnap = (snap) => {
+    const result = {};
+    snap.forEach(doc => { result[doc.id] = doc.data(); });
+    return result;
+  };
+
+  // Photos are stored inline, one base64 document each, so this collection
+  // is by far the heaviest thing the app reads — and it is the same bytes
+  // on every launch, because a photo almost never changes after it is set.
+  //
+  // So: serve whatever is already on the device first, and go to the server
+  // afterwards, in the background, merging anything that turned out to be
+  // new. A returning user sees their photos immediately instead of waiting
+  // for the whole collection to come down the wire again.
+  async function serverSlots(attempt = 0) {
+    try {
+      await authReady();
+      return readSnap(await _db.collection('image_slots').get({ source: 'server' }));
+    } catch (err) {
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+        return serverSlots(attempt + 1);
+      }
+      if (typeof reportError === 'function') reportError('load-images', err);
+      return null;
+    }
+  }
+
+  const catchUp = () => {
+    serverSlots().then(fresh => {
+      if (fresh && Object.keys(fresh).length && window.__mergeImageSlots) {
+        window.__mergeImageSlots(fresh);
+      }
+    }).catch(() => {});
+  };
+
+  async function fetchSlots() {
+    try {
+      await authReady();
+      const cached = await _db.collection('image_slots').get({ source: 'cache' });
+      if (!cached.empty) {
+        catchUp();                 // quietly bring it up to date behind the photos
+        return readSnap(cached);
+      }
+    } catch {
+      // no cache yet, or persistence is unavailable — fall through
+    }
+    const fresh = await serverSlots();
+    if (fresh === null) {
+      slotsPromise = null;         // let a later attempt try again
+      return {};
+    }
+    return fresh;
+  }
+
+  const loadSlots = () => {
+    if (!slotsPromise) slotsPromise = fetchSlots();
+    return slotsPromise;
+  };
+
+  // Re-reads the store and merges what comes back into the live one. Used
+  // after sign-in, so photos still arrive even if the first read was too
+  // early or failed.
+  window.db_refreshImageSlots = async () => {
+    slotsPromise = null;
+    const fresh = await loadSlots();
+    if (fresh && Object.keys(fresh).length && window.__mergeImageSlots) {
+      window.__mergeImageSlots(fresh);
+    }
+    return fresh;
+  };
 
   window.__imageSlotBridge = {
-    load: () => loadPromise,
+    load: loadSlots,
 
     save: async (slotsObj) => {
       if (!slotsObj || typeof slotsObj !== 'object') return;
@@ -116,13 +217,59 @@ async function compressDataUrl(dataUrl, maxPx = 1000, quality = 0.65) {
         }
         await batch.commit();
       } catch (e) {
-        console.warn('image_slots save failed:', e);
+        if (typeof reportError === 'function') reportError('save-image', e);
+        else console.warn('image_slots save failed:', e);
       }
     },
   };
 })();
 
 // ── Recipe CRUD ───────────────────────────────────────────────
+// Live view of the recipes. The first callback fires immediately from the
+// local cache (so the list is there with no connection), and again whenever
+// the server or another device changes something. Writes made offline show
+// up straight away and are replayed on reconnect.
+function db_watchRecipes(userId, sharedOwnerUids = [], onData, onError) {
+  const allUids = [...new Set([userId, ...sharedOwnerUids].filter(Boolean))];
+  const byUid = new Map();
+  const meta = new Map();
+
+  const emit = () => {
+    const seen = new Set();
+    const all = [];
+    for (const uid of allUids) {
+      for (const doc of (byUid.get(uid) || [])) {
+        if (seen.has(doc.id)) continue;
+        seen.add(doc.id);
+        all.push(doc);
+      }
+    }
+    all.sort((a, b) => {
+      const at = a.createdAt?.seconds ?? (typeof a.createdAt === 'number' ? a.createdAt / 1000 : 0);
+      const bt = b.createdAt?.seconds ?? (typeof b.createdAt === 'number' ? b.createdAt / 1000 : 0);
+      return bt - at;
+    });
+    const states = [...meta.values()];
+    onData(all, {
+      fromCache: states.some(m => m.fromCache),
+      hasPendingWrites: states.some(m => m.hasPendingWrites),
+      ready: byUid.size === allUids.length,
+    });
+  };
+
+  const unsubs = allUids.map(uid =>
+    _db.collection('recipes').where('userId', '==', uid)
+      .onSnapshot({ includeMetadataChanges: true },
+        (snap) => {
+          byUid.set(uid, snap.docs.map(d => ({ ...d.data(), id: d.id })));
+          meta.set(uid, { fromCache: snap.metadata.fromCache, hasPendingWrites: snap.metadata.hasPendingWrites });
+          emit();
+        },
+        (err) => { if (onError) onError(err); })
+  );
+  return () => unsubs.forEach(u => { try { u(); } catch {} });
+}
+
 async function db_loadRecipes(userId, sharedOwnerUids = []) {
   const allUids = [...new Set([userId, ...sharedOwnerUids].filter(Boolean))];
   const snapshots = await Promise.all(
@@ -146,18 +293,18 @@ async function db_loadRecipes(userId, sharedOwnerUids = []) {
 }
 
 async function db_saveRecipe(recipe) {
-  const { id, ...data } = recipe;
+  const { id, _catInfo, _shareId, _sharedBy, _sharedByEmail, ...data } = recipe;
   const uid = _auth.currentUser?.uid;
-  await _db.collection('recipes').doc(id).set({
+  return track('save-recipe', _db.collection('recipes').doc(id).set({
     ...data,
     ...(uid && !data.userId ? { userId: uid } : {}),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     createdAt: data.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }));
 }
 
 async function db_deleteRecipe(id) {
-  await _db.collection('recipes').doc(id).delete();
+  await track('delete-recipe', _db.collection('recipes').doc(id).delete());
   // Clean up orphaned image slots
   const slotsSnap = await _db.collection('image_slots')
     .where('recipeId', '==', id)
@@ -192,6 +339,8 @@ async function db_seedRecipes(recipes) {
 
 // ── Category CRUD ─────────────────────────────────────────────
 async function db_loadCategories() {
+  // Offline this resolves from the local cache; only a cold cache fails,
+  // and the caller falls back to the copy in localStorage.
   const snap = await _db.collection('categories').orderBy('order', 'asc').get();
   if (snap.empty) return null;
   return snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
@@ -204,7 +353,16 @@ async function db_saveCategories(cats) {
   cats.forEach((cat, idx) => {
     batch.set(_db.collection('categories').doc(cat.id), { ...cat, order: idx });
   });
-  await batch.commit();
+  return track('save-categories', batch.commit());
+}
+
+// Error log copy in the cloud — best effort, never blocks anything.
+async function db_logError(entry) {
+  const uid = _auth.currentUser?.uid || null;
+  return _db.collection('error_logs').add({
+    ...entry, uid,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).catch(() => {});
 }
 
 // ── Sharing ────────────────────────────────────────────────
@@ -316,13 +474,135 @@ async function db_removeSharedRecipe(shareId) {
   await _db.collection('recipe_shares').doc(shareId).delete();
 }
 
+// ── Full backup ───────────────────────────────────────────────
+// Everything here reads from the server, never from the local cache: a
+// backup that quietly copies a stale cache is worse than no backup.
+// Nothing in this section deletes or overwrites anything.
+
+const BACKUP_FORMAT  = 'maites-backup';
+const BACKUP_VERSION = 1;
+
+async function _getAll(name, source = 'server') {
+  const snap = await _db.collection(name).get({ source });
+  return snap.docs.map(d => ({ ...d.data(), id: d.id }));
+}
+
+// Reads every collection this account can see and returns one plain object.
+// `onStep` is called with a Hebrew label so the panel can say where it is.
+async function db_exportSnapshot(user, onStep = () => {}) {
+  const step = async (label, fn) => { onStep(label); return fn(); };
+
+  const recipes    = await step('מתכונים',  () => _getAll('recipes'));
+  const imageSlots = await step('תמונות',   () => _getAll('image_slots'));
+  const categories = await step('קטגוריות', () => _getAll('categories').catch(() => []));
+  const invites    = await step('שיתופים',  () => _getAll('invites').catch(() => []));
+  const shares     = await step('שיתופים',  () => _getAll('shares').catch(() => []));
+  const recipeShares = await step('שיתופים', () => _getAll('recipe_shares').catch(() => []));
+
+  onStep('אורז');
+  const slotMap = {};
+  let photoBytes = 0;
+  for (const s of imageSlots) {
+    const { id, ...rest } = s;
+    slotMap[id] = rest;
+    if (rest.u) photoBytes += rest.u.length;
+  }
+
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    user: { uid: user?.uid || null, email: user?.email || null },
+    counts: {
+      recipes: recipes.length,
+      imageSlots: imageSlots.length,
+      photos: Object.values(slotMap).filter(v => v && v.u).length,
+      categories: categories.length,
+      photoBytes,
+    },
+    recipes,
+    imageSlots: slotMap,
+    categories,
+    invites,
+    shares,
+    recipeShares,
+  };
+}
+
+// Compares a backup file against what is live right now. Reads only.
+async function db_inspectAgainstLive(backup) {
+  const liveRecipes = await _getAll('recipes').catch(() => null);
+  const liveSlots   = await _getAll('image_slots').catch(() => null);
+  if (!liveRecipes || !liveSlots) return { offline: true };
+
+  const liveRecipeIds = new Set(liveRecipes.map(r => r.id));
+  const liveSlotIds   = new Set(liveSlots.map(s => s.id));
+  const livePhotoIds  = new Set(liveSlots.filter(s => s.u).map(s => s.id));
+
+  const backupRecipes = backup.recipes || [];
+  const backupSlots   = backup.imageSlots || {};
+
+  const missingRecipes = backupRecipes.filter(r => !liveRecipeIds.has(r.id));
+  const missingPhotos  = Object.keys(backupSlots)
+    .filter(id => backupSlots[id] && backupSlots[id].u)
+    .filter(id => !livePhotoIds.has(id));
+
+  return {
+    offline: false,
+    live:    { recipes: liveRecipes.length, photos: livePhotoIds.size },
+    backup:  { recipes: backupRecipes.length, photos: Object.values(backupSlots).filter(v => v && v.u).length },
+    missingRecipes,
+    missingPhotos,
+    newerLive: backupRecipes.length < liveRecipeIds.size,
+    liveSlotIds,
+  };
+}
+
+// Writes back only what is genuinely absent. Never touches a document that
+// already exists, so running it twice changes nothing the second time.
+async function db_restoreMissing(backup, onStep = () => {}) {
+  const report = await db_inspectAgainstLive(backup);
+  if (report.offline) throw new Error('אין חיבור לשרת');
+
+  let recipesWritten = 0;
+  let photosWritten  = 0;
+
+  if (report.missingRecipes.length) {
+    onStep('מחזיר מתכונים');
+    const batch = _db.batch();
+    for (const r of report.missingRecipes) {
+      const { id, ...data } = r;
+      batch.set(_db.collection('recipes').doc(id), data);
+      recipesWritten++;
+    }
+    await batch.commit();
+  }
+
+  if (report.missingPhotos.length) {
+    onStep('מחזיר תמונות');
+    // Photos are heavy — commit them a few at a time.
+    const ids = report.missingPhotos;
+    for (let i = 0; i < ids.length; i += 4) {
+      const batch = _db.batch();
+      for (const id of ids.slice(i, i + 4)) {
+        batch.set(_db.collection('image_slots').doc(id), backup.imageSlots[id]);
+        photosWritten++;
+      }
+      await batch.commit();
+    }
+  }
+
+  return { recipesWritten, photosWritten };
+}
+
 Object.assign(window, {
   auth_signInWithGoogle, auth_signOut, auth_onAuthStateChanged,
-  db_loadRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot,
+  db_loadRecipes, db_watchRecipes, db_saveRecipe, db_deleteRecipe, db_deleteImageSlot, db_logError,
   db_seedRecipes, db_loadCategories, db_saveCategories,
   db_claimUnownedRecipes, db_hasUnownedRecipes,
-  db_createInvite, db_cancelInvite, db_getMyInvites,
+  db_createInvite, db_cancelInvite, db_getMyInvites, authReady,
   db_checkAndAcceptInvites, db_getMyShares, db_revokeShare,
   db_shareRecipeWith, db_getSharedWithMe, db_removeSharedRecipe,
   compressDataUrl,
+  db_exportSnapshot, db_inspectAgainstLive, db_restoreMissing,
 });
