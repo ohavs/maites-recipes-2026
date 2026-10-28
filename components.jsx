@@ -324,22 +324,22 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
   // Scroll-based physics (tilt / scale / fade / velocity-skew + tap bounce)
   useScrollPhysics(cardRef);
 
-  // With no photo at all we simply leave the space to the text — but only
+  // With no photo at all the card is its colour and its words — but only
   // once the photo store has actually been read, so a slow load can never
   // masquerade as "this recipe has no picture".
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
-  // One shape for every card. The photo is the full height of the card
-  // inside its padding — tall enough to be worth looking at, and filled
-  // edge to edge rather than floated inside blurred bands.
-  const cardH    = 184;
-  const padY     = 18;
-  const imgSize  = cardH - padY * 2;
-  const imgRadius= 'var(--r-md)';
+  // The photo IS the card: it covers the whole rectangle, and the title
+  // sits on top of it over a scrim dark enough to read against any
+  // picture. A card without a photo keeps the recipe's own colour and its
+  // own ink, so the list stays one list.
+  const cardH    = 208;
   const titleSize= 26;
   const descClamp= 2;
   const padX     = 24;
+  const padY     = 20;
+  const ink      = hasPhoto ? '#fff' : p.ink;
 
   const wrapperStyle = {
     position: 'relative',
@@ -360,7 +360,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
         style={{
           position: 'relative',
           borderRadius: 'var(--radius-card)',
-          minHeight: cardH,
+          height: cardH,
           cursor: 'pointer',
           background: cardBg,
           boxShadow: 'var(--shadow-card)',
@@ -369,42 +369,53 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           // Smooth out the scroll-physics transform between rAF frames
           transition: 'transform .18s cubic-bezier(.2,.8,.2,1.05), opacity .25s ease-out, box-shadow .25s ease',
         }}>
-        {/* shine — clipped to card so it doesn't bleed onto the protruding image */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          borderRadius: 'var(--radius-card)',
-          background: 'linear-gradient(160deg, var(--sheen) 0%, transparent 38%, rgba(0,0,0,.04) 100%)',
-          pointerEvents: 'none',
-          overflow: 'hidden',
-        }} />
-
-        {/* RTL row: text on right, big circle photo on left poking out */}
-        <div style={{
-          position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: `${padY}px ${padX}px`, gap: 14, alignItems: 'center',
-        }}>
-          {/* text */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="display" style={{
-              fontWeight: 700, fontSize: titleSize, lineHeight: 1.1, color: p.ink,
-              textWrap: 'balance',
-            }}>{recipe.title}</div>
-            {(
-              <div style={{
-                fontSize: 'var(--t-small)', lineHeight: 1.45,
-                color: p.ink, opacity: .75, fontWeight: 400,
-                display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-              }}>{recipe.description}</div>
-            )}
+        {/* the photo, corner to corner */}
+        {hasPhoto && (
+          <div style={{ position: 'absolute', inset: 0 }} data-shared-img={sharedId}>
+            <RecipePhoto url={photo} palette={p} radius={'var(--radius-card)'} alt="" fill/>
           </div>
+        )}
 
-          {/* photo — the same square, the same size, on every card */}
-          {hasPhoto && <div style={{
-            position: 'relative', width: imgSize, height: imgSize, flexShrink: 0,
-            borderRadius: imgRadius, overflow: 'hidden',
-          }} data-shared-img={sharedId}>
-            <RecipePhoto url={photo} palette={p} radius={imgRadius} alt="" fill/>
-          </div>}
+        {/* Words over a photograph need their own floor. The scrim is
+            nothing where the picture is at its best — the top two fifths —
+            and deepens to near-black behind the text. */}
+        {hasPhoto && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.46) 26%, rgba(0,0,0,.04) 56%, rgba(0,0,0,.14) 100%)',
+          }}/>
+        )}
+
+        {/* shine — only on a bare card; over a photo it just greys it */}
+        {!hasPhoto && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            borderRadius: 'var(--radius-card)',
+            background: 'linear-gradient(160deg, var(--sheen) 0%, transparent 38%, rgba(0,0,0,.04) 100%)',
+            pointerEvents: 'none',
+          }} />
+        )}
+
+        {/* text — along the bottom of the card, RTL */}
+        <div style={{
+          position: 'absolute', insetInline: 0, bottom: 0,
+          padding: `${padY}px ${padX}px`,
+          display: 'flex', flexDirection: 'column', gap: 6,
+          textAlign: 'start',
+        }}>
+          <div className="display" style={{
+            fontWeight: 700, fontSize: titleSize, lineHeight: 1.15, color: ink,
+            textWrap: 'balance',
+            textShadow: hasPhoto ? '0 1px 12px rgba(0,0,0,.55)' : 'none',
+          }}>{recipe.title}</div>
+          {recipe.description && (
+            <div style={{
+              fontSize: 'var(--t-small)', lineHeight: 1.45,
+              color: ink, opacity: hasPhoto ? .9 : .75, fontWeight: 400,
+              textShadow: hasPhoto ? '0 1px 10px rgba(0,0,0,.6)' : 'none',
+              display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+            }}>{recipe.description}</div>
+          )}
         </div>
 
         {/* favorite button — anchored to the OPPOSITE side (left in RTL = inline-end) */}
@@ -1010,31 +1021,21 @@ function ManageCategoriesSheet({ categories, onEdit, onDelete, onAdd, onClose })
 // RecipeCardSkeleton — placeholder while recipes load
 // ───────────────────────────────────────────────────────────
 function RecipeCardSkeleton() {
-  const cardH   = 184;
-  const imgSize = cardH - 36;
+  const cardH = 208;
   return (
     <div style={{ position: 'relative', width: '100%', animation: 'skelPulse 1.4s ease-in-out infinite' }}>
       <div style={{
-        borderRadius: 'var(--radius-card)', minHeight: cardH,
-        background: 'var(--glass)',
-        boxShadow: 'var(--shadow-card)', overflow: 'visible',
+        position: 'relative', height: cardH,
+        borderRadius: 'var(--radius-card)', overflow: 'hidden',
+        background: 'var(--glass)', boxShadow: 'var(--shadow-card)',
       }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--surface-sunken)' }}/>
         <div style={{
-          position: 'relative', height: cardH, display: 'flex', flexDirection: 'row-reverse',
-          padding: '18px 24px', gap: 8, alignItems: 'center',
+          position: 'absolute', insetInline: 0, bottom: 0, padding: '20px 24px',
+          display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ height: 24, width: '55%', borderRadius: 8, background: 'var(--surface-sunken)' }}/>
-            <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--surface-sunken)' }}/>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ height: 26, width: 64, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
-              <div style={{ height: 26, width: 44, borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)' }}/>
-            </div>
-          </div>
-          <div style={{
-            width: imgSize, height: imgSize, flexShrink: 0,
-            borderRadius: 'var(--r-md)', background: 'var(--surface-sunken)',
-          }}/>
+          <div style={{ height: 24, width: '55%', borderRadius: 8, background: 'var(--glass)' }}/>
+          <div style={{ height: 13, width: '75%', borderRadius: 6, background: 'var(--glass)' }}/>
         </div>
       </div>
       <style>{`@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
@@ -1043,16 +1044,10 @@ function RecipeCardSkeleton() {
 }
 
 // ───────────────────────────────────────────────────────────
-// RecipeCardGrid — 2-column square card with image poking out
-// from the top center. Used in 'grid' density mode.
-// ───────────────────────────────────────────────────────────
 // Every tile in the grid is the same size, whether or not the recipe has a
 // photo and whatever shape that photo is — a grid of different-sized cards
-// reads as clutter.
-// Taller than it is wide, so the photo above the caption gets the larger
-// share of the tile.
-const GRID_TILE_H = 206;
-const GRID_CAPTION_H = 56;
+// reads as clutter. Taller than it is wide: a tile is mostly photograph.
+const GRID_TILE_H = 212;
 
 function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   const p = paletteOf(recipe.palette);
@@ -1069,7 +1064,6 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const hasPhoto = !!photo || !slotsReady;
-  const slotSuffix = `-${recipe.mainSlot || (recipe.gallery && recipe.gallery[0]) || 'main'}`;
 
   return (
     <div style={{
@@ -1083,24 +1077,31 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
         borderRadius: 'var(--r-lg)', overflow: 'hidden',
         boxShadow: 'var(--e2)',
         background: `linear-gradient(160deg, ${p.bg} 0%, ${p.bg2 || p.bg} 100%)`,
-        display: 'flex', flexDirection: 'column',
         transition: 'transform var(--dur-fast) cubic-bezier(.2,.8,.2,1.05)',
       }}>
+        {/* the photo, corner to corner — same treatment as the list card */}
         {hasPhoto && (
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            <RecipePhoto url={photo} palette={p} radius={0} alt="" fill/>
+          <div style={{ position: 'absolute', inset: 0 }}>
+            <RecipePhoto url={photo} palette={p} radius={'var(--r-lg)'} alt="" fill/>
           </div>
         )}
+        {hasPhoto && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: 'linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.46) 28%, rgba(0,0,0,.04) 58%, rgba(0,0,0,.16) 100%)',
+          }}/>
+        )}
 
-        {/* With a photo the title is a caption strip under it; with no photo
-            it is the whole tile, so it gets to be large and centred. */}
+        {/* With a photo the title is a caption along the bottom; with no
+            photo it is the whole tile, so it gets to be large and centred. */}
         <div style={{
-          height: hasPhoto ? GRID_CAPTION_H : '100%',
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: hasPhoto ? '0 12px' : '36px 14px',
-          fontWeight: 700, color: p.ink,
+          position: 'absolute', inset: hasPhoto ? 'auto 0 0 0' : 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: hasPhoto ? '14px 12px 13px' : '36px 14px',
+          fontWeight: 700, color: hasPhoto ? '#fff' : p.ink,
           fontSize: hasPhoto ? 'var(--t-small)' : 'var(--t-heading)',
           lineHeight: hasPhoto ? 1.28 : 1.3,
+          textShadow: hasPhoto ? '0 1px 10px rgba(0,0,0,.6)' : 'none',
         }}>
           <span style={{
             display: '-webkit-box', WebkitLineClamp: hasPhoto ? 2 : 4,
