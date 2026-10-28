@@ -1,0 +1,57 @@
+# Publishes the web app to Firebase Hosting.
+#
+# The build needs nothing but Node — build.js uses only built-in modules —
+# so the whole deploy is two steps: compile dist/, then hand dist/ to
+# Firebase. No npm install, no Android SDK.
+#
+# Nothing secret is in this repository. The one secret below is set in
+# Settings → Secrets and variables → Actions:
+#
+#   FIREBASE_TOKEN — the output of `firebase login:ci` on a machine
+#   signed in to the bookingapp124 project.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    # The Android half of the repository never changes what is served.
+    paths-ignore:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+      - 'README.md'
+
+# Two deploys at once would race for the same site; the newer one wins.
+concurrency:
+  group: deploy-hosting
+  cancel-in-progress: true
+
+jobs:
+  hosting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Compile the web layer
+        run: node build.js
+
+      - name: Publish to Firebase Hosting
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::error::FIREBASE_TOKEN is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          # Pinned: the token login is deprecated and disappears in a major
+          # version, so the deploy must not follow firebase-tools forward
+          # on its own.
+          npx --yes firebase-tools@13.35.1 deploy \
+            --only hosting \
+            --project bookingapp124 \
+            --non-interactive
