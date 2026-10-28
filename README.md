@@ -1,6 +1,7 @@
 # Maites
 
-A Hebrew recipe app: a PWA today, an Android app in progress.
+A Hebrew recipe app for Android, built out of plain web files. The site
+Firebase Hosting serves is the same build, but the app is the product.
 
 ## Running it
 
