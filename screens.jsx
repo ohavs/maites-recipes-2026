@@ -271,7 +271,10 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
   const heroPhotoUrl = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
   const heroPhoto = !!heroPhotoUrl || !slotsReady;
-  const HERO_H = heroPhoto ? 258 : 116;
+  // With a photograph the hero IS the photograph: it fills the whole band,
+  // edge to edge, so it needs the height a picture deserves. Without one
+  // the band shrinks to just the top bar.
+  const HERO_H = heroPhoto ? 306 : 116;
   const BODY_OVERLAP = 30;     // how much body covers the hero by default
 
   // Parallax: as user scrolls up, the image translates up faster than the
@@ -300,20 +303,31 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           overflow: 'hidden',
           zIndex: 1,
         }}>
-          <div style={{ opacity: decorOpacity, transition: 'opacity .2s' }}>
-            <DecorScatter palette={p}/>
-          </div>
+          {/* the scattered dots are the backdrop for a hero with no
+              picture; over a photograph they are only litter */}
+          {!heroPhoto && (
+            <div style={{ opacity: decorOpacity, transition: 'opacity .2s' }}>
+              <DecorScatter palette={p}/>
+            </div>
+          )}
           {heroPhoto && (
             <div style={{
-              position: 'absolute', left: 0, right: 0, top: 58,
+              position: 'absolute', inset: 0,
               transform: `translateY(${-imgTranslate}px)`,
               transition: 'transform .05s linear',
               opacity: imgOpacity,
             }}>
               <ImageGallery recipeId={recipe.id}
                 slots={recipe.gallery && recipe.gallery.length ? recipe.gallery : ['main']}
-                size={168}
+                palette={p}
               />
+              {/* the round buttons float straight on the picture, so the
+                  top of it gets a floor dark enough to hold them */}
+              <div aria-hidden="true" style={{
+                position: 'absolute', insetInline: 0, top: 0, height: 120,
+                pointerEvents: 'none',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,.34) 0%, rgba(0,0,0,.12) 55%, rgba(0,0,0,0) 100%)',
+              }}/>
             </div>
           )}
         </div>

@@ -439,10 +439,25 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
 }
 
 // ───────────────────────────────────────────────────────────
-// ImageGallery — horizontal swipeable carousel of FoodImage
-// circles. Shows dots underneath. Used on the recipe detail.
+// ImageGallery — the recipe's photographs, one to a screen,
+// swiped sideways. Each picture covers the whole panel it is
+// given, corner to corner, the way it covers a card; the dots
+// ride on top of it. The gallery fills its parent, so the
+// parent decides the shape.
 // ───────────────────────────────────────────────────────────
-function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
+function GallerySlide({ recipeId, slot, palette }) {
+  const url = useRecipePhoto({ id: recipeId }, slot);
+  return (
+    <div style={{
+      flex: '0 0 100%', position: 'relative', scrollSnapAlign: 'center',
+      background: palette ? palette.bg : 'var(--surface-sunken)',
+    }}>
+      <RecipePhoto url={url} palette={palette} radius={0} alt="" fill/>
+    </div>
+  );
+}
+
+function ImageGallery({ recipeId, slots = ['main'], palette }) {
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
   const [slotsWithImages, setSlotsWithImages] = useState(new Set());
@@ -481,50 +496,31 @@ function ImageGallery({ recipeId, slots = ['main'], size = 260, onAddSlot }) {
   const slotsWithDots = slots.filter(slot => slotsWithImages.has(slot));
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ position: 'absolute', inset: 0 }}>
       <div ref={scrollRef} onScroll={onScroll} style={{
+        position: 'absolute', inset: 0,
         display: 'flex', overflowX: 'auto', overflowY: 'hidden',
         scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
         msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch',
       }}>
-        {slots.map((slot, i) => (
-          <div key={slot} style={{
-            flex: '0 0 100%', display: 'grid', placeItems: 'center',
-            scrollSnapAlign: 'center', padding: '8px 0',
-          }}>
-            <FoodImage recipeId={recipeId} size={size} slotIdSuffix={`-${slot}`} readonly />
-          </div>
+        {slots.map(slot => (
+          <GallerySlide key={slot} recipeId={recipeId} slot={slot} palette={palette}/>
         ))}
-        {onAddSlot && (
-          <div style={{
-            flex: '0 0 100%', display: 'grid', placeItems: 'center',
-            scrollSnapAlign: 'center', padding: '8px 0',
-          }}>
-            <button onClick={onAddSlot} style={{
-              width: size, height: size, borderRadius: '50%',
-              border: '2px dashed var(--line-strong)',
-              background: 'var(--surface-sunken)', cursor: 'pointer',
-              display: 'grid', placeItems: 'center', gap: 8,
-              fontFamily: 'inherit', color: 'var(--ink-soft)',
-            }}>
-              <IconPlus size={28} strokeWidth={2.2}/>
-              <span style={{ fontSize: 'var(--t-caption)', fontWeight: 700 }}>הוסיפו תמונה</span>
-            </button>
-          </div>
-        )}
       </div>
-      {/* dots — only when more than 1 slot actually has an image */}
+      {/* dots — only when more than 1 slot actually has an image. They sit
+          on the photograph itself, so they carry their own shadow. */}
       {slotsWithDots.length > 1 && (
         <div style={{
+          position: 'absolute', insetInline: 0, bottom: 46,
           display: 'flex', gap: 6, justifyContent: 'center',
-          marginTop: 4,
         }}>
           {slots.map((slot, i) => slotsWithImages.has(slot) ? (
             <button key={i} onClick={() => goTo(i)} aria-label={`תמונה ${i+1}`}
               style={{
                 width: i === index ? 22 : 7, height: 7, borderRadius: 'var(--r-pill)',
-                background: i === index ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.5)',
+                background: i === index ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.55)',
                 border: 'none', cursor: 'pointer', padding: 0,
+                boxShadow: '0 1px 4px rgba(0,0,0,.35)',
                 transition: 'width .25s, background .25s',
               }}/>
           ) : null)}
