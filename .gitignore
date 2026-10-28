@@ -1,4 +1,5 @@
 .firebase/
+firebase-debug.log
 
 # Local dev harness: runs the app against a stubbed backend for screenshots
 # and smoke tests. Never deployed.
