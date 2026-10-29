@@ -17,6 +17,10 @@ every change is for a phone with the APK installed, and judge it there.
   own updater (`updates.jsx`, on the settings screen) offers that release to
   the phone. Dispatching the workflow directly needs `actions:write`, which
   an assistant working here does not have — hence the branch.
+- **Always release.** The owner has asked for every finished change to be
+  shipped to the phone, without asking first: once work is committed and
+  pushed, push `release/<next version>` (one minor above the newest `v*`
+  tag) from the same commit, and say which version it is.
 - **There is no service worker inside the app.** `index.html` removes any it
   finds in the WebView on purpose: that cache outlives the app's own update
   and would serve the old version after an install. "I deployed and nothing
