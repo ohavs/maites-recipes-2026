@@ -236,6 +236,7 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
                 density={density}
                 variant={variant}
                 sharedId={r.id}
+                category={(categories || []).find(c => c.id === r.category) || (typeof CATEGORY_SEED !== 'undefined' ? CATEGORY_SEED[r.category] : null)}
               />
         ))}
       </div>
@@ -248,8 +249,14 @@ function HomeScreen({ recipes, recipesLoaded = true, loadError = null, onRetryLo
 // "disappears" behind the recipe body as it scrolls up),
 // swipeable image gallery, ingredients, notes, edit button.
 // ───────────────────────────────────────────────────────────
-function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onUpdateNotes, onShare, readOnly = false, openMs = 380 }) {
+function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDelete, onDuplicate, onUpdateNotes, onShare, onShareText, onShareImage, readOnly = false, openMs = 380 }) {
   const p = paletteOf(recipe.palette);
+  const [menu, setMenu] = uS(null);   // 'more' | 'share'
+  // Quantities in the recipe's own measures, or turned into grams and
+  // millilitres where the ingredient is one we know the weight of.
+  const [metric, setMetric] = uS(false);
+  const canConvert = uM(() => (recipe.ingredients || []).some(i => typeof convertQuantity === 'function'
+    && convertQuantity(i.qty, i.name, 'metric') !== (i.qty || '')), [recipe.ingredients]);
   const scrollRef = uR(null);
   const [scrollY, setScrollY] = uS(0);
   const [mounted, setMounted] = uS(false);
@@ -361,7 +368,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                 {minutes > 0 && <Chip tone="palette" palette={p}><IconClock size={13} strokeWidth={2.4}/> {formatMinutes(minutes)}</Chip>}
                 {stated && <Chip tone="palette" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {countLabel(servings, 'מנה אחת', 'מנות')}</Chip>}
-                {recipe.cuisine && <Chip tone="palette" palette={p}>🍽 {recipe.cuisine}</Chip>}
+                {recipe.cuisine && <Chip tone="palette" palette={p}><IconCuisine size={13} strokeWidth={2.4}/> {recipe.cuisine}</Chip>}
               </div>
             );
           })()}
@@ -383,6 +390,13 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
                 <div style={{ marginTop: 12 }}>
                   <ServingScaler base={baseServings} servings={servings} onChange={setServings} palette={p}/>
                 </div>
+                {canConvert && (
+                  <div style={{ marginTop: 10 }}>
+                    <SegmentedControl label="יחידות מידה" value={metric ? 'metric' : 'orig'}
+                      onChange={(v) => setMetric(v === 'metric')}
+                      options={[{ value: 'orig', label: 'כמו במתכון' }, { value: 'metric', label: 'גרם ומ״ל' }]}/>
+                  </div>
+                )}
                 {groups.map((g, gi) => (
                   <div key={gi} style={{ marginTop: g.name ? 22 : 12 }}>
                     {g.name && (
@@ -396,7 +410,7 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
                     )}
                     <div style={{ marginTop: g.name ? 4 : 0, display: 'flex', flexDirection: 'column' }}>
                       {g.items.map(({ ing, index }) => (
-                        <IngredientRow key={index} ing={ing} palette={p} index={index} factor={factor}/>
+                        <IngredientRow key={index} ing={ing} palette={p} index={index} factor={factor} metric={metric}/>
                       ))}
                     </div>
                   </div>
@@ -467,8 +481,8 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
         zIndex: 5, pointerEvents: 'none',
       }}>
         <div style={{ pointerEvents: 'auto' }}>
-          <RoundBtn onClick={onClose} title="חזרה" color="var(--ink)" ink="var(--bg)" size={42}>
-            <IconForward size={19} strokeWidth={2.4}/>
+          <RoundBtn onClick={onClose} title="חזרה" size={44}>
+            <IconForward size={20} strokeWidth={2.4}/>
           </RoundBtn>
         </div>
 
@@ -480,32 +494,58 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
               fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink)',
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <span>👤</span> שותף ע״י {recipe._sharedBy}
+              <IconUsers size={14} strokeWidth={2.4}/> שותף ע״י {recipe._sharedBy}
             </div>
           ) : <div/>
         ) : (
-          // Each action is its own round button, the same one the back
-          // arrow is — rather than a frosted capsule, which was the only
-          // blurred floating thing left in the app.
+          // Three things you do often stay on the picture; the rest —
+          // editing, copying, deleting — wait behind ⋯, so deleting a
+          // recipe is never one stray tap away.
           <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" size={42}
+            <RoundBtn onClick={() => onToggleFav(recipe.id)} title="מועדפים" size={44}
               ink={recipe.favorite ? 'var(--brand-strong)' : 'var(--ink)'}>
               <FavHeart filled={recipe.favorite}/>
             </RoundBtn>
-            {onShare && (
-              <RoundBtn onClick={() => onShare(recipe)} title="שיתוף" size={42}>
-                <IconShare size={18} strokeWidth={2.2}/>
-              </RoundBtn>
-            )}
-            <RoundBtn onClick={() => onEdit(recipe)} title="עריכה" size={42}>
-              <IconEdit size={18} strokeWidth={2.2}/>
+            <RoundBtn onClick={() => setMenu('share')} title="שיתוף" size={44}>
+              <IconShare size={19} strokeWidth={2.2}/>
             </RoundBtn>
-            <RoundBtn onClick={() => onDelete(recipe)} title="מחיקה" size={42} ink="var(--danger)">
-              <IconTrash size={18} strokeWidth={2.2}/>
+            <RoundBtn onClick={() => setMenu('more')} title="עוד פעולות" size={44}>
+              <IconMore size={20}/>
             </RoundBtn>
           </div>
         )}
       </div>
+
+      {menu === 'more' && (
+        <Sheet title={recipe.title} onClose={() => setMenu(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+            <SheetAction icon={<IconEdit size={21}/>} label="עריכה"
+              onClick={() => { setMenu(null); onEdit(recipe); }}/>
+            {onDuplicate && (
+              <SheetAction icon={<IconCopy size={21}/>} label="שכפול — ליצירת גרסה אחרת"
+                onClick={() => { setMenu(null); onDuplicate(recipe); }}/>
+            )}
+            <div style={{ borderTop: '1px solid var(--line)', marginTop: 6 }}/>
+            <SheetAction icon={<IconTrash size={21}/>} label="מחיקת המתכון" danger
+              onClick={() => { setMenu(null); onDelete(recipe); }}/>
+          </div>
+        </Sheet>
+      )}
+
+      {menu === 'share' && (
+        <Sheet title="שיתוף" subtitle={recipe.title} onClose={() => setMenu(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+            <SheetAction icon={<IconText size={21}/>} label="שליחה כטקסט — לוואטסאפ ולכל מקום"
+              onClick={() => { setMenu(null); onShareText && onShareText(recipe); }}/>
+            <SheetAction icon={<IconImage size={21}/>} label="שליחה כתמונה של עמוד המתכון"
+              onClick={() => { setMenu(null); onShareImage && onShareImage(recipe); }}/>
+            {onShare && (
+              <SheetAction icon={<IconUsers size={21}/>} label="שיתוף עם חשבון Maites אחר"
+                onClick={() => { setMenu(null); onShare(recipe); }}/>
+            )}
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }
@@ -584,7 +624,7 @@ function RoundBtn({ children, onClick, title, color = 'var(--surface-raised)', i
 }
 
 
-function IngredientRow({ ing, palette, index, factor = 1 }) {
+function IngredientRow({ ing, palette, index, factor = 1, metric = false }) {
   const ms = useAnimMs(420);
   const enabled = useAnimEnabled();
   const [shown, setShown] = uS(false);
@@ -614,7 +654,10 @@ function IngredientRow({ ing, palette, index, factor = 1 }) {
         fontSize: 'var(--t-body)', fontWeight: 600, color: 'var(--ink)', flex: 1,
       }}>
         <span style={{ color: palette.accent, fontVariantNumeric: 'tabular-nums', marginInlineEnd: 8 }}>
-          {typeof scaleQuantity === 'function' ? scaleQuantity(ing.qty, factor) : ing.qty}
+          {(() => {
+            const q = typeof scaleQuantity === 'function' ? scaleQuantity(ing.qty, factor) : ing.qty;
+            return metric && typeof convertQuantity === 'function' ? convertQuantity(q, ing.name, 'metric') : q;
+          })()}
         </span>
         {ing.name}
       </span>
@@ -907,9 +950,9 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   return (
     <div style={{
       height: '100%', display: 'flex', flexDirection: 'column',
-      // A form sits on a calm surface, not on the app's gradient: the
-      // fields are what you are looking at.
-      background: 'var(--surface)',
+      // The same ground as every other screen; the fields and cards on it
+      // are white, as the cards on the home screen are.
+      background: 'var(--ground)', backgroundColor: 'var(--bg)',
     }}>
 
       <div style={{ flexShrink: 0 }}>
@@ -1036,7 +1079,7 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
       {/* ── the bar that moves you along ───────────────── */}
       <div style={{
         flexShrink: 0, padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
-        background: 'var(--surface)', borderTop: '1px solid var(--line)',
+        background: 'transparent', borderTop: '1px solid var(--line)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <BarButton tone="quiet" onClick={() => (step === 0 ? tryCancel() : setStep(step - 1))}>
@@ -1145,8 +1188,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
 // as tall as a thumb — the form has no floating pills in it.
 function BarButton({ tone = 'quiet', grow, disabled, onClick, children }) {
   const tones = {
-    primary: { background: disabled ? 'var(--field-fill)' : 'var(--ink)', color: disabled ? 'var(--ink-faint)' : 'var(--bg)' },
-    quiet:   { background: 'var(--field-fill)', color: 'var(--ink)' },
+    primary: { background: disabled ? 'var(--field-fill)' : 'var(--brand-strong)', color: disabled ? 'var(--ink-faint)' : 'var(--on-brand)' },
+    quiet:   { background: 'var(--surface-raised)', color: 'var(--ink)' },
   };
   return (
     <button type="button" onClick={onClick} disabled={disabled}
@@ -1178,7 +1221,7 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
       <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
         {((+prepTime||0)+(+cookTime||0)) > 0 && <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {formatMinutes((+prepTime||0)+(+cookTime||0))}</Chip>}
         {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
-        {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
+        {cuisine && <Chip tone="raised" palette={p}><IconCuisine size={13} strokeWidth={2.4}/> {cuisine}</Chip>}
       </div>
     </div>
   );
@@ -1508,7 +1551,7 @@ function UnsavedChangesDialog({ onStay, onLeave }) {
       title="שינויים לא נשמרו"
       body="יש שינויים שטרם נשמרו. לצאת בלי לשמור?"
       confirmLabel="המשך עריכה"
-      cancelLabel="צא בלי לשמור"
+      cancelLabel="יציאה בלי שמירה"
       danger={false}
       onConfirm={onStay}
       onCancel={onLeave}
@@ -1546,7 +1589,7 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
           emoji="🤝"
           title="הסרת מתכון משותף"
           body={`להסיר את "${confirmItem.title}" ששותף איתך ע״י ${confirmItem._sharedBy}?`}
-          confirmLabel="הסר"
+          confirmLabel="הסרה"
           cancelLabel="ביטול"
           onConfirm={() => { onRemove(confirmId); setConfirmId(null); }}
           onCancel={() => setConfirmId(null)}
@@ -1556,9 +1599,7 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
         padding: '0 22px 10px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <span style={{ fontSize: 'var(--t-small)', fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.06em' }}>
-          שותפו איתי
-        </span>
+        <SectionLabel>שותפו איתי</SectionLabel>
         <span style={{
           fontSize: 'var(--t-caption)', fontWeight: 700, color: 'var(--ink-soft)',
           background: 'var(--surface-sunken)', borderRadius: 'var(--r-pill)', padding: '2px 8px',
@@ -1586,7 +1627,7 @@ function SharedRecipesSection({ items, onOpen, onRemove }) {
                   fontSize: 'var(--t-caption)', color: p.ink, opacity: .65, fontWeight: 600,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
-                  <span>👤</span> {r._sharedBy}
+                  <IconUsers size={13} strokeWidth={2.4}/> {r._sharedBy}
                 </div>
               </div>
               <button onClick={e => { e.stopPropagation(); setConfirmId(r._shareId); }}
@@ -1657,7 +1698,7 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'var(--bg)',
+      background: 'var(--ground)', backgroundColor: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
       animation: 'slideUp .32s cubic-bezier(.2,1.1,.35,1)',
     }}>
@@ -1682,7 +1723,7 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
           color: allInFilterSelected ? 'var(--bg)' : 'var(--ink)',
           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
         }}>
-          {allInFilterSelected ? 'בטל הכל' : 'בחר הכל'}
+          {allInFilterSelected ? 'ניקוי הבחירה' : 'בחירת הכל'}
         </button>
       </div>
 
@@ -1769,13 +1810,13 @@ function RecipeSelectSheet({ initialRecipe, recipes, categories, onShare, onClos
             }}/>
           <button onClick={handleShare} disabled={!canSend || sharing} style={{
             padding: '13px 18px', border: 'none', borderRadius: 'var(--r-md)',
-            background: canSend ? 'var(--ink)' : 'var(--line)',
-            color: canSend ? 'var(--bg)' : 'var(--ink-soft)',
+            background: canSend ? 'var(--brand-strong)' : 'var(--line)',
+            color: canSend ? 'var(--on-brand)' : 'var(--ink-soft)',
             fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)',
             cursor: canSend ? 'pointer' : 'default',
             flexShrink: 0, opacity: sharing ? .7 : 1, whiteSpace: 'nowrap',
           }}>
-            {sharing ? '…' : selectedIds.size > 0 ? `שתף ${selectedIds.size}` : 'שתף'}
+            {sharing ? '…' : selectedIds.size > 0 ? `שיתוף ${selectedIds.size}` : 'שיתוף'}
           </button>
         </div>
         {selectedIds.size > 0 && (
@@ -1847,7 +1888,7 @@ function LoginScreen({ onSignIn }) {
           onMouseUp={e => e.currentTarget.style.transform=''}
           onMouseLeave={e => e.currentTarget.style.transform=''}
         >
-          {loading ? <span style={{ fontSize: 'var(--t-heading)' }}>⏳</span> : (
+          {loading ? <Spinner size={20}/> : (
             <svg width="22" height="22" viewBox="0 0 48 48">
               <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.4c-.5 2.7-2.1 5-4.4 6.5v5.4h7.1c4.2-3.8 6.6-9.5 6.6-15.9z"/>
               <path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.1-5.5c-2.1 1.4-4.7 2.2-8.1 2.2-6.2 0-11.5-4.2-13.4-9.9H3.3v5.7C7 42.6 15 48 24 48z"/>
@@ -1855,7 +1896,7 @@ function LoginScreen({ onSignIn }) {
               <path fill="#EA4335" d="M24 9.6c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.4 2.4 30.1 0 24 0 15 0 7 5.4 3.3 13.3l7.3 5.7C12.5 13.8 17.8 9.6 24 9.6z"/>
             </svg>
           )}
-          {loading ? 'מתחברת…' : 'כניסה עם Google'}
+          {loading ? 'מתחברים…' : 'כניסה עם Google'}
         </button>
         {err && (
           <div style={{ marginTop: 16 }}>
@@ -1945,7 +1986,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                 ].map((s, i, arr) => (
                   <div key={i} style={{
                     flex: 1, textAlign: 'center',
-                    borderRight: i < arr.length - 1 ? '1px solid var(--line)' : 'none',
+                    borderInlineEnd: i < arr.length - 1 ? '1px solid var(--line)' : 'none',
                     padding: '4px 0',
                   }}>
                     <div style={{ fontSize: 'var(--t-title)', fontWeight: 800, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{s.num}</div>
@@ -2015,14 +2056,14 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                   background: 'var(--danger-soft)', color: 'var(--danger)', marginTop: 4,
                 }}
                   onClick={() => confirm({
-                    emoji: '🚪',
+                    emoji: '👋',
                     title: 'לצאת מהחשבון?',
-                    body: 'המתכונים נשארים בענן. אפשר להיכנס שוב מתי שתרצה.',
+                    body: 'המתכונים נשארים בענן. אפשר להיכנס שוב בכל זמן.',
                     confirmLabel: 'יציאה',
-                    cancelLabel: 'השאר מחובר',
+                    cancelLabel: 'ביטול',
                     onConfirm: onSignOut,
                   })}>
-                  <span style={{ fontSize: 'var(--t-heading)' }} aria-hidden="true">🚪</span> יציאה מהחשבון
+                  <IconLogout size={18} strokeWidth={2.2}/> יציאה מהחשבון
                 </Button>
               ) : null}
 
@@ -2038,14 +2079,12 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
 
               {/* Advanced account sharing */}
               <div>
-                <div style={{ fontSize: 'var(--t-caption)', fontWeight: 800, color: 'var(--ink-soft)', letterSpacing: '.1em', marginBottom: 10 }}>
-                  שיתוף חשבון
-                </div>
+                <SectionLabel style={{ marginBottom: 10 }}>שיתוף חשבון</SectionLabel>
                 <div style={{
                   background: 'var(--glass)', borderRadius: 'var(--r-md)', padding: '14px 16px',
                   fontSize: 'var(--t-small)', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: 10,
                 }}>
-                  הזמן/י מישהו לראות את כל המתכונים שלך — כולל עתידיים. הם יקבלו גישה ברגע שיכנסו לאפליקציה עם הג׳ימייל שלהם.
+                  אפשר להזמין מישהו לראות את כל המתכונים שלך — גם את אלה שיתווספו בעתיד. הגישה נפתחת ברגע שנכנסים לאפליקציה עם הג׳ימייל שהוזמן.
                 </div>
 
                 {/* People I shared with (as owner) */}
@@ -2076,13 +2115,13 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                           title: 'לבטל את השיתוף?',
                           body: <><strong style={{ color: 'var(--ink)' }}>{s.guestEmail}</strong> לא יוכל/תוכל יותר לראות את המתכונים שלך.</>,
                           confirmLabel: 'ביטול שיתוף',
-                          cancelLabel: 'השאר',
+                          cancelLabel: 'ביטול',
                           onConfirm: () => onRevokeShare(s.id),
                         })} style={{
                           border: 'none', background: 'var(--danger-soft)', color: 'var(--danger)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
-                        }}>בטל</button>
+                        }}>ביטול</button>
                       </div>
                     ))}
                   </div>
@@ -2098,7 +2137,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                         padding: '10px 14px', background: 'rgba(255,213,85,.15)', borderRadius: 'var(--r-sm)',
                         marginBottom: 6, border: '1px dashed var(--line-strong)',
                       }}>
-                        <span style={{ fontSize: 'var(--t-body)' }}>⏳</span>
+                        <span style={{ color: 'var(--warning)', display: 'grid', placeItems: 'center' }}><IconClock size={18} strokeWidth={2.2}/></span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 'var(--t-small)', fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {inv.guestEmail}
@@ -2112,13 +2151,13 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                           title: 'לבטל את ההזמנה?',
                           body: <>ההזמנה ל<strong style={{ color: 'var(--ink)' }}>{inv.guestEmail}</strong> תבוטל.</>,
                           confirmLabel: 'ביטול הזמנה',
-                          cancelLabel: 'השאר',
+                          cancelLabel: 'ביטול',
                           onConfirm: () => onCancelInvite(inv.id),
                         })} style={{
                           border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
-                        }}>בטל</button>
+                        }}>ביטול</button>
                       </div>
                     ))}
                   </div>
@@ -2134,7 +2173,7 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                         padding: '10px 14px', background: 'rgba(179,228,195,.25)', borderRadius: 'var(--r-sm)',
                         marginBottom: 6, border: '1px solid var(--line)',
                       }}>
-                        <span style={{ fontSize: 'var(--t-body)' }}>✅</span>
+                        <span style={{ color: 'var(--success)', display: 'grid', placeItems: 'center' }}><IconCheck size={18} strokeWidth={2.6}/></span>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 'var(--t-small)', fontWeight: 700, color: 'var(--ink)' }}>{s.ownerDisplayName || s.ownerEmail}</div>
                           <div style={{ fontSize: 'var(--t-caption)', color: 'var(--ink-soft)' }}>{s.ownerEmail}</div>
@@ -2144,13 +2183,13 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                           title: 'לבטל את השיתוף?',
                           body: <><strong style={{ color: 'var(--ink)' }}>{s.guestEmail}</strong> לא יוכל/תוכל יותר לראות את המתכונים שלך.</>,
                           confirmLabel: 'ביטול שיתוף',
-                          cancelLabel: 'השאר',
+                          cancelLabel: 'ביטול',
                           onConfirm: () => onRevokeShare(s.id),
                         })} style={{
                           border: 'none', background: 'var(--surface-sunken)', color: 'var(--ink-soft)',
                           borderRadius: 'var(--r-sm)', padding: '6px 10px', cursor: 'pointer',
                           fontFamily: 'inherit', fontSize: 'var(--t-caption)', fontWeight: 700, flexShrink: 0,
-                        }}>הסר</button>
+                        }}>הסרה</button>
                       </div>
                     ))}
                   </div>
@@ -2171,11 +2210,11 @@ function AccountPanel({ user, recipes, sharesInfo, pendingInvites, onClose, onSi
                     }}/>
                   <button onClick={handleInvite} disabled={!inviteEmail.trim() || inviting} style={{
                     padding: '12px 18px', border: 'none', borderRadius: 'var(--r-sm)', cursor: inviteEmail.trim() ? 'pointer' : 'default',
-                    background: inviteEmail.trim() ? 'var(--ink)' : 'var(--line)',
-                    color: inviteEmail.trim() ? 'var(--bg)' : 'var(--ink-soft)',
+                    background: inviteEmail.trim() ? 'var(--brand-strong)' : 'var(--line)',
+                    color: inviteEmail.trim() ? 'var(--on-brand)' : 'var(--ink-soft)',
                     fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-small)', flexShrink: 0,
                     opacity: inviting ? .7 : 1,
-                  }}>{inviting ? '…' : 'הזמן'}</button>
+                  }}>{inviting ? '…' : 'הזמנה'}</button>
                 </div>
 
                 {/* Mutual toggle */}
@@ -2248,7 +2287,7 @@ function SignInBlock({ onSignIn, localCount = 0 }) {
             : 'התחברות מסנכרנת את המתכונים בין מכשירים, שומרת אותם בענן ומאפשרת שיתוף. בלעדיה הכל נשמר על המכשיר הזה בלבד.'}
         </div>
         <Button tone="primary" size="lg" full disabled={busy} onClick={go}>
-          {busy ? 'מתחבר…' : 'התחברות עם Google'}
+          {busy ? 'מתחברים…' : 'התחברות עם Google'}
         </Button>
         {err && (
           <div>
@@ -2306,7 +2345,7 @@ function LocalNotebookBlock({ count, onUpload }) {
         </div>
         <Button tone="glass" full disabled={busy}
           onClick={async () => { setBusy(true); try { await onUpload(); } finally { setBusy(false); } }}>
-          {busy ? 'מעלה…' : `העלאת ${count} מתכונים לחשבון`}
+          {busy ? 'מעלים…' : `העלאת ${count} מתכונים לחשבון`}
         </Button>
       </div>
     </div>

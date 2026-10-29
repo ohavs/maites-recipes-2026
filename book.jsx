@@ -67,7 +67,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
         {/* running head */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          fontSize: 12, letterSpacing: '.22em', fontWeight: 700, color: p.accent,
+          fontSize: 13, fontWeight: 700, color: p.accent,
           textTransform: 'uppercase', paddingBottom: 12,
           borderBottom: `2px solid ${p.bg}`,
         }}>
@@ -123,7 +123,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
             padding: '22px 20px', boxShadow: `inset 0 0 0 1.5px ${p.bg}`,
           }}>
             <div style={{
-              fontSize: 12.5, letterSpacing: '.18em', fontWeight: 800, color: p.accent,
+              fontSize: 14, fontWeight: 800, color: p.accent,
               textTransform: 'uppercase', marginBottom: 14,
             }}>מצרכים</div>
             {ingredientGroups(ings).map((g, gi) => (
@@ -155,7 +155,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
           {(stepList.length > 0 || notes) && (
           <div style={{ flex: 1, minWidth: 0 }}>
             {stepList.length > 0 && <div style={{
-              fontSize: 12.5, letterSpacing: '.18em', fontWeight: 800, color: p.accent,
+              fontSize: 14, fontWeight: 800, color: p.accent,
               textTransform: 'uppercase', marginBottom: 16,
             }}>אופן ההכנה</div>}
             {stepList.length > 0 && stepList.map((st, i) => (
@@ -262,7 +262,7 @@ function BookTOCPage({ recipes, categories, forPrint = false }) {
       {groups.map(g => (
         <div key={g.id} style={{ marginBottom: 26, breakInside: 'avoid' }}>
           <div style={{
-            fontSize: 13, letterSpacing: '.2em', fontWeight: 800, color: '#b3445a',
+            fontSize: 14, fontWeight: 800, color: '#b3445a',
             marginBottom: 10,
           }}>{g.emoji} {g.label}</div>
           {g.items.map(it => (
@@ -477,6 +477,61 @@ function PdfBook({ recipes, categories, onDone, onError }) {
 }
 
 // ───────────────────────────────────────────────────────────
+// ShareImageJob — the recipe's book page as a picture, for sending.
+// The same page the PDF prints, so what arrives in a chat looks like the
+// book and not like a screenshot of the app.
+// ───────────────────────────────────────────────────────────
+function ShareImageJob({ recipe, categories, onDone, onError }) {
+  const stageRef = bR(null);
+  bE(() => {
+    let cancelled = false;
+    (async () => {
+      await new Promise(r => setTimeout(r, 350));   // photo and fonts settle
+      try {
+        await ensurePdfLibs();
+        const el = stageRef.current && stageRef.current.querySelector('.book-page');
+        if (!el) throw new Error('no page');
+        const canvas = await window.html2canvas(el, {
+          scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false,
+          width: A4_W, height: el.offsetHeight, windowWidth: A4_W,
+        });
+        const url = canvas.toDataURL('image/jpeg', 0.9);
+        canvas.width = canvas.height = 0;
+        if (cancelled) return;
+        // ASCII only: Android drops a file name with Hebrew in it.
+        const result = await shareImage(url, `maites-recipe-${Date.now().toString(36)}.jpg`, recipe.title);
+        if (!cancelled) onDone(result);
+      } catch (e) {
+        if (!cancelled) onError(e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return ReactDOM.createPortal(
+    <>
+      <div ref={stageRef} className="pdf-stage" aria-hidden="true">
+        <BookPage recipe={recipe} pageNo={1} categories={categories} forPrint/>
+      </div>
+      <div role="status" aria-live="polite" style={{
+        position: 'fixed', inset: 0, zIndex: 200, display: 'grid', placeItems: 'center',
+        background: 'var(--overlay)', backdropFilter: 'blur(8px)',
+      }}>
+        <div style={{
+          background: 'var(--surface)', color: 'var(--ink)', borderRadius: 'var(--r-lg)',
+          padding: '26px 30px', textAlign: 'center', boxShadow: 'var(--e3)',
+          display: 'grid', justifyItems: 'center', gap: 12,
+        }}>
+          <Spinner size={26}/>
+          <div style={{ ...TYPE.heading }}>מכינים תמונה…</div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
+// ───────────────────────────────────────────────────────────
 // PrintSelectSheet — pick which recipes go into the PDF
 // ───────────────────────────────────────────────────────────
 function PrintSelectSheet({ recipes, categories, onPrint, onClose }) {
@@ -484,85 +539,51 @@ function PrintSelectSheet({ recipes, categories, onPrint, onClose }) {
   const toggle = (id) => setSel(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
   const all = sel.length === recipes.length;
 
+  // Built on the shared Sheet, like every other sheet in the app — it used
+  // to be its own copy, with its own radii, sizes and handle.
   return (
-    <div onClick={onClose} style={{
-      position: 'absolute', inset: 0, zIndex: 60, background: 'rgba(28,22,32,.5)',
-      backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end',
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: 'var(--surface)', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', width: '100%',
-        maxHeight: '86%', display: 'flex', flexDirection: 'column',
-        boxShadow: 'var(--e3)', animation: 'slideUp .3s cubic-bezier(.2,1.1,.4,1)',
-      }}>
-        <div style={{ padding: '18px 22px 10px' }}>
-          <div style={{
-            width: 42, height: 5, borderRadius: 'var(--r-pill)', background: 'var(--line)',
-            margin: '0 auto 14px',
-          }}/>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-display)' }}>
-              אילו מתכונים להדפיס?
-            </h3>
-            <button onClick={() => setSel(all ? [] : recipes.map(r => r.id))} style={{
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700,
-              padding: '8px 14px', borderRadius: 'var(--r-pill)', background: 'var(--surface-sunken)', color: 'var(--ink)',
-            }}>{all ? 'ניקוי הכל' : 'בחירת הכל'}</button>
-          </div>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--ink-soft)' }}>
-            נבחרו {sel.length} מתוך {recipes.length} · יודפס עמוד A4 לכל מתכון
-          </p>
-        </div>
-
-        <div className="scroll-y" style={{ flex: 1, padding: '6px 16px 10px' }}>
-          {recipes.map(r => {
-            const on = sel.includes(r.id);
-            const p = paletteOf(r.palette);
-            const cat = (categories || []).find(c => c.id === r.category);
-            return (
-              <button key={r.id} onClick={() => toggle(r.id)} style={{
-                width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
-                padding: '10px 12px', borderRadius: 16, marginBottom: 6,
-                background: on ? 'var(--surface-raised)' : 'var(--glass)',
-                boxShadow: on ? 'var(--e1)' : 'none',
-              }}>
-                <span style={{
-                  width: 34, height: 34, borderRadius: 11, background: p.bg, flexShrink: 0,
-                  display: 'grid', placeItems: 'center', fontSize: 16,
-                }}>{cat?.emoji || '🍽️'}</span>
-                <span style={{
-                  flex: 1, minWidth: 0, fontSize: 14.5, fontWeight: 700, color: 'var(--ink)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>{r.title}</span>
-                <span style={{
-                  width: 22, height: 22, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center',
-                  background: on ? 'var(--ink)' : 'transparent', color: 'var(--bg)',
-                  boxShadow: on ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
-                }}>{on && <IconCheck size={13} strokeWidth={3}/>}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ padding: '12px 18px 26px', display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{
-            flexShrink: 0, padding: '15px 20px', border: 'none', cursor: 'pointer', borderRadius: 18,
-            background: 'var(--surface-sunken)', color: 'var(--ink)', fontFamily: 'inherit', fontWeight: 700, fontSize: 15,
-          }}>ביטול</button>
-          <button disabled={!sel.length}
-            onClick={() => onPrint(recipes.filter(r => sel.includes(r.id)))}
-            style={{
-              flex: 1, padding: '15px', border: 'none', borderRadius: 18,
-              cursor: sel.length ? 'pointer' : 'default',
-              background: sel.length ? 'var(--ink)' : 'var(--line)', color: 'var(--bg)',
-              fontFamily: 'inherit', fontWeight: 700, fontSize: 15.5,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    <Sheet title="אילו מתכונים להדפיס?"
+      subtitle={`נבחרו ${sel.length} מתוך ${recipes.length} · עמוד A4 לכל מתכון`}
+      onClose={onClose}
+      footer={<>
+        <Button tone="quiet" onClick={() => setSel(all ? [] : recipes.map(r => r.id))} style={{ flex: 1 }}>
+          {all ? 'ניקוי הבחירה' : 'בחירת הכל'}
+        </Button>
+        <Button tone="primary" disabled={!sel.length} style={{ flex: 2 }}
+          onClick={() => onPrint(recipes.filter(r => sel.includes(r.id)))}>
+          <IconFilePdf size={17} strokeWidth={2.2}/> ייצוא PDF
+        </Button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 8 }}>
+        {recipes.map(r => {
+          const on = sel.includes(r.id);
+          const p = paletteOf(r.palette);
+          const cat = (categories || []).find(c => c.id === r.category);
+          return (
+            <button key={r.id} type="button" onClick={() => toggle(r.id)} style={{
+              width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 12, textAlign: 'start',
+              padding: '10px 12px', minHeight: 56, borderRadius: 'var(--r-md)',
+              background: on ? 'var(--surface-raised)' : 'transparent',
             }}>
-            <IconFilePdf size={17} strokeWidth={2.2}/> ייצוא PDF
-          </button>
-        </div>
+              <span style={{
+                width: 36, height: 36, borderRadius: 'var(--r-sm)', background: p.bg, flexShrink: 0,
+                display: 'grid', placeItems: 'center', fontSize: 18,
+              }}>{cat?.emoji || '🍽️'}</span>
+              <span style={{
+                flex: 1, minWidth: 0, ...TYPE.body, fontWeight: 600, color: 'var(--ink)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>{r.title}</span>
+              <span style={{
+                width: 24, height: 24, borderRadius: 'var(--r-sm)', flexShrink: 0, display: 'grid', placeItems: 'center',
+                background: on ? 'var(--brand-strong)' : 'transparent', color: 'var(--on-brand)',
+                boxShadow: on ? 'none' : 'inset 0 0 0 2px var(--line-strong)',
+              }}>{on && <IconCheck size={14} strokeWidth={3}/>}</span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -617,21 +638,16 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: 15, fontWeight: 800, color: 'var(--ink)',
+              ...TYPE.heading, color: 'var(--ink)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{r.title}</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>
+            <div style={{ ...TYPE.caption, color: 'var(--ink-faint)' }}>
               עמוד {openIndex + 1} מתוך {ordered.length}
             </div>
           </div>
-          <button onClick={() => onPrint([r])} style={{
-            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            padding: '10px 15px', borderRadius: 'var(--r-pill)', background: 'var(--ink)', color: 'var(--bg)',
-            fontSize: 13, fontWeight: 700, boxShadow: 'var(--e1)',
-          }}>
+          <Button tone="primary" size="sm" onClick={() => onPrint([r])}>
             <IconFilePdf size={15} strokeWidth={2.2}/> PDF
-          </button>
+          </Button>
         </div>
 
         <div style={{ padding: '0 16px 18px' }}>
@@ -662,7 +678,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
       {/* cover */}
       <div style={{ padding: '0 18px' }}>
         <div style={{
-          position: 'relative', overflow: 'hidden', borderRadius: 28, padding: '30px 24px 26px',
+          position: 'relative', overflow: 'hidden', borderRadius: 'var(--r-lg)', padding: '30px 24px 26px',
           background: 'linear-gradient(150deg, var(--cover-1) 0%, var(--cover-2) 48%, var(--cover-3) 100%)',
           boxShadow: 'var(--shadow-card)', textAlign: 'center',
         }}>
@@ -675,31 +691,17 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
             ))}
           <div style={{ position: 'relative' }}>
             <div style={{ fontSize: 40 }}>📖</div>
-            <h1 className="display" style={{
-              margin: '6px 0 0', fontSize: 28, fontWeight: 800, color: 'var(--ink)',
-            }}>ספר המתכונים שלי</h1>
-            <div style={{ fontSize: 13.5, color: 'var(--ink-soft)', marginTop: 6 }}>
+            <h1 style={{ margin: '6px 0 0', ...TYPE.title, fontWeight: 800, color: 'var(--ink)' }}>ספר המתכונים שלי</h1>
+            <div style={{ ...TYPE.small, color: 'var(--ink-soft)', marginTop: 6 }}>
               {recipes.length} {recipes.length === 1 ? 'מתכון' : 'מתכונים'} · עמוד A4 מעוצב לכל מתכון
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'center' }}>
-              <button onClick={() => onPrint(ordered)} disabled={!ordered.length} style={{
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '12px 18px', borderRadius: 'var(--r-pill)', background: 'var(--ink)', color: 'var(--bg)',
-                fontSize: 13.5, fontWeight: 700, boxShadow: 'var(--e1)',
-                opacity: ordered.length ? 1 : .5,
-              }}>
+              <Button tone="primary" onClick={() => onPrint(ordered)} disabled={!ordered.length}>
                 <IconFilePdf size={16} strokeWidth={2.2}/> ייצוא הספר
-              </button>
-              <button onClick={onSelectPrint} disabled={!ordered.length} style={{
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '12px 18px', borderRadius: 'var(--r-pill)', background: 'var(--glass)', color: 'var(--ink)',
-                fontSize: 13.5, fontWeight: 700, boxShadow: 'var(--e1)',
-                opacity: ordered.length ? 1 : .5,
-              }}>
+              </Button>
+              <Button tone="glass" onClick={onSelectPrint} disabled={!ordered.length}>
                 <IconCheck size={16} strokeWidth={2.4}/> בחירת מתכונים
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -707,17 +709,11 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
 
       {/* table of contents */}
       <div style={{ padding: '24px 22px 0' }}>
-        <div style={{
-          fontSize: 12.5, letterSpacing: '.18em', fontWeight: 800, color: 'var(--ink-soft)',
-          textTransform: 'uppercase',
-        }}>תוכן העניינים</div>
+        <SectionLabel>תוכן העניינים</SectionLabel>
       </div>
 
       {!ordered.length && (
-        <div style={{ padding: '40px 22px', textAlign: 'center', color: 'var(--ink-soft)' }}>
-          <div style={{ fontSize: 46, marginBottom: 10 }}>📚</div>
-          <div style={{ fontSize: 15 }}>הספר עוד ריק — הוסיפו מתכון ראשון</div>
-        </div>
+        <EmptyState emoji="📚" title="הספר עוד ריק" text="כל מתכון שתוסיפו יקבל כאן עמוד משלו."/>
       )}
 
       {groups.map(g => (
@@ -726,14 +722,14 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
             display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 8px',
           }}>
             <span style={{ fontSize: 18 }}>{g.emoji}</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>{g.label}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink-soft)' }}>
+            <span style={{ ...TYPE.body, fontWeight: 800, color: 'var(--ink)' }}>{g.label}</span>
+            <span style={{ ...TYPE.caption, color: 'var(--ink-faint)' }}>
               {g.items.length === 1 ? 'מתכון אחד' : `${g.items.length} מתכונים`}
             </span>
             <span style={{ flex: 1, height: 1, background: 'var(--line)' }}/>
           </div>
           <div style={{
-            background: 'var(--glass)', borderRadius: 'var(--r-md)', overflow: 'hidden',
+            background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', overflow: 'hidden',
             boxShadow: 'var(--e1)',
           }}>
             {g.items.map((it, i) => {
@@ -742,7 +738,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
                 <button key={it.recipe.id} onClick={() => onOpenPage(it.recipe.id)} style={{
                   width: '100%', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   display: 'flex', alignItems: 'center', gap: 10, textAlign: 'start',
-                  padding: '12px 14px', background: 'transparent',
+                  padding: '14px 16px', minHeight: 52, background: 'transparent',
                   borderTop: i ? '1px solid var(--line)' : 'none',
                 }}>
                   <span style={{
@@ -750,13 +746,13 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
                     boxShadow: `0 0 0 3px ${p.bg2}`,
                   }}/>
                   <span style={{
-                    fontSize: 14.5, fontWeight: 700, color: 'var(--ink)',
+                    ...TYPE.body, fontWeight: 600, color: 'var(--ink)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '65%',
                   }}>{it.recipe.title}</span>
                   <span style={{
                     flex: 1, borderBottom: '2px dotted var(--line-strong)', transform: 'translateY(-3px)',
                   }}/>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink-soft)' }}>{it.pageNo}</span>
+                  <span style={{ ...TYPE.small, fontWeight: 800, color: 'var(--ink-faint)', fontVariantNumeric: 'tabular-nums' }}>{it.pageNo}</span>
                 </button>
               );
             })}
@@ -768,19 +764,19 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
 }
 
 const roundBarBtn = {
-  width: 40, height: 40, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
-  background: 'var(--glass)', color: 'var(--ink)',
-  display: 'grid', placeItems: 'center', boxShadow: 'var(--e1)',
+  width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', cursor: 'pointer', flexShrink: 0,
+  background: 'var(--surface-raised)', color: 'var(--ink)',
+  display: 'grid', placeItems: 'center', boxShadow: 'var(--e2)',
 };
 
 const pagerBtn = {
   flex: 1, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-  padding: '14px 0', borderRadius: 18, background: 'var(--glass)', color: 'var(--ink)',
-  fontSize: 14, fontWeight: 700, boxShadow: 'var(--e1)',
+  minHeight: 'var(--tap)', borderRadius: 'var(--r-md)', background: 'var(--surface-raised)', color: 'var(--ink)',
+  ...TYPE.small, fontWeight: 700,
 };
 
 Object.assign(window, {
-  BookScreen, BookPage, BookCover, BookTOCPage, PdfBook, PrintSelectSheet, PageScaler,
+  BookScreen, BookPage, BookCover, BookTOCPage, PdfBook, ShareImageJob, PrintSelectSheet, PageScaler,
   groupByCategory, pagesToPdfFile, ensurePdfLibs,
 });

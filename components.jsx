@@ -215,93 +215,27 @@ function useImageSlotsReady() {
 }
 
 // ───────────────────────────────────────────────────────────
-// useScrollPhysics — attaches to nearest .scroll-y ancestor and writes
-// a transform / opacity to the ref element on every scroll, based on its
-// distance from the viewport center + the parent's scroll velocity. All
-// updates go straight to `el.style` via rAF — zero React re-renders.
+// usePressBounce — a card gives a little under your finger, and that is
+// all it does. It used to tilt, shrink, fade and skew with every scroll as
+// well, which made the whole list sway: lively for a moment, then simply
+// unsteady, and harder to read than a list that holds still.
 // ───────────────────────────────────────────────────────────
-function useScrollPhysics(ref, opts = {}) {
+function usePressBounce(ref) {
   const enabled = useAnimEnabled();
-  const {
-    tiltDeg     = 10,    // rotateX magnitude (degrees) at viewport edges
-    scaleAmt    = 0.06,  // how much to scale down at edges (0–1)
-    fadeAmt     = 0.18,  // how much to fade at edges (0–1)
-    skewMax     = 4,     // max skew (deg) from scroll velocity
-  } = opts;
-
   useEffect(() => {
-    if (!enabled) return;
     const el = ref.current;
-    if (!el) return;
+    if (!el || !enabled) return;
+    const down = () => { el.style.transform = 'scale(.975)'; };
+    const up = () => { el.style.transform = ''; };
+    el.addEventListener('pointerdown', down);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => el.addEventListener(t, up));
+    // A scroll that began on the card is not a press.
     const scroller = el.closest('.scroll-y');
-    if (!scroller) return;
-
-    let raf = 0;
-    let lastScroll = scroller.scrollTop;
-    let lastTime = performance.now();
-    let velocity = 0;
-    let velTarget = 0;
-    let pressedScale = 1;
-
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
-    const apply = () => {
-      raf = 0;
-      const r  = el.getBoundingClientRect();
-      const sR = scroller.getBoundingClientRect();
-      const center = sR.top + sR.height / 2;
-      const cardCenter = r.top + r.height / 2;
-      const norm = clamp((cardCenter - center) / (sR.height * 0.55), -1, 1);
-
-      const rotX  = -norm * tiltDeg;
-      const scale = (1 - Math.abs(norm) * scaleAmt) * pressedScale;
-      const op    = 1 - Math.abs(norm) * fadeAmt;
-      // Velocity decays toward 0 — ease the displayed skew toward velTarget
-      velocity += (velTarget - velocity) * 0.18;
-      const skew  = clamp(velocity * 0.025, -skewMax, skewMax);
-
-      el.style.transform =
-        `perspective(1200px) rotateX(${rotX.toFixed(2)}deg) ` +
-        `skewY(${skew.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
-      el.style.opacity = op.toFixed(3);
-      el.style.willChange = 'transform, opacity';
-
-      // Keep ticking while velocity is non-trivial so the skew decays smoothly
-      if (Math.abs(velocity - velTarget) > 0.02 || Math.abs(velocity) > 0.05) {
-        velTarget *= 0.86;
-        raf = requestAnimationFrame(apply);
-      }
-    };
-
-    const onScroll = () => {
-      const now = performance.now();
-      const dt  = Math.max(1, now - lastTime);
-      const dy  = scroller.scrollTop - lastScroll;
-      velTarget = clamp((dy / dt) * 16, -180, 180);
-      lastScroll = scroller.scrollTop;
-      lastTime = now;
-      if (!raf) raf = requestAnimationFrame(apply);
-    };
-
-    // Press handlers — satisfying bounce on tap
-    const onDown = () => { pressedScale = 0.965; if (!raf) raf = requestAnimationFrame(apply); };
-    const onUp   = () => { pressedScale = 1;     if (!raf) raf = requestAnimationFrame(apply); };
-
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    el.addEventListener('pointerdown',   onDown);
-    el.addEventListener('pointerup',     onUp);
-    el.addEventListener('pointerleave',  onUp);
-    el.addEventListener('pointercancel', onUp);
-
-    apply(); // initial positioning
-
+    if (scroller) scroller.addEventListener('scroll', up, { passive: true });
     return () => {
-      scroller.removeEventListener('scroll', onScroll);
-      el.removeEventListener('pointerdown',   onDown);
-      el.removeEventListener('pointerup',     onUp);
-      el.removeEventListener('pointerleave',  onUp);
-      el.removeEventListener('pointercancel', onUp);
-      cancelAnimationFrame(raf);
+      el.removeEventListener('pointerdown', down);
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => el.removeEventListener(t, up));
+      if (scroller) scroller.removeEventListener('scroll', up);
     };
   }, [enabled]);
 }
@@ -311,7 +245,7 @@ function useScrollPhysics(ref, opts = {}) {
 // PROTRUDES from the card edge (like the reference video).
 // Three variants via Tweaks: 'block' (TikTok), 'bleed', 'soft'.
 // ───────────────────────────────────────────────────────────
-function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block', onToggleFav, sharedId }) {
+function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block', onToggleFav, sharedId, category }) {
   const p = paletteOf(recipe.palette);
   const enterMs = useAnimMs(550);
   const enabled = useAnimEnabled();
@@ -321,8 +255,7 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
     const t = setTimeout(() => setMounted(true), enabled ? index * 70 : 0);
     return () => clearTimeout(t);
   }, []);
-  // Scroll-based physics (tilt / scale / fade / velocity-skew + tap bounce)
-  useScrollPhysics(cardRef);
+  usePressBounce(cardRef);
 
   // With no photo at all the card is its colour and its words — but only
   // once the photo store has actually been read, so a slow load can never
@@ -416,7 +349,18 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
               display: '-webkit-box', WebkitLineClamp: descClamp, WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>{recipe.description}</div>
           )}
+          <CardMeta recipe={recipe} ink={ink} onPhoto={hasPhoto}/>
         </div>
+
+        {/* A card with no photograph is not a blank block of colour: it
+            carries its category's symbol where the picture would be. */}
+        {!hasPhoto && category && category.emoji && (
+          <div aria-hidden="true" style={{
+            position: 'absolute', top: 16, insetInlineStart: 18,
+            width: 60, height: 60, borderRadius: 'var(--r-pill)',
+            background: p.bg2, display: 'grid', placeItems: 'center', fontSize: 30,
+          }}>{category.emoji}</div>
+        )}
 
         {/* favorite button — anchored to the OPPOSITE side (left in RTL = inline-end) */}
         <button
@@ -434,6 +378,26 @@ function RecipeCard({ recipe, onOpen, index, density = 'comfy', variant = 'block
           <FavHeart filled={recipe.favorite} />
         </button>
       </div>
+    </div>
+  );
+}
+
+// The time and the servings under a card's title — only the ones the
+// recipe actually states.
+function CardMeta({ recipe, ink, onPhoto }) {
+  const minutes = recipeMinutes(recipe);
+  const serves = +recipe.servings > 0 ? +recipe.servings : 0;
+  if (!minutes && !serves) return null;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 14, marginTop: 2,
+      ...TYPE.caption, color: ink, opacity: onPhoto ? .92 : .7,
+      textShadow: onPhoto ? '0 1px 8px rgba(0,0,0,.6)' : 'none',
+    }}>
+      {minutes > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <IconClock size={13} strokeWidth={2.4}/>{formatMinutes(minutes)}</span>}
+      {serves > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+        <IconUsers size={13} strokeWidth={2.4}/>{countLabel(serves, 'מנה אחת', 'מנות')}</span>}
     </div>
   );
 }
@@ -1055,7 +1019,7 @@ function RecipeCardGrid({ recipe, onOpen, onToggleFav, index = 0 }) {
     const t = setTimeout(() => setMounted(true), enabled ? index * 55 : 0);
     return () => clearTimeout(t);
   }, []);
-  useScrollPhysics(cardRef, { tiltDeg: 5, scaleAmt: 0.03, fadeAmt: 0.1, skewMax: 2 });
+  usePressBounce(cardRef);
 
   const photo = useRecipePhoto(recipe);
   const slotsReady = useImageSlotsReady();
@@ -1169,7 +1133,7 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
     }} onClick={onCancel}>
       <div onClick={e => e.stopPropagation()} style={{
         background: 'var(--surface)',
-        borderRadius: 36, padding: '36px 28px 28px',
+        borderRadius: 'var(--r-lg)', padding: '32px 24px 24px',
         maxWidth: 340, width: '100%',
         boxShadow: 'var(--e3)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22,
@@ -1199,7 +1163,7 @@ function ConfirmDialog({ emoji = '🗑️', title, body, confirmLabel = 'איש�
 }
 
 Object.assign(window, {
-  AnimSpeedContext, useAnimMs, useAnimEnabled, useScrollPhysics,
+  AnimSpeedContext, useAnimMs, useAnimEnabled, usePressBounce,
   FoodImage, RecipePhoto, getRecipePhoto, useRecipePhoto, useImageSlotsReady, ImageGallery, RecipeCardSkeleton,
   RecipeCard, RecipeCardGrid, FavHeart, prefersReducedMotion,
   BottomNav, CategoryDropdown, CategoryEditSheet, CategoryPickSheet, ManageCategoriesSheet, useConfirm,

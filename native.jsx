@@ -142,7 +142,57 @@ function startNative() {
   }
 }
 
+// ── sending a recipe somewhere else ───────────────────────────
+// The phone's own share sheet: WhatsApp, messages, mail, whatever is
+// installed. Resolves to 'shared', 'copied' (no share sheet, so the text
+// went to the clipboard) or 'cancelled'.
+async function shareText(title, text) {
+  const c = CAP();
+  try {
+    if (isNative() && c.Share) {
+      await c.Share.share({ title, text, dialogTitle: 'שליחת המתכון' });
+      return 'shared';
+    }
+    if (navigator.share) { await navigator.share({ title, text }); return 'shared'; }
+  } catch (e) {
+    // Backing out of the share sheet is not a failure.
+    if (/cancel|abort/i.test(String(e && (e.name || e.message)))) return 'cancelled';
+    throw e;
+  }
+  await navigator.clipboard.writeText(text);
+  return 'copied';
+}
+
+// An image, from a data URL. On the phone it is written to the app's cache
+// and handed to the share sheet as a file; in a browser it is shared as a
+// file where that is possible and downloaded where it is not.
+async function shareImage(dataUrl, fileName, title) {
+  const c = CAP();
+  const base64 = String(dataUrl).split(',')[1] || '';
+  try {
+    if (isNative() && c.Share && c.Filesystem) {
+      const out = await c.Filesystem.writeFile({ path: fileName, data: base64, directory: c.Directory.Cache });
+      await c.Share.share({ title, files: [out.uri], dialogTitle: 'שליחת המתכון' });
+      return 'shared';
+    }
+    const blob = await (await fetch(dataUrl)).blob();
+    const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ title, files: [file] });
+      return 'shared';
+    }
+    const a = document.createElement('a');
+    a.href = dataUrl; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    return 'downloaded';
+  } catch (e) {
+    if (/cancel|abort/i.test(String(e && (e.name || e.message)))) return 'cancelled';
+    throw e;
+  }
+}
+
 Object.assign(window, {
   isNative, hapticTap, hapticDone, hapticWarn,
   pickPhotoNative, signInWithGoogleNative, paintSystemBars, startNative,
+  shareText, shareImage,
 });

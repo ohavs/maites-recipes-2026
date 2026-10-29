@@ -96,6 +96,63 @@ function scaleQuantity(qty, factor) {
   return (formatQtyNumber(parsed.value * factor) + (parsed.rest || '')).trim();
 }
 
+// ═══════════════════════════════════════════════════════════
+// Unit conversion — cups and spoons into grams and millilitres
+// ═══════════════════════════════════════════════════════════
+
+// What a millilitre of each weighs, in grams. A cup of flour and a cup of
+// sugar are the same cup and very different weights, so a conversion is
+// only offered for an ingredient on this list. Longer names come first so
+// "סוכר חום" is not read as "סוכר".
+const DENSITY = [
+  ['אבקת סוכר', 0.5], ['סוכר חום', 0.93], ['סוכר', 0.83],
+  ['קמח', 0.52], ['קורנפלור', 0.53], ['עמילן', 0.53], ['סולת', 0.7],
+  ['אבקת אפייה', 0.8], ['סודה לשתייה', 1.1], ['שמרים', 0.6],
+  ['קקאו', 0.42], ['שיבולת', 0.38], ['פירורי לחם', 0.45], ['פנקו', 0.25], ['קוקוס', 0.35],
+  ['אורז', 0.8], ['קוסקוס', 0.75], ['קינואה', 0.75], ['בורגול', 0.75], ['עדשים', 0.8], ['פתיתים', 0.65],
+  ['אגוזים טחונים', 0.45], ['שקדים טחונים', 0.45], ['אגוזים', 0.5], ['שקדים', 0.6], ['צימוקים', 0.6],
+  ['שוקולד צ׳יפס', 0.7], ['שוקולד ציפס', 0.7],
+  ['חמאת בוטנים', 1.08], ['חמאה', 0.95], ['מרגרינה', 0.95],
+  ['דבש', 1.42], ['סילאן', 1.4], ['ריבה', 1.3], ['טחינה', 1.0],
+  ['שמנת חמוצה', 1.0], ['גבינת שמנת', 1.0], ['יוגורט', 1.03], ['לבנה', 1.05], ['ריקוטה', 1.0],
+  ['גבינה מגורדת', 0.4], ['פרמזן', 0.4], ['מלח', 1.2],
+];
+
+// Liquids are measured, not weighed: these become millilitres.
+const LIQUIDS = ['מים', 'חלב', 'שמן', 'שמנת מתוקה', 'שמנת לבישול', 'מיץ', 'ציר', 'יין', 'חומץ', 'רוטב סויה', 'סויה', 'קפה', 'תה', 'משקה', 'בירה', 'רום', 'ליקר', 'תמצית', 'שמנת'];
+
+function densityOf(name) {
+  const n = String(name || '');
+  const hit = DENSITY.find(([w]) => n.includes(w));
+  return hit ? hit[1] : null;
+}
+
+function roundGrams(g) {
+  if (g < 10) return Math.round(g * 2) / 2;
+  if (g < 100) return Math.round(g);
+  return Math.round(g / 5) * 5;
+}
+
+// "2 כוסות" of flour → "255 גרם". Anything it cannot convert honestly —
+// an ingredient it does not know, a range, a measure that is not a cup or
+// a spoon — comes back exactly as it went in.
+function convertQuantity(qty, name, mode = 'metric') {
+  if (mode !== 'metric') return qty || '';
+  const parsed = parseQtyNumber(qty);
+  if (!parsed || parsed.wasRange) return qty || '';
+  const measure = readMeasure(parsed.rest);
+  if (!measure) return qty || '';
+  const ml = parsed.value * MEASURE_ML[measure.unit];
+  const tail = measure.tail ? ' ' + measure.tail : '';
+  const n = String(name || '');
+  if (!densityOf(n) && LIQUIDS.some(w => n.includes(w))) {
+    return `${ml >= 100 ? Math.round(ml / 5) * 5 : Math.round(ml)} מ״ל${tail}`;
+  }
+  const d = densityOf(n);
+  if (!d) return qty || '';
+  return `${formatQtyNumber(roundGrams(ml * d)) || roundGrams(ml * d)} גרם${tail}`;
+}
+
 // ───────────────────────────────────────────────────────────
 // ServingScaler — "how many are we cooking for?"
 // ───────────────────────────────────────────────────────────
@@ -367,7 +424,7 @@ function CookScreen({ recipe, onClose, servings }) {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, zIndex: 30, background: 'var(--bg)',
+      position: 'absolute', inset: 0, zIndex: 30, background: 'var(--ground)', backgroundColor: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
     }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 
@@ -385,7 +442,7 @@ function CookScreen({ recipe, onClose, servings }) {
             }}>{recipe.title}</div>
           </div>
           <Button size="sm" tone="glass" onClick={() => setShowIngredients(true)}>
-            🧺 מצרכים
+            <IconBasket size={16} strokeWidth={2.2}/> מצרכים
           </Button>
         </div>
 
@@ -512,6 +569,6 @@ function CookScreen({ recipe, onClose, servings }) {
 }
 
 Object.assign(window, {
-  scaleQuantity, parseQtyNumber, formatQtyNumber, readMeasure, sayMeasure, ServingScaler,
+  scaleQuantity, convertQuantity, parseQtyNumber, formatQtyNumber, readMeasure, sayMeasure, ServingScaler,
   parseDurations, useWakeLock, ringAlarm, StepTimer, CookScreen,
 });

@@ -90,7 +90,46 @@ function countLabel(n, one, many) {
   return +n === 1 ? one : `${n} ${many}`;
 }
 
+// A recipe as a message: WhatsApp's *bold* and _italic_ for the headings,
+// the parts of the ingredients kept, nothing the recipe does not state.
+function recipeAsText(r) {
+  const clean = (t) => (typeof stripHTML === 'function' ? stripHTML(t || '') : String(t || '')).trim();
+  const out = [`*${r.title}*`];
+  const desc = clean(r.description);
+  if (desc) out.push(desc);
+  const meta = [];
+  const minutes = recipeMinutes(r);
+  if (minutes) meta.push(`⏱ ${formatMinutes(minutes)}`);
+  if (+r.servings > 0) meta.push(`👥 ${countLabel(r.servings, 'מנה אחת', 'מנות')}`);
+  if (meta.length) out.push(meta.join(' · '));
+
+  const groups = ingredientGroups(r.ingredients);
+  if (groups.length) {
+    out.push('', '*מצרכים*');
+    groups.forEach(g => {
+      if (g.name) out.push(`_${g.name}_`);
+      g.items.forEach(({ ing }) => out.push(`• ${[ing.qty, ing.name].filter(Boolean).join(' ')}`));
+    });
+  }
+
+  const steps = (r.steps || []).filter(s => (s.title || '').trim() || (s.body || '').trim());
+  const auto = steps.length && steps.every(s => /^שלב\s*\d+$/.test((s.title || '').trim()));
+  const lines = steps.length
+    ? steps.map(s => [!auto && clean(s.title), clean(s.body)].filter(Boolean).join(' — '))
+    : clean(r.instructions).split(/\n+/).map(t => t.trim()).filter(Boolean);
+  if (lines.length) {
+    out.push('', '*אופן ההכנה*');
+    lines.forEach((t, i) => out.push(`${i + 1}. ${t}`));
+  }
+
+  const notes = clean(r.notes);
+  if (notes) out.push('', '*הערות*', notes);
+  out.push('', '— נשלח מ־Maites');
+  return out.join('\n');
+}
+
 Object.assign(window, {
+  recipeAsText,
   CATEGORIES, CATEGORY_SEED, PALETTES, PALETTE_HEX, PALETTE_KEYS,
   paletteOf, paletteHexOf, RECIPES, defaultGallery,
   ingredientGroups, formatMinutes, recipeMinutes, countLabel,

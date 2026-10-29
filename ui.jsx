@@ -16,7 +16,9 @@ const TYPE = {
   body:    { fontSize: 'var(--t-body)',    fontWeight: 400, lineHeight: 'var(--lh-body)' },
   small:   { fontSize: 'var(--t-small)',   fontWeight: 500, lineHeight: 1.5 },
   caption: { fontSize: 'var(--t-caption)', fontWeight: 600, lineHeight: 1.45 },
-  label:   { fontSize: 'var(--t-label)',   fontWeight: 800, lineHeight: 1.4, letterSpacing: '.14em', textTransform: 'uppercase' },
+  // No letter-spacing: spaced-out Hebrew reads as separate letters
+  // ("מ צ ר כ י ם"), not as a heading.
+  label:   { fontSize: 'var(--t-label)',   fontWeight: 800, lineHeight: 1.4 },
 };
 
 // ───────────────────────────────────────────────────────────
@@ -118,8 +120,10 @@ function IconButton({ size = 'md', tone = 'glass', label, onClick, disabled, sty
 // ───────────────────────────────────────────────────────────
 function Button({ tone = 'primary', size = 'md', full, disabled, onClick, style, children, ...rest }) {
   const tones = {
-    primary: { background: 'var(--ink)',           color: 'var(--bg)',       boxShadow: 'var(--e2)' },
-    brand:   { background: 'var(--brand-strong)',  color: 'var(--on-brand)', boxShadow: 'var(--e2)' },
+    // One colour for "do it": the brand pink, the same as the + button and
+    // the bar. Black is for what is selected, not for what you press.
+    primary: { background: 'var(--brand-strong)',  color: 'var(--on-brand)', boxShadow: 'none' },
+    brand:   { background: 'var(--brand-strong)',  color: 'var(--on-brand)', boxShadow: 'none' },
     quiet:   { background: 'var(--surface-sunken)', color: 'var(--ink)',     boxShadow: 'none' },
     glass:   { background: 'var(--glass)',         color: 'var(--ink)',      boxShadow: 'var(--e1)' },
     danger:  { background: 'var(--danger)',        color: 'var(--on-danger)', boxShadow: 'var(--e2)' },
@@ -365,33 +369,13 @@ function Page({ title, subtitle, onClose, closeLabel = 'סגירה', header, foo
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 55,
-      background: 'var(--surface)', color: 'var(--ink)',
+      background: 'var(--ground)', backgroundColor: 'var(--bg)', color: 'var(--ink)',
       display: 'flex', flexDirection: 'column',
       animation: 'pageIn var(--dur-slow) var(--ease-out)',
       ...style,
     }}>
       <div style={{ flexShrink: 0 }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 8px 10px 14px', minHeight: 64,
-        }}>
-          <div style={{ flex: 1, minWidth: 0, paddingInlineStart: 10 }}>
-            <div className="display" style={{ ...TYPE.title, color: 'var(--ink)' }}>{title}</div>
-            {subtitle && (
-              <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>{subtitle}</div>
-            )}
-          </div>
-          {onClose && (
-            <button type="button" onClick={onClose} aria-label={closeLabel}
-              style={{
-                width: 48, height: 48, borderRadius: 999, border: 'none', flexShrink: 0,
-                background: 'transparent', color: 'var(--ink)', cursor: 'pointer',
-                display: 'grid', placeItems: 'center',
-              }}>
-              <IconClose size={22} strokeWidth={2.2}/>
-            </button>
-          )}
-        </div>
+        <ScreenBar title={title} subtitle={subtitle} onClose={onClose} closeLabel={closeLabel}/>
         {header}
       </div>
 
@@ -413,6 +397,35 @@ function Page({ title, subtitle, onClose, closeLabel = 'סגירה', header, foo
           @keyframes pageIn{0%{opacity:0}100%{opacity:1}}
         }
       `}</style>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// ScreenBar — the top of every screen that covers the app. The way out
+// sits at the start of the line, where a phone puts "back" and where the
+// recipe screen already had it; it used to be at the far end on some
+// screens and the near end on others.
+// ───────────────────────────────────────────────────────────
+function ScreenBar({ title, subtitle, onClose, closeLabel = 'סגירה', icon }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 16px 10px', minHeight: 68,
+    }}>
+      {onClose && (
+        <IconButton label={closeLabel} tone="raised" size="md" onClick={onClose}>
+          {icon || <IconClose size={20} strokeWidth={2.3}/>}
+        </IconButton>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="display" style={{ ...TYPE.title, color: 'var(--ink)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        {subtitle && (
+          <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -466,7 +479,7 @@ function Spinner({ size = 22, color = 'var(--ink-soft)' }) {
 // Toast — transient message, and SaveState — the persistent
 // "is my data safe" indicator.
 // ───────────────────────────────────────────────────────────
-function Toast({ message, tone = 'neutral', onDismiss }) {
+function Toast({ message, tone = 'neutral', onDismiss, action }) {
   const tones = {
     neutral: { background: 'var(--ink)', color: 'var(--bg)' },
     success: { background: 'var(--success)', color: 'var(--on-success)' },
@@ -484,6 +497,15 @@ function Toast({ message, tone = 'neutral', onDismiss }) {
         ...tones[tone],
       }}>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{message}</span>
+      {/* One thing to do about it — "undo", usually. Big enough to hit. */}
+      {action && (
+        <button type="button" onClick={(e) => { e.stopPropagation(); action.onClick(); }}
+          style={{
+            border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer',
+            fontFamily: 'inherit', ...TYPE.small, fontWeight: 800, textDecoration: 'underline',
+            padding: '10px 6px', margin: '-10px -6px -10px 0', flexShrink: 0,
+          }}>{action.label}</button>
+      )}
       <style>{`@keyframes toastIn{0%{opacity:0;transform:translate(-50%,12px)}100%{opacity:1;transform:translate(-50%,0)}}`}</style>
     </div>
   );
@@ -496,8 +518,8 @@ function SaveState({ state, pending = 0, onRetry }) {
   const map = {
     saving:  { icon: <Spinner size={13} color="var(--ink-soft)"/>, text: 'שומר…',        bg: 'var(--glass)',        fg: 'var(--ink-soft)' },
     saved:   { icon: <IconCheck size={13} strokeWidth={3}/>,        text: 'נשמר',         bg: 'var(--success-soft)', fg: 'var(--success)' },
-    offline: { icon: <span aria-hidden="true">☁️</span>,            text: pending > 1 ? `${pending} שינויים ממתינים לחיבור` : 'ממתין לחיבור', bg: 'var(--glass)', fg: 'var(--ink-soft)' },
-    error:   { icon: <span aria-hidden="true">⚠️</span>,            text: 'השמירה נכשלה', bg: 'var(--danger-soft)',  fg: 'var(--danger)' },
+    offline: { icon: <IconCloud size={14} strokeWidth={2.4}/>,            text: pending > 1 ? `${pending} שינויים ממתינים לחיבור` : 'ממתין לחיבור', bg: 'var(--glass)', fg: 'var(--ink-soft)' },
+    error:   { icon: <span aria-hidden="true" style={{ fontWeight: 900 }}>!</span>,            text: 'השמירה נכשלה', bg: 'var(--danger-soft)',  fg: 'var(--danger)' },
   };
   const s = map[state] || map.saving;
   return (
@@ -536,7 +558,7 @@ function OfflineBanner({ pending }) {
       boxShadow: 'var(--e2)', color: 'var(--ink)',
       animation: 'toastIn var(--dur) var(--ease-out)',
     }}>
-      <span aria-hidden="true" style={{ fontSize: 15 }}>☁️</span>
+      <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', color: 'var(--ink-soft)' }}><IconCloud size={18} strokeWidth={2.2}/></span>
       <span style={{ ...TYPE.caption, flex: 1, minWidth: 0 }}>
         {pending
           ? 'אין חיבור — השינויים שמורים במכשיר ויסונכרנו אוטומטית'
@@ -602,7 +624,7 @@ function SegmentedControl({ value, options, onChange, label }) {
 
 Object.assign(window, {
   TYPE, useTheme, applyTheme, readTheme,
-  Card, IconButton, Button, Chip, SectionLabel, Field, inputStyle, Page,
+  Card, IconButton, Button, Chip, SectionLabel, Field, inputStyle, Page, ScreenBar,
   ListRow, Sheet, EmptyState, ErrorState, Spinner, Toast, SaveState, OfflineBanner,
   Switch, SegmentedControl,
 });

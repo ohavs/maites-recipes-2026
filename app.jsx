@@ -26,6 +26,7 @@ function App() {
   const [editingRecipeId, setEditingRecipeId] = $S(null);
   const [deletingRecipeId, setDeletingRecipeId] = $S(null);
   const [toast, setToast] = $S(null);
+  const [shareImageOf, setShareImageOf] = $S(null);   // a recipe being turned into a picture
   const [density, setDensity] = $S(() => {
     // Two layouts: stacked cards, or a grid of tiles. 'compact' was a
     // third, in between, and anyone still on it lands on the cards.
@@ -137,7 +138,7 @@ function App() {
       if (recipesUnsubRef.current) recipesUnsubRef.current();
       recipesUnsubRef.current = db_watchRecipes(user.uid, ownerUids,
         (recs, meta) => {
-          setRecipes(recs || []);
+          setRecipes((recs || []).filter(r => !pendingDeletes.current.has(r.id)));
           setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites });
           setRecipesLoaded(true);
           setLoadError(null);
@@ -303,20 +304,91 @@ function App() {
       return updated;
     });
 
+  // Deleting asks nothing and can be taken back. The recipe leaves the
+  // list at once, and is really deleted only when the "undo" has gone —
+  // a confirm dialog asks before every delete to protect against the rare
+  // mistake, where an undo costs nothing until the mistake happens.
+  // (The server delete also clears the photos, which is why it waits
+  // rather than deleting now and re-saving on undo.)
+  const UNDO_MS = 5000;
+  const pendingDeletes = $R(new Map());   // id → { timer, run }
+  const commitDelete = (id) => {
+    const p = pendingDeletes.current.get(id);
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingDeletes.current.delete(id);
+    p.run();
+  };
+  $E(() => {
+    // Leaving the app (or the screen going off) finishes what is pending,
+    // so a delete is never silently forgotten.
+    const flush = () => { if (document.visibilityState === 'hidden') [...pendingDeletes.current.keys()].forEach(commitDelete); };
+    document.addEventListener('visibilitychange', flush);
+    return () => document.removeEventListener('visibilitychange', flush);
+  }, []);
+
   const deleteRecipe = (id) => {
+    const rec = recipes.find(r => r.id === id);
+    if (!rec) return;
+    const at = recipes.indexOf(rec);
+    const user = currentUser;
     setRecipes(rs => rs.filter(r => r.id !== id));
-    if (!currentUser) guestDelete(id);
-    else if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
     setOpenRecipeId(null);
     setDeletingRecipeId(null);
-    showToast('המתכון נמחק');
+    const run = () => {
+      if (!user) guestDelete(id);
+      else if (typeof db_deleteRecipe !== 'undefined') db_deleteRecipe(id).catch(err => reportError('delete-recipe', err));
+    };
+    pendingDeletes.current.set(id, { run, timer: setTimeout(() => commitDelete(id), UNDO_MS) });
+    showToast(`"${rec.title}" נמחק`, 'neutral', {
+      label: 'ביטול',
+      onClick: () => {
+        const p = pendingDeletes.current.get(id);
+        if (p) { clearTimeout(p.timer); pendingDeletes.current.delete(id); }
+        setRecipes(rs => {
+          if (rs.some(r => r.id === id)) return rs;
+          const next = [...rs];
+          next.splice(Math.min(at, next.length), 0, rec);
+          return next;
+        });
+        setToast(null);
+        if (typeof hapticTap === 'function') hapticTap();
+      },
+    });
+  };
+
+  // A copy to change: the same recipe, its photos with it, and the form
+  // open on it straight away.
+  const duplicateRecipe = (r) => {
+    const id = `${String(r.title || 'recipe').trim().replace(/\s+/g, '-').slice(0, 24)}-${Date.now().toString(36)}`;
+    const copy = {
+      ...r, id, title: `${r.title} (עותק)`, favorite: false,
+      createdAt: undefined, updatedAt: undefined, userId: undefined,
+    };
+    Object.keys(copy).forEach(k => copy[k] === undefined && delete copy[k]);
+    (r.gallery && r.gallery.length ? r.gallery : ['main']).forEach(slot => {
+      const d = window.__getImageSlot && window.__getImageSlot(`food-${r.id}-${slot}`);
+      if (d && window.__setImageSlot) window.__setImageSlot(`food-${id}-${slot}`, d);
+    });
+    setRecipes(rs => [copy, ...rs]);
+    persist(copy);
+    setOpenRecipeId(id);
+    setEditingRecipeId(id);
+    showToast('נוצר עותק — אפשר לשנות אותו');
+  };
+
+  const shareRecipeText = async (r) => {
+    try {
+      const how = await shareText(r.title, recipeAsText(r));
+      if (how === 'copied') showToast('המתכון הועתק — אפשר להדביק אותו בכל מקום');
+    } catch (err) { reportError('share-text', err); showToast('השליחה נכשלה', 'danger'); }
   };
 
   const toastTimer = $R(0);
-  const showToast = (msg, tone = 'neutral') => {
+  const showToast = (msg, tone = 'neutral', action = null) => {
     clearTimeout(toastTimer.current);
-    setToast({ msg, tone });
-    toastTimer.current = setTimeout(() => setToast(null), tone === 'danger' ? 4000 : 2400);
+    setToast({ msg, tone, action });
+    toastTimer.current = setTimeout(() => setToast(null), action ? UNDO_MS : tone === 'danger' ? 4000 : 2400);
   };
 
   const handleExport = (kind) => {
@@ -502,7 +574,7 @@ function App() {
       }}>
         <div style={{ textAlign: 'center', color: 'var(--ink-soft)' }}>
           <img src="/maites-logo.png" alt="Maites" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }}/>
-          <div style={{ fontSize: 'var(--t-body)' }}>טוענת…</div>
+          <Spinner size={22}/>
         </div>
       </div>
     );
@@ -586,9 +658,12 @@ function App() {
             onToggleFav={toggleFav}
             onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 1); }}
             onEdit={(r) => setEditingRecipeId(r.id)}
-            onDelete={(r) => setDeletingRecipeId(r.id)}
+            onDelete={(r) => deleteRecipe(r.id)}
+            onDuplicate={duplicateRecipe}
             onUpdateNotes={updateNotes}
-            onShare={(r) => setSharingRecipe(r)}
+            onShare={currentUser ? (r) => setSharingRecipe(r) : null}
+            onShareText={shareRecipeText}
+            onShareImage={(r) => setShareImageOf(r)}
             openMs={openMs}
           />
         )}
@@ -603,6 +678,8 @@ function App() {
               onClose={() => setOpenRecipeId(null)}
               onToggleFav={() => {}}
               onOpenSteps={(r, servings) => { setCookRecipeId(r.id); setCookServings(servings || r.servings || 1); }}
+              onShareText={shareRecipeText}
+              onShareImage={(r) => setShareImageOf(r)}
               readOnly={true}
               openMs={openMs}
             />
@@ -645,7 +722,7 @@ function App() {
         )}
 
         {/* Transient message, the save indicator, and the offline notice */}
-        {toast && <Toast message={toast.msg} tone={toast.tone} onDismiss={() => setToast(null)} />}
+        {toast && <Toast message={toast.msg} tone={toast.tone} action={toast.action} onDismiss={() => setToast(null)} />}
         <SaveState
           state={!online && (syncMeta.hasPendingWrites || saveState.pending) ? 'offline' : saveState.state}
           pending={saveState.pending}
@@ -749,7 +826,7 @@ function App() {
                 setSharedOwnerUids(ownerUids);
                 if (recipesUnsubRef.current) recipesUnsubRef.current();
                 recipesUnsubRef.current = db_watchRecipes(currentUser.uid, ownerUids,
-                  (recs, meta) => { setRecipes(recs || []); setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites }); },
+                  (recs, meta) => { setRecipes((recs || []).filter(r => !pendingDeletes.current.has(r.id))); setSyncMeta({ fromCache: !!meta.fromCache, hasPendingWrites: !!meta.hasPendingWrites }); },
                   (err) => reportError('watch-recipes', err));
                 showToast('השיתוף בוטל');
               } catch (err) { reportError('account-action', err); showToast('הפעולה נכשלה', 'danger'); }
@@ -816,12 +893,12 @@ function App() {
               </p>
               <Button tone="primary" size="lg" full disabled={claiming}
                 onClick={handleClaimRecipes} style={{ marginBottom: 10 }}>
-                {claiming ? 'מעביר…' : 'כן, שייך אליי'}
+                {claiming ? 'מעבירים…' : 'כן, לשייך אליי'}
               </Button>
               <Button tone="quiet" full onClick={() => {
                 localStorage.setItem(`maites.claimed.${currentUser.uid}`, '1');
                 setShowClaimPrompt(false);
-              }}>דלג בינתיים</Button>
+              }}>לא עכשיו</Button>
             </div>
           </div>
         )}
@@ -833,6 +910,15 @@ function App() {
           @keyframes tab-up{0%{opacity:0;transform:translateY(32px)}100%{opacity:1;transform:none}}
         `}</style>
       </div>
+
+      {shareImageOf && (
+        <ShareImageJob
+          recipe={shareImageOf}
+          categories={categories}
+          onDone={(how) => { setShareImageOf(null); if (how === 'downloaded') showToast('התמונה נשמרה'); }}
+          onError={(err) => { setShareImageOf(null); reportError('share-image', err); showToast('יצירת התמונה נכשלה', 'danger'); }}
+        />
+      )}
 
       {printJob && (
         <PdfBook
@@ -895,7 +981,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
           }}>🍳</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, color: 'var(--ink)' }}>
-              התקיני את Maites
+              התקנת Maites
             </div>
             <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
               גישה מהירה לכל המתכונים שלך
@@ -913,7 +999,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
             background: 'rgba(247,168,184,.15)', borderRadius: 'var(--r-md)', padding: '12px 14px',
             fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.7, textAlign: 'right',
           }}>
-            בספארי: לחצי על <strong>שתף</strong> (□↑) ← <strong>"הוסף למסך הבית"</strong>
+            בספארי: לחצו על <strong>שתף</strong> (□↑) ← <strong>"הוסף למסך הבית"</strong>
           </div>
         ) : canNativeInstall ? (
           <button onClick={onInstall} style={{
@@ -923,7 +1009,7 @@ function InstallPrompt({ isIOS, canNativeInstall, onInstall, onDismiss }) {
             fontWeight: 700, fontSize: 15, color: 'var(--ink)',
             cursor: 'pointer', width: '100%',
           }}>
-            התקיני עכשיו
+            התקנה
           </button>
         ) : (
           <div style={{

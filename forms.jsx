@@ -49,7 +49,8 @@ function NField({ value, onChange, label, hint, type = 'text', inputMode, placeh
           // floating inside and moving about while you type.
           background: 'var(--surface-raised)', color: 'var(--ink)',
           border: `2px solid ${focused ? 'var(--brand-strong)' : 'transparent'}`,
-          borderRadius: 'var(--r-lg)',
+          // The same corner as the buttons beside it, rather than a pill.
+          borderRadius: 'var(--r-md)',
           fontFamily: 'inherit', fontSize: 'var(--t-body)', fontWeight: 500,
           textAlign: 'right', direction: 'rtl',
           padding: multiline ? '16px 18px' : '0 18px',
@@ -452,7 +453,7 @@ function EmojiGrid({ value, onPick, onType, custom = true, onConfirm, confirmLab
               style={{
                 border: 'none', borderRadius: 'var(--r-md)', padding: '0 20px', minHeight: 'var(--field-h)',
                 cursor: 'pointer', flexShrink: 0,
-                background: 'var(--ink)', color: 'var(--bg)',
+                background: 'var(--brand-strong)', color: 'var(--on-brand)',
                 fontFamily: 'inherit', fontWeight: 700, fontSize: 'var(--t-body)',
               }}>{confirmLabel}</button>
           )}
@@ -793,29 +794,7 @@ function FormPager({ step, onStep, count, children }) {
 // a phone puts at the top of a screen you are inside.
 // ───────────────────────────────────────────────────────────
 function NAppBar({ title, subtitle, onClose, closeLabel = 'סגירה' }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 8px 10px 14px', minHeight: 64,
-    }}>
-      <div style={{ flex: 1, minWidth: 0, paddingInlineStart: 10 }}>
-        <div className="display" style={{ ...TYPE.title, color: 'var(--ink)' }}>{title}</div>
-        {subtitle && (
-          <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 600, marginTop: 2 }}>{subtitle}</div>
-        )}
-      </div>
-      {onClose && (
-        <button type="button" onClick={onClose} aria-label={closeLabel}
-          style={{
-            width: 48, height: 48, borderRadius: 999, border: 'none', flexShrink: 0,
-            background: 'transparent', color: 'var(--ink)', cursor: 'pointer',
-            display: 'grid', placeItems: 'center',
-          }}>
-          <IconClose size={22} strokeWidth={2.2}/>
-        </button>
-      )}
-    </div>
-  );
+  return <ScreenBar title={title} subtitle={subtitle} onClose={onClose} closeLabel={closeLabel}/>;
 }
 
 Object.assign(window, {

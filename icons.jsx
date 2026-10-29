@@ -257,6 +257,29 @@ const IconMore = (p) => (
     <circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/>
   </Icon>
 );
+const IconBasket = (p) => (
+  <Icon {...p}><path d="M5 10h14l-1.5 9a2 2 0 0 1-2 1.7h-7A2 2 0 0 1 6.5 19z"/><path d="M8.5 10l3.5-6 3.5 6"/><path d="M10 14v3M14 14v3"/></Icon>
+);
+const IconLogout = (p) => (
+  <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></Icon>
+);
+const IconCloud = (p) => (
+  <Icon {...p}><path d="M7 18a4.5 4.5 0 0 1-.5-8.97A6 6 0 0 1 18 8.5a4.75 4.75 0 0 1-.5 9.5z"/></Icon>
+);
+// Fork and knife — the kind of cooking.
+const IconCuisine = (p) => (
+  <Icon {...p}><path d="M7 3v8M4.5 3v5a2.5 2.5 0 0 0 5 0V3M7 11v10"/><path d="M17 21V3c-2 1.5-3 4-3 7v3h3"/></Icon>
+);
+const IconCopy = (p) => (
+  <Icon {...p}><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></Icon>
+);
+// Two arrows trading places — a measure turned into another.
+const IconConvert = (p) => (
+  <Icon {...p}><path d="M4 8h14l-3.5-3.5"/><path d="M20 16H6l3.5 3.5"/></Icon>
+);
+const IconText = (p) => (
+  <Icon {...p}><path d="M4 6h16M4 12h16M4 18h10"/></Icon>
+);
 // Stacked layers — a part of a recipe, the dough or the filling.
 const IconLayers = (p) => (
   <Icon {...p}><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></Icon>
@@ -322,7 +345,7 @@ Object.assign(window, {
   IconCheck, IconShare, IconExcel, IconWord, IconCamera, IconImage,
   IconEdit, IconNote, IconTrash,
   IconGrid, IconRows, IconColumns2,
-  IconBook, IconChevronDown, IconChevronUp, IconMore, IconLayers, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
+  IconBook, IconChevronDown, IconChevronUp, IconMore, IconLayers, IconBasket, IconLogout, IconCloud, IconCuisine, IconCopy, IconConvert, IconText, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,
   ING_ICONS, ING_KEY_EMOJI, IngredientIcon,
