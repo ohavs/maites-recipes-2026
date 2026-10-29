@@ -91,10 +91,10 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
               {[
-                ['⏱', `${(recipe.prepTime || 0) + (recipe.cookTime || 0) || recipe.time || 0} דקות`],
-                ['👥', `${recipe.servings || '—'} מנות`],
+                recipeMinutes(recipe) ? ['⏱', formatMinutes(recipeMinutes(recipe))] : null,
+                +recipe.servings > 0 ? ['👥', countLabel(recipe.servings, 'מנה אחת', 'מנות')] : null,
                 recipe.cuisine ? ['🍽', recipe.cuisine] : null,
-                ings.length ? ['🧺', `${ings.length} מצרכים`] : null,
+                ings.length ? ['🧺', countLabel(ings.length, 'מצרך אחד', 'מצרכים')] : null,
               ].filter(Boolean).map(([e, t], i) => (
                 <span key={i} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -117,6 +117,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
 
         {/* body — ingredients (right) + method (left) */}
         <div style={{ display: 'flex', gap: 34, marginTop: 30, alignItems: 'flex-start', flex: 1 }}>
+          {ings.length > 0 && (
           <div style={{
             width: 252, flexShrink: 0, background: `${p.bg2}`, borderRadius: 22,
             padding: '22px 20px', boxShadow: `inset 0 0 0 1.5px ${p.bg}`,
@@ -125,30 +126,39 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
               fontSize: 12.5, letterSpacing: '.18em', fontWeight: 800, color: p.accent,
               textTransform: 'uppercase', marginBottom: 14,
             }}>מצרכים</div>
-            {ings.length ? ings.map((ing, i) => (
-              <div key={i} style={{
-                display: 'flex', gap: 9, alignItems: 'flex-start',
-                fontSize: 14.5, lineHeight: 1.5, padding: '7px 0',
-                borderBottom: i < ings.length - 1 ? '1px solid rgba(44,29,39,.08)' : 'none',
-              }}>
-                <span style={{
-                  width: 7, height: 7, borderRadius: 'var(--r-pill)', background: p.accent,
-                  marginTop: 8, flexShrink: 0,
-                }}/>
-                <span>
-                  {ing.qty && <strong style={{ color: p.accent, marginInlineEnd: 5 }}>{ing.qty}</strong>}
-                  {ing.name}
-                </span>
+            {ingredientGroups(ings).map((g, gi) => (
+              <div key={gi} style={{ marginTop: gi ? 16 : 0, breakInside: 'avoid' }}>
+                {g.name && (
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#2c1d27', paddingBottom: 4 }}>{g.name}</div>
+                )}
+                {g.items.map(({ ing }, i) => (
+                  <div key={i} style={{
+                    display: 'flex', gap: 9, alignItems: 'flex-start',
+                    fontSize: 14.5, lineHeight: 1.5, padding: '7px 0',
+                    borderBottom: i < g.items.length - 1 ? '1px solid rgba(44,29,39,.08)' : 'none',
+                  }}>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: 'var(--r-pill)', background: p.accent,
+                      marginTop: 8, flexShrink: 0,
+                    }}/>
+                    <span>
+                      {ing.qty && <strong style={{ color: p.accent, marginInlineEnd: 5 }}>{ing.qty}</strong>}
+                      {ing.name}
+                    </span>
+                  </div>
+                ))}
               </div>
-            )) : <div style={{ fontSize: 14, color: '#5b4452', fontStyle: 'italic' }}>לא הוזנו מצרכים</div>}
+            ))}
           </div>
+          )}
 
+          {(stepList.length > 0 || notes) && (
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
+            {stepList.length > 0 && <div style={{
               fontSize: 12.5, letterSpacing: '.18em', fontWeight: 800, color: p.accent,
               textTransform: 'uppercase', marginBottom: 16,
-            }}>אופן ההכנה</div>
-            {stepList.length ? stepList.map((st, i) => (
+            }}>אופן ההכנה</div>}
+            {stepList.length > 0 && stepList.map((st, i) => (
               <div key={i} style={{ display: 'flex', gap: 14, marginBottom: 16, breakInside: 'avoid' }}>
                 <span style={{
                   width: 30, height: 30, borderRadius: 'var(--r-pill)', flexShrink: 0,
@@ -162,11 +172,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
                   <div style={{ color: '#3b2b35' }}>{clean(st.body || '')}</div>
                 </div>
               </div>
-            )) : (
-              <div style={{ fontSize: 14.5, color: '#5b4452', fontStyle: 'italic' }}>
-                לא נוספו הוראות הכנה למתכון זה.
-              </div>
-            )}
+            ))}
 
             {notes && (
               <div style={{
@@ -180,6 +186,7 @@ function BookPage({ recipe, pageNo, categories, forPrint = false }) {
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* folio */}
@@ -575,6 +582,12 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
   const openIndex = ordered.findIndex(r => r.id === openId);
   const groups = bM(() => groupByCategory(ordered, categories), [ordered, categories]);
 
+  // A page comes in the way the tabs do: forward from the left, and the
+  // contents back from the right when you close it.
+  const wasOpen = bR(false);
+  const closing = wasOpen.current && openIndex < 0;
+  bE(() => { wasOpen.current = openIndex >= 0; });
+
   // swipe between pages
   const touch = bR(null);
   const onTouchStart = (e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
@@ -592,7 +605,7 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
   if (openIndex >= 0) {
     const r = ordered[openIndex];
     return (
-      <div className="scroll-y" style={{ height: '100%' }}
+      <div key={r.id} className="scroll-y" style={{ height: '100%', animation: 'tab-fromLeft var(--dur-slow) var(--ease-out) both' }}
         onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div style={{
           position: 'sticky', top: 0, zIndex: 10, padding: '12px 18px',
@@ -642,7 +655,10 @@ function BookScreen({ recipes, categories, openId, onOpenPage, onClosePage, onPr
   }
 
   return (
-    <div className="scroll-y" style={{ height: '100%', padding: '14px 0 140px' }}>
+    <div className="scroll-y" style={{
+      height: '100%', padding: '14px 0 140px',
+      animation: closing ? 'tab-fromRight var(--dur-slow) var(--ease-out) both' : undefined,
+    }}>
       {/* cover */}
       <div style={{ padding: '0 18px' }}>
         <div style={{

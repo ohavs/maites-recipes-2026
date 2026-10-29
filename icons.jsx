@@ -249,6 +249,18 @@ const IconBook = (p) => (
 const IconChevronDown = (p) => (
   <Icon {...p}><path d="M6 9l6 6 6-6"/></Icon>
 );
+const IconChevronUp = (p) => (
+  <Icon {...p}><path d="M6 15l6-6 6 6"/></Icon>
+);
+const IconMore = (p) => (
+  <Icon {...p} fill="currentColor" stroke="none">
+    <circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/>
+  </Icon>
+);
+// Stacked layers — a part of a recipe, the dough or the filling.
+const IconLayers = (p) => (
+  <Icon {...p}><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></Icon>
+);
 const IconCamera = (p) => (
   <Icon {...p}>
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -310,7 +322,7 @@ Object.assign(window, {
   IconCheck, IconShare, IconExcel, IconWord, IconCamera, IconImage,
   IconEdit, IconNote, IconTrash,
   IconGrid, IconRows, IconColumns2,
-  IconBook, IconChevronDown, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
+  IconBook, IconChevronDown, IconChevronUp, IconMore, IconLayers, IconFilePdf, IconVeg, IconFruit, IconEgg, IconDairy, IconBread, IconGrain, IconSpice, IconHerb,
   IconSweet, IconMeat, IconFish, IconCheese, IconDrop, IconBottle, IconChocolate,
   IconCoffee, IconNuts,
   ING_ICONS, ING_KEY_EMOJI, IngredientIcon,

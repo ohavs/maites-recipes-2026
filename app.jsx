@@ -362,8 +362,18 @@ function App() {
   };
 
   const TABS = ['home', 'book', 'add'];
+  // Which way the screen arrives from. Home → book used to cut straight
+  // across with nothing moving, while book → home seemed to animate only
+  // because the home cards fade in on their own. Every switch now moves:
+  // the book sits to the left of home in the bar, so it comes in from the
+  // left and home comes back from the right; a new recipe rises from below.
+  const [tabEnter, setTabEnter] = $S(null);
   const goTab = (id) => {
-    setTab(TABS.includes(id) ? id : 'home');
+    const next = TABS.includes(id) ? id : 'home';
+    if (next !== tab) {
+      setTabEnter(next === 'add' ? 'up' : TABS.indexOf(next) > TABS.indexOf(tab) ? 'fromLeft' : 'fromRight');
+    }
+    setTab(next);
     if (id !== 'book') setBookRecipeId(null);
   };
   const navTo = (id) => {
@@ -504,6 +514,10 @@ function App() {
 
         {/* Main tab screens */}
         <div style={{ position: 'absolute', inset: 0 }}>
+          <div key={tab} style={{
+            position: 'absolute', inset: 0,
+            animation: tabEnter ? `tab-${tabEnter} var(--dur-slow) var(--ease-out) both` : undefined,
+          }}>
           {tab === 'home' && (
             <HomeScreen
               recipes={recipes}
@@ -560,6 +574,7 @@ function App() {
               onStepChange={setFormStep}
             />
           )}
+          </div>
           {!anyOverlay && <BottomNav active={tab} onChange={navTo} onAdd={() => navTo('add')} />}
         </div>
 
@@ -813,6 +828,9 @@ function App() {
 
         <style>{`
           @keyframes toastIn{0%{opacity:0;transform:translate(-50%,12px)}100%{opacity:1;transform:translate(-50%,0)}}
+          @keyframes tab-fromLeft{0%{opacity:0;transform:translateX(-9%)}100%{opacity:1;transform:none}}
+          @keyframes tab-fromRight{0%{opacity:0;transform:translateX(9%)}100%{opacity:1;transform:none}}
+          @keyframes tab-up{0%{opacity:0;transform:translateY(32px)}100%{opacity:1;transform:none}}
         `}</style>
       </div>
 

@@ -340,7 +340,9 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
           marginTop: -BODY_OVERLAP,
           zIndex: 2,
           padding: '26px 22px 180px',
-          minHeight: '70vh',
+          // Down to the bottom of the screen however short the recipe is —
+          // a short one used to end in mid-air, its shadow on the page below.
+          minHeight: `calc(100% - ${HERO_H - BODY_OVERLAP}px)`,
           boxShadow: 'var(--e3)',
         }}>
           <h1 className="display" data-comment-anchor="detail-title" style={{
@@ -348,11 +350,21 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             lineHeight: 1.15, textWrap: 'balance',
           }}>{recipe.title}</h1>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <Chip tone="palette" palette={p}><IconClock size={13} strokeWidth={2.4}/> {recipe.time} דקות</Chip>
-            <Chip tone="palette" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings || recipe.servings} מנות</Chip>
-            {recipe.cuisine && <Chip tone="palette" palette={p}>🍽 {recipe.cuisine}</Chip>}
-          </div>
+          {/* Only what the recipe actually says. A time nobody wrote down
+              used to read "0 דקות", and a recipe that never said how many
+              it feeds read "1 מנות" — both made up by the screen. */}
+          {(() => {
+            const minutes = recipeMinutes(recipe);
+            const stated = +recipe.servings > 0;
+            if (!minutes && !stated && !recipe.cuisine) return null;
+            return (
+              <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                {minutes > 0 && <Chip tone="palette" palette={p}><IconClock size={13} strokeWidth={2.4}/> {formatMinutes(minutes)}</Chip>}
+                {stated && <Chip tone="palette" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {countLabel(servings, 'מנה אחת', 'מנות')}</Chip>}
+                {recipe.cuisine && <Chip tone="palette" palette={p}>🍽 {recipe.cuisine}</Chip>}
+              </div>
+            );
+          })()}
 
           {recipe.description && (
             <p style={{
@@ -361,65 +373,69 @@ function DetailScreen({ recipe, onClose, onToggleFav, onOpenSteps, onEdit, onDel
             }}>{typeof stripHTML === 'function' ? stripHTML(recipe.description) : recipe.description}</p>
           )}
 
-          {/* Ingredients */}
-          <div style={{ marginTop: 26 }}>
-            <SectionLabel ink={p.accent}>מצרכים</SectionLabel>
-            {(recipe.ingredients || []).length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <ServingScaler base={baseServings} servings={servings} onChange={setServings} palette={p}/>
+          {/* Ingredients, part by part when the recipe has parts */}
+          {(() => {
+            const groups = ingredientGroups(recipe.ingredients);
+            if (!groups.length) return null;
+            return (
+              <div style={{ marginTop: 26 }}>
+                <SectionLabel ink={p.accent}>מצרכים</SectionLabel>
+                <div style={{ marginTop: 12 }}>
+                  <ServingScaler base={baseServings} servings={servings} onChange={setServings} palette={p}/>
+                </div>
+                {groups.map((g, gi) => (
+                  <div key={gi} style={{ marginTop: g.name ? 22 : 12 }}>
+                    {g.name && (
+                      <div style={{
+                        ...TYPE.heading, color: 'var(--ink)',
+                        display: 'flex', alignItems: 'center', gap: 10, paddingInline: 4,
+                      }}>
+                        <span style={{ width: 4, alignSelf: 'stretch', borderRadius: 'var(--r-pill)', background: p.bg }}/>
+                        {g.name}
+                      </div>
+                    )}
+                    <div style={{ marginTop: g.name ? 4 : 0, display: 'flex', flexDirection: 'column' }}>
+                      {g.items.map(({ ing, index }) => (
+                        <IngredientRow key={index} ing={ing} palette={p} index={index} factor={factor}/>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' }}>
-              {(recipe.ingredients || []).map((ing, i) => (
-                <IngredientRow key={i} ing={ing} palette={p} index={i} factor={factor}/>
-              ))}
-            </div>
-          </div>
+            );
+          })()}
 
-          {/* Notes */}
-          <div style={{ marginTop: 26 }}>
-            <SectionLabel ink={p.accent}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <IconNote size={14} strokeWidth={2.2}/>
-                הערות אישיות
-              </span>
-            </SectionLabel>
-            {(() => {
-              const notes = typeof stripHTML === 'function' ? stripHTML(recipe.notes || '') : (recipe.notes || '');
-              return notes.trim() ? (
+          {/* Notes — only when there are some */}
+          {(() => {
+            const notes = typeof stripHTML === 'function' ? stripHTML(recipe.notes || '') : (recipe.notes || '');
+            if (!notes.trim()) return null;
+            return (
+              <div style={{ marginTop: 26 }}>
+                <SectionLabel ink={p.accent}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <IconNote size={14} strokeWidth={2.2}/>
+                    הערות אישיות
+                  </span>
+                </SectionLabel>
                 <p style={{
                   margin: '10px 0 0', fontSize: 'var(--t-small)', lineHeight: 1.65, color: 'var(--ink)',
                   whiteSpace: 'pre-line', padding: '14px 16px', borderRadius: 'var(--r-md)',
                   background: 'var(--glass)',
                   boxShadow: 'var(--e1)',
                 }}>{notes}</p>
-              ) : (
-                <p style={{ margin: '10px 0 0', padding: '4px 0', fontSize: 'var(--t-small)', color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-                  לא נוספו הערות
-                </p>
-              );
-            })()}
-          </div>
+              </div>
+            );
+          })()}
 
-          {/* CTA — instructions button or "no instructions" message */}
+          {/* CTA — the way into the steps, when there are steps */}
           {(() => {
             const s = recipe.steps || [];
             const isAuto = s.length > 0 && s.every(x => /^שלב\s*\d+$/.test((x.title || '').trim()));
             const hasContent = !!(recipe.instructions?.trim())
               || (s.length > 0 && !isAuto)
               || (isAuto && s.some(x => (x.body || '').trim()));
-            if (!hasContent) {
-              return (
-                <div style={{
-                  marginTop: 28, padding: '18px 22px', borderRadius: 'var(--r-lg)',
-                  background: 'var(--surface-sunken)', textAlign: 'center',
-                  color: 'var(--ink-soft)', fontSize: 'var(--t-small)', fontWeight: 500,
-                }}>
-                  אין הוראות הכנה למתכון זה
-                </div>
-              );
-            }
-            const label = (s.length > 0 && !isAuto) ? `בואו נכין יחד · ${s.length} שלבים` : 'הוראות הכנה';
+            if (!hasContent) return null;
+            const label = (s.length > 0 && !isAuto) ? `בואו נכין יחד · ${countLabel(s.length, 'שלב אחד', 'שלבים')}` : 'הוראות הכנה';
             return (
               <button onClick={() => onOpenSteps(recipe, servings)}
                 style={{
@@ -625,7 +641,7 @@ function IngredientRow({ ing, palette, index, factor = 1 }) {
 // ───────────────────────────────────────────────────────────
 const FORM_STEPS = [
   { id: 'what',  label: 'המתכון',  hint: 'שם, תמונה, איך ייראה' },
-  { id: 'ings',  label: 'מצרכים',  hint: 'לכמה אנשים, ומה נכנס' },
+  { id: 'ings',  label: 'מצרכים',  hint: 'מה נכנס, ובאיזו כמות' },
   { id: 'how',   label: 'הכנה',    hint: 'זמנים, שלבים, הערות' },
 ];
 
@@ -633,15 +649,25 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   const [title, setTitle] = uS(existing?.title || '');
   const [desc, setDesc] = uS(existing?.description || '');
   const [cuisine, setCuisine] = uS(existing?.cuisine || '');
-  const [prepTime, setPrepTime] = uS(existing?.prepTime ?? 15);
-  const [cookTime, setCookTime] = uS(existing?.cookTime ?? 15);
+  // Empty until somebody says otherwise. These used to start at 15 and
+  // 15, so every recipe nobody timed claimed to take half an hour.
+  const [prepTime, setPrepTime] = uS(existing?.prepTime > 0 ? String(existing.prepTime) : '');
+  const [cookTime, setCookTime] = uS(existing?.cookTime > 0 ? String(existing.cookTime) : '');
   const [servings, setServings] = uS(existing?.servings > 0 ? String(existing.servings) : '');
   const [paletteKey, setPaletteKey] = uS(existing?.palette || 'peach');
   // 'pop' = photo circle pokes out of the card, 'inside' = photo contained in it
   const [imageMode, setImageMode] = uS(existing?.imageMode || 'pop');
   const [category, setCategory] = uS(existing?.category || 'mains');
   const [notes, setNotes] = uS(existing?.notes || '');
-  const [ings, setIngs] = uS(existing?.ingredients?.length ? existing.ingredients : [{ qty: '', name: '', icon: 'chef' }]);
+  // The ingredients, part by part. A recipe with no parts is one section
+  // with no name, and the form shows it as a plain list.
+  const [sections, setSections] = uS(() => ingredientSections(existing?.ingredients));
+  // The one ingredient open for editing; the rest read as finished lines.
+  const [activeIng, setActiveIng] = uS(() => (existing?.ingredients?.length ? null : FIRST_ING_KEY));
+  const [focusIng, setFocusIng] = uS(null);
+  const [ingMenu, setIngMenu] = uS(null);       // { s, i } — the ingredient whose menu is open
+  const [groupMenu, setGroupMenu] = uS(null);   // the section whose menu is open
+  const [focusGroup, setFocusGroup] = uS(null);  // a new section, waiting for its name
   const [stepsArr, setStepsArr] = uS(existing?.steps?.length ? existing.steps : [{ title: '', body: '' }]);
   const [gallery, setGallery] = uS(existing?.gallery?.length ? existing.gallery : (defaultGallery ? defaultGallery() : ['main']));
   const [mainSlot, setMainSlot] = uS(existing?.mainSlot || gallery[0] || 'main');
@@ -660,7 +686,8 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     if (onStepChange) onStepChange(n); else setOwnStep(n);
   };
   const mountedRef = uR(false);
-  const ingsKey = ings.map(i => (i.name || '') + (i.qty || '')).join('|');
+  const ingsKey = sections.map(sc => (sc.name || '') + ':' +
+    sc.items.map(i => (i.name || '') + (i.qty || '') + (i.icon || '')).join(',')).join('|');
   const stepsKey = stepsArr.map(s => (s.title || '') + (s.body || '')).join('|');
   uE(() => {
     if (!mountedRef.current) { mountedRef.current = true; return; }
@@ -673,35 +700,156 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
     else if (onCancel) { onCancel(); }
   };
 
-  const updateIng = (i, k, v) => setIngs(arr => arr.map((x, idx) => {
-    if (idx !== i) return x;
-    const next = { ...x, [k]: v };
-    // Typing a name picks the icon, so a recipe written in a hurry does
-    // not arrive as twenty identical plates. Choosing one by hand sticks.
-    if (k === 'name' && !x.iconPicked && typeof guessIngredientIcon === 'function') {
-      next.icon = guessIngredientIcon(v) || 'chef';
-    }
-    if (k === 'icon') next.iconPicked = true;
-    return next;
+  // ── the ingredients, by section ───────────────────────
+  const editSection = (sk, fn) => setSections(ss => ss.map(sc => sc._k === sk ? fn(sc) : sc));
+
+  const updateIng = (sk, ik, k, v) => editSection(sk, sc => ({
+    ...sc,
+    items: sc.items.map(x => {
+      if (x._k !== ik) return x;
+      const next = { ...x, [k]: v };
+      // Typing a name picks the icon, so a recipe written in a hurry does
+      // not arrive as twenty identical plates. Choosing one by hand sticks.
+      if (k === 'name' && !x.iconPicked && typeof guessIngredientIcon === 'function') {
+        next.icon = guessIngredientIcon(v) || 'chef';
+      }
+      if (k === 'icon') next.iconPicked = true;
+      return next;
+    }),
   }));
-  const addIng = () => setIngs(arr => [...arr, { qty: '', name: '', icon: 'chef' }]);
-  const dropIng = (i) => setIngs(arr => arr.filter((_,idx) => idx !== i));
-  const updateStep = (i, k, v) => setStepsArr(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
-  const addStep = () => setStepsArr(arr => [...arr, { title: '', body: '' }]);
-  const dropStep = (i) => setStepsArr(arr => arr.filter((_,idx) => idx !== i));
+
+  // Opening one ingredient closes the last, and a row that was opened and
+  // left empty goes with it rather than staying behind as a blank line.
+  const openIng = (ik, focus = true) => {
+    setSections(ss => ss.map(sc => ({
+      ...sc,
+      items: sc.items.filter(x => x._k === ik || !isBlankIng(x)),
+    })));
+    setActiveIng(ik);
+    setFocusIng(focus ? ik : null);
+  };
+
+  const addIng = (sk) => {
+    const item = blankIng();
+    setSections(ss => ss.map(sc => ({
+      ...sc,
+      items: [...sc.items.filter(x => !isBlankIng(x)), ...(sc._k === sk ? [item] : [])],
+    })));
+    setActiveIng(item._k);
+    setFocusIng(item._k);
+  };
+
+  const dropIng = (sk, ik) => {
+    editSection(sk, sc => ({ ...sc, items: sc.items.filter(x => x._k !== ik) }));
+    if (activeIng === ik) setActiveIng(null);
+  };
 
   // Removing a row that has something written in it throws that writing
   // away, so it asks first. An untouched row has nothing to lose and goes
   // quietly — a dialog for an empty row is just a dialog in the way.
-  const removeIng = (i) => {
-    const row = ings[i] || {};
-    if (!(row.name || '').trim() && !(row.qty || '').trim()) return dropIng(i);
+  const removeIng = (sk, ik) => {
+    const row = (sections.find(sc => sc._k === sk)?.items || []).find(x => x._k === ik) || {};
+    if (isBlankIng(row)) return dropIng(sk, ik);
     confirm({
       title: 'למחוק את המצרך?',
       body: <><strong style={{ color: 'var(--ink)' }}>{(row.qty ? row.qty + ' ' : '') + (row.name || '')}</strong> יימחק מהרשימה.</>,
-      onConfirm: () => dropIng(i),
+      onConfirm: () => dropIng(sk, ik),
     });
   };
+
+  const moveIng = (sk, ik, dir) => editSection(sk, sc => {
+    const items = [...sc.items];
+    const at = items.findIndex(x => x._k === ik);
+    const to = at + dir;
+    if (at < 0 || to < 0 || to >= items.length) return sc;
+    [items[at], items[to]] = [items[to], items[at]];
+    return { ...sc, items };
+  });
+
+  // Moves an ingredient into another part of the recipe — or into a new
+  // part, which is how a list written flat gets split up afterwards.
+  const moveIngTo = (sk, ik, target) => {
+    const item = sections.find(sc => sc._k === sk)?.items.find(x => x._k === ik);
+    if (!item) return;
+    let next = sections.map(sc => sc._k === sk ? { ...sc, items: sc.items.filter(x => x._k !== ik) } : sc);
+    let into = target;
+    if (target === 'new') {
+      const sec = { _k: nextIngKey(), name: '', named: true, items: [item] };
+      into = sec._k;
+      next = [...next, sec];
+      setFocusGroup(sec._k);
+    } else {
+      next = next.map(sc => sc._k === target ? { ...sc, items: [...sc.items, item] } : sc);
+    }
+    // A section left with nothing in it and no name has no reason to stay.
+    setSections(next.filter(sc => sc.items.length || sc.name.trim() || sc._k === into));
+    if (typeof hapticTap === 'function') hapticTap();
+  };
+
+  const addGroup = () => {
+    if (typeof hapticTap === 'function') hapticTap();
+    // A list that has nothing in it yet does not need a nameless part
+    // above the new one: the empty list simply gets a name.
+    const only = sections.length === 1 ? sections[0] : null;
+    if (only && !only.named && !only.name && only.items.every(isBlankIng)) {
+      setSections([{ ...only, named: true }]);
+      setFocusGroup(only._k);
+      return;
+    }
+    const item = blankIng();
+    const sec = { _k: nextIngKey(), name: '', named: true, items: [item] };
+    setSections([...sections.map(sc => ({ ...sc, items: sc.items.filter(x => !isBlankIng(x)) })), sec]);
+    setFocusGroup(sec._k);
+    setActiveIng(item._k);
+    setFocusIng(null);
+  };
+
+  const renameGroup = (sk, name) => editSection(sk, sc => ({ ...sc, name }));
+
+  const moveGroup = (sk, dir) => setSections(ss => {
+    const next = [...ss];
+    const at = next.findIndex(sc => sc._k === sk);
+    const to = at + dir;
+    if (at < 0 || to < 0 || to >= next.length) return ss;
+    [next[at], next[to]] = [next[to], next[at]];
+    return next;
+  });
+
+  const removeGroup = (sk) => {
+    const sec = sections.find(sc => sc._k === sk);
+    if (!sec) return;
+    const filled = sec.items.filter(x => !isBlankIng(x)).length;
+    const drop = () => setSections(ss => {
+      const left = ss.filter(sc => sc._k !== sk);
+      return left.length ? left : ingredientSections([]);
+    });
+    if (!filled && !sec.name.trim()) return drop();
+    confirm({
+      title: 'למחוק את הקבוצה?',
+      body: <>
+        <strong style={{ color: 'var(--ink)' }}>{sec.name.trim() || 'הקבוצה'}</strong>
+        {filled ? <> ו־{countLabel(filled, 'המצרך שבה', 'המצרכים שבה')} יימחקו.</> : ' תימחק.'}
+      </>,
+      onConfirm: drop,
+    });
+  };
+
+  // Dissolving a part keeps what is in it: the ingredients join the part
+  // above, or the first part when it was the first.
+  const ungroup = (sk) => setSections(ss => {
+    const at = ss.findIndex(sc => sc._k === sk);
+    if (at < 0) return ss;
+    const into = at > 0 ? at - 1 : 1;
+    if (!ss[into]) return ss.map(sc => sc._k === sk ? { ...sc, name: '', named: false } : sc);
+    const items = ss[at].items.filter(x => !isBlankIng(x));
+    return ss
+      .map((sc, i) => i === into ? { ...sc, items: [...sc.items, ...items] } : sc)
+      .filter((_, i) => i !== at);
+  });
+
+  const updateStep = (i, k, v) => setStepsArr(arr => arr.map((x,idx) => idx===i ? {...x, [k]: v} : x));
+  const addStep = () => setStepsArr(arr => [...arr, { title: '', body: '' }]);
+  const dropStep = (i) => setStepsArr(arr => arr.filter((_,idx) => idx !== i));
 
   const removeStep = (i) => {
     const st = stepsArr[i] || {};
@@ -716,11 +864,14 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
   const p = paletteOf(paletteKey);
   const canSave = !!title.trim();
   const cats = (catsProp || []).filter(c => c.id !== 'all');
-  const currentCat = cats.find(c => c.id === category);
+  // A new recipe starts in "mains", which is created the moment it is
+  // saved — so the row says so rather than showing a dash until then.
+  const currentCat = cats.find(c => c.id === category)
+    || (typeof CATEGORY_SEED !== 'undefined' ? CATEGORY_SEED[category] : null);
 
   const done = [
     !!title.trim(),
-    ings.some(i => (i.name || '').trim()),
+    sections.some(sc => sc.items.some(i => (i.name || '').trim())),
     stepsArr.some(s => (s.title || '').trim() || (s.body || '').trim()),
   ];
 
@@ -736,13 +887,16 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
       palette: paletteKey, category, imageMode,
       prepTime: +prepTime || 0,
       cookTime: +cookTime || 0,
-      time: total || (existing?.time || 0),
+      // An old recipe that only ever had a total keeps it; one that was
+      // timed in halves says exactly what the halves say, nothing at all
+      // included.
+      time: total || ((existing && existing.prepTime == null && existing.cookTime == null) ? (existing.time || 0) : 0),
       servings: Math.max(0, parseInt(servings, 10) || 0),   // 0 = not stated
       level: existing?.level || 'קל',
       favorite: existing?.favorite || false,
       notes: notes,
       gallery, mainSlot,
-      ingredients: ings.filter(i => i.name.trim()).map(i => ({ qty: i.qty || '', name: i.name, icon: i.icon || 'chef' })),
+      ingredients: flattenSections(sections),
       steps: stepsArr.filter(s => (s.title || '').trim() || (s.body || '').trim()),
     });
   };
@@ -799,27 +953,41 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
               servings={servings} cuisine={cuisine}/>
           </div>
           <div style={pane}>
-            <NStepper label="לכמה אנשים" value={servings} onChange={setServings}/>
-            <div style={group}>מצרכים</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {ings.map((ing, i) => (
-                <IngredientFormRow key={i} ing={ing}
-                  onChange={(k, v) => updateIng(i, k, v)}
-                  onRemove={() => removeIng(i)}
-                  canRemove={ings.length > 1}
-                />
-              ))}
-              <button onClick={addIng} style={addRowBtn}>
-                <IconPlus size={18}/> הוספת מצרך
-              </button>
-            </div>
+            <NStepper label="מספר מנות" value={servings} onChange={setServings}
+              hint={+servings > 0 ? 'הכמויות כתובות לכמות הזו' : 'לא חובה'}/>
+            {sections.map((sc, si) => (
+              <IngredientSection key={sc._k}
+                section={sc}
+                showHeader={sections.length > 1 || sc.named || !!sc.name.trim()}
+                focusName={focusGroup === sc._k}
+                onNameFocused={() => setFocusGroup(null)}
+                onRename={(v) => renameGroup(sc._k, v)}
+                onMenu={() => setGroupMenu(sc._k)}
+                activeKey={activeIng}
+                focusKey={focusIng}
+                onOpenItem={(ik) => openIng(ik)}
+                onChangeItem={(ik, k, v) => updateIng(sc._k, ik, k, v)}
+                onItemMenu={(ik) => setIngMenu({ s: sc._k, i: ik })}
+                onAddItem={() => addIng(sc._k)}
+                onDone={() => { setActiveIng(null); setFocusIng(null); }}
+              />
+            ))}
+            <button type="button" onClick={addGroup} style={addGroupBtn}>
+              <IconLayers size={19} strokeWidth={2.1}/>
+              <span style={{ display: 'grid', textAlign: 'start' }}>
+                <span>הוספת קבוצה</span>
+                <span style={{ ...TYPE.caption, fontWeight: 500, color: 'var(--ink-faint)' }}>
+                  למנה מכמה חלקים — בצק, מלית, ציפוי
+                </span>
+              </span>
+            </button>
           </div>
           <div style={pane}>
 
             <div style={{ display: 'flex', gap: 12 }}>
-              <NField label="הכנה (דק׳)" value={prepTime} onChange={setPrepTime}
+              <NField label="הכנה (דק׳)" value={prepTime} onChange={setPrepTime} placeholder="—"
                 type="number" inputMode="numeric" style={{ flex: 1 }}/>
-              <NField label="בישול (דק׳)" value={cookTime} onChange={setCookTime}
+              <NField label="בישול (דק׳)" value={cookTime} onChange={setCookTime} placeholder="—"
                 type="number" inputMode="numeric" style={{ flex: 1 }}/>
             </div>
             <div style={group}>שלבי הכנה</div>
@@ -888,6 +1056,68 @@ function RecipeFormScreen({ existing, onSave, onCancel, mode = 'add', categories
         )}
       </div>
 
+      {ingMenu && (() => {
+        const sec = sections.find(sc => sc._k === ingMenu.s);
+        const at = sec ? sec.items.findIndex(x => x._k === ingMenu.i) : -1;
+        if (!sec || at < 0) return null;
+        const item = sec.items[at];
+        const close = () => setIngMenu(null);
+        const others = sections.filter(sc => sc._k !== sec._k);
+        const title = [item.qty, item.name].filter(Boolean).join(' ').trim() || 'מצרך';
+        return (
+          <Sheet title={title} onClose={close}>
+            <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+              <SheetAction icon={<IconEdit size={21}/>} label="עריכה"
+                onClick={() => { close(); openIng(item._k); }}/>
+              <SheetAction icon={<IconChevronUp size={22}/>} label="הזזה למעלה" disabled={at === 0}
+                onClick={() => { moveIng(sec._k, item._k, -1); }}/>
+              <SheetAction icon={<IconChevronDown size={22}/>} label="הזזה למטה" disabled={at === sec.items.length - 1}
+                onClick={() => { moveIng(sec._k, item._k, 1); }}/>
+              {others.length > 0 && (
+                <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 700, padding: '14px 18px 4px', borderTop: '1px solid var(--line)', marginTop: 6 }}>
+                  העברה לקבוצה
+                </div>
+              )}
+              {others.map(o => (
+                <SheetAction key={o._k} icon={<IconLayers size={21}/>}
+                  label={o.name.trim() || 'ללא שם'}
+                  onClick={() => { close(); moveIngTo(sec._k, item._k, o._k); }}/>
+              ))}
+              <SheetAction icon={<IconPlus size={22}/>} label="לקבוצה חדשה"
+                onClick={() => { close(); moveIngTo(sec._k, item._k, 'new'); }}/>
+              <div style={{ borderTop: '1px solid var(--line)', marginTop: 6 }}/>
+              <SheetAction icon={<IconTrash size={21}/>} label="מחיקת המצרך" danger
+                onClick={() => { close(); removeIng(sec._k, item._k); }}/>
+            </div>
+          </Sheet>
+        );
+      })()}
+
+      {groupMenu && (() => {
+        const at = sections.findIndex(sc => sc._k === groupMenu);
+        if (at < 0) return null;
+        const sec = sections[at];
+        const close = () => setGroupMenu(null);
+        return (
+          <Sheet title={sec.name.trim() || 'קבוצה'} onClose={close}>
+            <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
+              <SheetAction icon={<IconChevronUp size={22}/>} label="הזזה למעלה" disabled={at === 0}
+                onClick={() => moveGroup(sec._k, -1)}/>
+              <SheetAction icon={<IconChevronDown size={22}/>} label="הזזה למטה" disabled={at === sections.length - 1}
+                onClick={() => moveGroup(sec._k, 1)}/>
+              {sections.length > 1 && (
+                <SheetAction icon={<IconLayers size={21}/>}
+                  label="ביטול הקבוצה — המצרכים נשארים"
+                  onClick={() => { close(); ungroup(sec._k); }}/>
+              )}
+              <div style={{ borderTop: '1px solid var(--line)', marginTop: 6 }}/>
+              <SheetAction icon={<IconTrash size={21}/>} label="מחיקת הקבוצה ומה שבה" danger
+                onClick={() => { close(); removeGroup(sec._k); }}/>
+            </div>
+          </Sheet>
+        );
+      })()}
+
       {catSheet && (
         <CategoryPickSheet
           value={category}
@@ -946,7 +1176,7 @@ function PreviewCard({ p, title, desc, prepTime, cookTime, servings, cuisine }) 
         {desc || 'תיאור קצר שיופיע בכרטיס המתכון…'}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-        <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {(+prepTime||0)+(+cookTime||0)} ד׳</Chip>
+        {((+prepTime||0)+(+cookTime||0)) > 0 && <Chip tone="raised" palette={p}><IconClock size={13} strokeWidth={2.4}/> {formatMinutes((+prepTime||0)+(+cookTime||0))}</Chip>}
         {+servings > 0 && <Chip tone="raised" palette={p}><IconUsers size={13} strokeWidth={2.4}/> {servings}</Chip>}
         {cuisine && <Chip tone="raised" palette={p}>🍽 {cuisine}</Chip>}
       </div>
@@ -970,65 +1200,212 @@ function EditRecipeScreen({ recipe, onSave, onCancel, categories, cuisines, onAd
 }
 
 // ───────────────────────────────────────────────────────────
-// IngredientFormRow — qty + name + icon picker per row
+// The ingredients in the form, part by part.
+//
+// The form keeps them as sections — one per part of the dish — and saves
+// them as one flat list where each ingredient names its part (see
+// ingredientGroups in data.jsx). A recipe with no parts is a single
+// section with no name, and nothing about it looks like a group.
 // ───────────────────────────────────────────────────────────
-function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
-  const [pickerOpen, setPickerOpen] = uS(false);
-  const [qtyOpen, setQtyOpen] = uS(false);
-  const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
+let ingKeySeq = 0;
+const nextIngKey = () => `ing${++ingKeySeq}`;
+// The very first row of a new recipe, so it can start out open.
+const FIRST_ING_KEY = 'ing0';
+
+const blankIng = (key) => ({ _k: key || nextIngKey(), qty: '', name: '', icon: 'chef' });
+const isBlankIng = (x) => !(x.name || '').trim() && !(x.qty || '').trim();
+
+function ingredientSections(list) {
+  const sections = [];
+  const byName = new Map();
+  (list || []).forEach(ing => {
+    const name = String(ing.group || '').trim();
+    let sec = byName.get(name);
+    if (!sec) {
+      sec = { _k: nextIngKey(), name, named: !!name, items: [] };
+      byName.set(name, sec);
+      sections.push(sec);
+    }
+    const { group, ...rest } = ing;
+    sec.items.push({ ...rest, _k: nextIngKey() });
+  });
+  if (!sections.length) sections.push({ _k: nextIngKey(), name: '', named: false, items: [blankIng(FIRST_ING_KEY)] });
+  return sections;
+}
+
+function flattenSections(sections) {
+  const out = [];
+  sections.forEach(sc => {
+    const group = (sc.name || '').trim();
+    sc.items.forEach(i => {
+      const name = (i.name || '').trim();
+      if (!name) return;
+      const row = { qty: (i.qty || '').trim(), name, icon: i.icon || 'chef' };
+      if (i.iconPicked) row.iconPicked = true;
+      if (group) row.group = group;
+      out.push(row);
+    });
+  });
+  return out;
+}
+
+function IngredientSection({ section, showHeader, focusName, onNameFocused, onRename, onMenu,
+                             activeKey, focusKey, onOpenItem, onChangeItem, onItemMenu, onAddItem, onDone }) {
+  const nameRef = uR(null);
+  uE(() => {
+    if (!focusName || !nameRef.current) return;
+    nameRef.current.focus();
+    onNameFocused && onNameFocused();
+  }, [focusName]);
 
   return (
-    // Two lines, not one. Everything used to be crammed onto a single row
-    // — symbol, amount, name and a bin — which left the name, the longest
-    // thing you type, with whatever was left over, usually about half the
-    // screen. The name now has the whole width, and the amount sits under
-    // it where it only needs to be as wide as "2 כפות".
+    // One card per part, the rows inside it divided by hairlines — a list,
+    // not a stack of boxes inside boxes.
+    <div style={{ background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: '6px 12px' }}>
+      {showHeader && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 0 10px', borderBottom: '1px solid var(--line)',
+        }}>
+          <span aria-hidden="true" style={{ color: 'var(--brand-strong)', display: 'grid', placeItems: 'center', paddingInlineStart: 4 }}>
+            <IconLayers size={20} strokeWidth={2.2}/>
+          </span>
+          <input ref={nameRef} value={section.name} onChange={e => onRename(e.target.value)}
+            aria-label="שם הקבוצה"
+            placeholder={section.named ? 'שם הקבוצה — למשל: לבצק' : 'קבוצה ללא שם'}
+            enterKeyHint="next"
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+            style={{
+              flex: 1, minWidth: 0, height: 44, border: 'none', outline: 'none',
+              background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-display)',
+              fontSize: 'var(--t-heading)', fontWeight: 700, textAlign: 'right', padding: '0 4px',
+            }}/>
+          <button type="button" onClick={onMenu} aria-label="פעולות על הקבוצה" style={rowMoreBtn}>
+            <IconMore size={20}/>
+          </button>
+        </div>
+      )}
+
+      {section.items.map((ing, idx) => (
+        <IngredientFormRow key={ing._k} ing={ing}
+          divided={idx > 0}
+          open={activeKey === ing._k}
+          autoFocus={focusKey === ing._k}
+          last={idx === section.items.length - 1}
+          onOpen={() => onOpenItem(ing._k)}
+          onChange={(k, v) => onChangeItem(ing._k, k, v)}
+          onMenu={() => onItemMenu(ing._k)}
+          onNext={onAddItem}
+          onDone={onDone}
+        />
+      ))}
+
+      <button type="button" onClick={onAddItem}
+        style={{
+          width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 12, textAlign: 'right',
+          padding: '0 4px', minHeight: 56, color: 'var(--brand-strong)',
+          borderTop: section.items.length ? '1px solid var(--line)' : 'none',
+        }}>
+        <span style={{ width: 44, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <IconPlus size={22} strokeWidth={2.4}/>
+        </span>
+        <span style={{ ...TYPE.body, fontWeight: 700 }}>הוספת מצרך</span>
+      </button>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// IngredientFormRow — one ingredient.
+//
+// Closed, it is the line as the recipe will print it: the symbol, the
+// amount, the name. Tapped, it opens into the two fields that make it,
+// with the amounts dropdown beside the amount. Only one is open at a
+// time, so the list stays a list you can read while you write it.
+// ───────────────────────────────────────────────────────────
+function IngredientFormRow({ ing, divided, open, autoFocus, last, onOpen, onChange, onMenu, onNext, onDone }) {
+  const [pickerOpen, setPickerOpen] = uS(false);
+  const [qtyOpen, setQtyOpen] = uS(false);
+  const qtyRef = uR(null);
+  const emoji = (typeof ING_KEY_EMOJI !== 'undefined' && ING_KEY_EMOJI[ing.icon]) || ing.icon || '🍽️';
+  uE(() => { if (!open) setQtyOpen(false); }, [open]);
+
+  const symbol = (
+    <button type="button" onClick={() => setPickerOpen(true)}
+      aria-label="בחירת סמל"
+      style={{
+        width: 44, height: 44, borderRadius: 'var(--r-md)', border: 'none', flexShrink: 0,
+        background: 'var(--field-fill)', cursor: 'pointer',
+        display: 'grid', placeItems: 'center', fontSize: 22, padding: 0,
+      }}>{emoji}</button>
+  );
+
+  const field = {
+    width: '100%', height: 48, border: 'none', outline: 'none',
+    background: 'var(--field-fill)', color: 'var(--ink)',
+    borderRadius: 'var(--r-md)', padding: '0 14px',
+    fontFamily: 'inherit', fontSize: 'var(--t-body)', textAlign: 'right',
+  };
+
+  return (
     <div style={{
       position: 'relative',
-      background: 'var(--field-fill)', borderRadius: 'var(--r-lg)', padding: 8,
-      display: 'grid', gap: 8,
+      borderTop: divided ? '1px solid var(--line)' : 'none',
     }}>
-      <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
-        <div style={{ flexShrink: 0 }}>
-          <button type="button" onClick={() => setPickerOpen(o => !o)}
-            aria-label="בחירת סמל"
+      {!open ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 60, padding: '6px 0' }}>
+          <div style={{ paddingInlineStart: 0 }}>{symbol}</div>
+          <button type="button" onClick={onOpen}
             style={{
-              width: 56, height: 56, borderRadius: 'var(--r-md)', border: 'none',
-              background: 'var(--surface-raised)', color: 'var(--ink)',
-              cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 26,
-            }}>{emoji}</button>
-          {pickerOpen && (
-            <EmojiPickerPopover current={emoji}
-              onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
-              onType={(e) => onChange('icon', e)}
-              onClose={() => setPickerOpen(false)}
-            />
-          )}
+              flex: 1, minWidth: 0, alignSelf: 'stretch', border: 'none', background: 'transparent',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right', padding: '0 2px',
+              ...TYPE.body, fontWeight: 600, color: 'var(--ink)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+            {ing.qty && (
+              <span style={{ color: 'var(--brand-strong)', fontWeight: 700, marginInlineEnd: 8, fontVariantNumeric: 'tabular-nums' }}>
+                {ing.qty}
+              </span>
+            )}
+            {ing.name || <span style={{ color: 'var(--ink-faint)', fontWeight: 500 }}>מצרך חדש</span>}
+          </button>
+          <button type="button" onClick={onMenu} aria-label="פעולות על המצרך" style={rowMoreBtn}>
+            <IconMore size={20}/>
+          </button>
         </div>
-        <NField label="מצרך" hideLabel placeholder="מצרך"
-          value={ing.name || ''} onChange={v => onChange('name', v)}
-          style={{ flex: 1, minWidth: 0 }}/>
-        {canRemove && (
-          <button type="button" onClick={onRemove} aria-label="מחיקת מצרך" style={{
-            width: 40, height: 56, borderRadius: 'var(--r-md)', border: 'none', cursor: 'pointer',
-            background: 'transparent', color: 'var(--ink-faint)', flexShrink: 0,
-            display: 'grid', placeItems: 'center',
-          }}><IconTrash size={18}/></button>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexDirection: 'row-reverse', alignItems: 'center' }}>
-        <NField label="כמות" hideLabel placeholder="כמות"
-          value={ing.qty || ''} onChange={v => onChange('qty', v)}
-          style={{ flex: 1, minWidth: 0 }}
-          after={
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '44px 1fr 40px', columnGap: 12, rowGap: 8, padding: '10px 0 12px' }}>
+          <div style={{ gridRow: '1 / span 2' }}>{symbol}</div>
+          <input value={ing.name || ''} onChange={e => onChange('name', e.target.value)}
+            aria-label="מצרך" placeholder="מצרך — למשל: קמח"
+            autoFocus={autoFocus}
+            enterKeyHint="next"
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); qtyRef.current && qtyRef.current.focus(); } }}
+            style={{ ...field, fontWeight: 600 }}/>
+          <button type="button" onClick={onMenu} aria-label="פעולות על המצרך" style={{ ...rowMoreBtn, alignSelf: 'center' }}>
+            <IconMore size={20}/>
+          </button>
+          <div style={{ position: 'relative' }}>
+            <input ref={qtyRef} value={ing.qty || ''} onChange={e => onChange('qty', e.target.value)}
+              aria-label="כמות" placeholder="כמות"
+              enterKeyHint={last ? 'next' : 'done'}
+              onKeyDown={e => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                // Enter on the amount of the last line starts the next one,
+                // so a list can be typed without reaching for the screen.
+                if (last && (ing.name || '').trim()) onNext(); else onDone();
+              }}
+              style={{ ...field, paddingInlineEnd: 46 }}/>
             <button type="button" data-qty-toggle="true"
               onClick={() => { setQtyOpen(o => !o); if (typeof hapticTap === 'function') hapticTap(); }}
               aria-label="כמויות מוכנות" aria-expanded={qtyOpen}
               style={{
-                width: 34, height: 34, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                position: 'absolute', insetInlineEnd: 6, top: 6,
+                width: 36, height: 36, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
                 background: qtyOpen ? 'var(--ink)' : 'transparent',
-                color: qtyOpen ? 'var(--bg)' : 'var(--ink-faint)',
+                color: qtyOpen ? 'var(--bg)' : 'var(--ink-soft)',
                 display: 'grid', placeItems: 'center', padding: 0,
                 transition: 'background var(--dur-fast), color var(--dur-fast)',
               }}>
@@ -1038,18 +1415,40 @@ function IngredientFormRow({ ing, onChange, onRemove, canRemove }) {
                 transition: 'transform var(--dur) var(--ease-out)',
               }}><IconChevronDown size={16} strokeWidth={2.6}/></span>
             </button>
-          }/>
-      </div>
+          </div>
+          {qtyOpen && (
+            <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
+              <QtyPicker value={ing.qty || ''}
+                onPick={v => onChange('qty', v)}
+                onClose={() => setQtyOpen(false)}/>
+            </div>
+          )}
+        </div>
+      )}
 
-      {qtyOpen && (
-        <QtyPicker value={ing.qty || ''}
-          onPick={v => onChange('qty', v)}
-          onClose={() => setQtyOpen(false)}/>
+      {pickerOpen && (
+        <EmojiPickerPopover current={emoji}
+          onPick={(e) => { onChange('icon', e); setPickerOpen(false); }}
+          onType={(e) => onChange('icon', e)}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
   );
 }
 
+const rowMoreBtn = {
+  width: 40, height: 40, borderRadius: 'var(--r-pill)', border: 'none', flexShrink: 0,
+  background: 'transparent', color: 'var(--ink-soft)', cursor: 'pointer',
+  display: 'grid', placeItems: 'center', padding: 0,
+};
+
+const addGroupBtn = {
+  border: '1.5px dashed var(--line-strong)', background: 'transparent',
+  borderRadius: 'var(--r-lg)', padding: '12px 18px', minHeight: 64, cursor: 'pointer',
+  fontFamily: 'inherit', ...TYPE.body, fontWeight: 700, color: 'var(--ink)',
+  display: 'flex', alignItems: 'center', gap: 14, textAlign: 'right',
+};
 
 function EmojiPickerPopover({ current, onPick, onType, onClose }) {
   return (

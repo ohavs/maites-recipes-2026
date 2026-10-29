@@ -456,7 +456,12 @@ function CookScreen({ recipe, onClose, servings }) {
         <Sheet title="מצרכים" subtitle={factor !== 1 ? `הכמויות מותאמות ל-${servings} מנות` : undefined}
           onClose={() => setShowIngredients(false)}>
           <div style={{ paddingBottom: 12 }}>
-            {ings.map((ing, k) => {
+            {ingredientGroups(ings).map((g, gi) => (
+              <div key={gi} style={{ marginTop: gi ? 18 : 0 }}>
+                {g.name && (
+                  <div style={{ ...TYPE.heading, color: 'var(--ink)', padding: '4px 6px 6px' }}>{g.name}</div>
+                )}
+            {g.items.map(({ ing, index: k }) => {
               const on = checked.has(k);
               return (
                 <button key={k} type="button"
@@ -493,6 +498,8 @@ function CookScreen({ recipe, onClose, servings }) {
                 </button>
               );
             })}
+              </div>
+            ))}
             {!ings.length && <div style={{ ...TYPE.small, color: 'var(--ink-soft)', padding: 12 }}>לא הוזנו מצרכים</div>}
           </div>
         </Sheet>

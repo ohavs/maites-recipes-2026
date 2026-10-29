@@ -99,6 +99,38 @@ function parseIngredient(raw) {
   return { qty: '', name: t, icon: guessIcon(t) };
 }
 
+// A cell's ingredient lines, with the parts of the recipe kept: a line
+// that is only a name and a colon ("לציפוי:") heads the lines under it.
+// The export writes them that way, so a file goes out and comes back in
+// with its parts intact.
+function parseIngredientLines(lines) {
+  let group = '';
+  const out = [];
+  lines.forEach(line => {
+    const head = String(line).trim().match(/^([^\d:]{1,40}):$/);
+    if (head) { group = head[1].trim(); return; }
+    const ing = parseIngredient(line);
+    if (!ing.name) return;
+    if (group) ing.group = group;
+    out.push(ing);
+  });
+  return out;
+}
+
+// The other way: a recipe's ingredients as lines for a cell.
+// The lines without a part go first: once a heading has been written,
+// every line under it belongs to it until the next one.
+function ingredientLines(ingredients) {
+  const groups = ingredientGroups(ingredients);
+  groups.sort((a, b) => (a.name ? 1 : 0) - (b.name ? 1 : 0));
+  const lines = [];
+  groups.forEach(g => {
+    if (g.name) lines.push(`${g.name}:`);
+    g.items.forEach(({ ing: i }) => lines.push(`${i.qty || ''} - ${i.name || ''}`.replace(/^\s*-\s*/, '')));
+  });
+  return lines;
+}
+
 // Split steps from a raw cell: newlines first, then inline numbered list.
 function splitSteps(raw) {
   if (raw == null) return [];
@@ -253,7 +285,7 @@ function rowToRecipe(row, map) {
   const desc  = stripHTML(String(get('desc')  || ''));
   const notes = stripHTML(String(get('notes') || ''));
 
-  const ingredients = splitMulti(get('ingredients')).map(parseIngredient);
+  const ingredients = parseIngredientLines(splitMulti(get('ingredients')));
   const instructions = stripHTML(String(get('steps') || ''));
 
   const mainImages = splitMulti(get('mainImage'));
@@ -380,7 +412,7 @@ function sheetToRecipe(sheetName, rows) {
     console.log('[import]', title, '— fields:', Object.keys(kv), '— instructions key:', candidates[0]?.[0] || 'not found');
   }
 
-  const ingredients = splitMulti(ingRaw).map(parseIngredient).filter(i => i.name);
+  const ingredients = parseIngredientLines(splitMulti(ingRaw));
   const instructions = instrRaw;
 
   const mainImages = mainImgRaw.split(/,\s*/).map(u => u.trim()).filter(Boolean);
@@ -484,7 +516,7 @@ function exportExcelWithXLSX(recipes) {
       r.servings ?? '',
       r.category || '',
       r.description || '',
-      (r.ingredients || []).map(i => `${i.qty || ''} - ${i.name || ''}`.replace(/^\s*-\s*/, '')).join('\n'),
+      ingredientLines(r.ingredients).join('\n'),
       (r.steps || []).map((s, i) => `${i+1}. ${s.title ? s.title + ': ' : ''}${s.body || ''}`).join('\n'),
       r.notes || '',
       r.palette || '',
@@ -533,6 +565,7 @@ function recipesToWordHTML(recipes) {
     .meta { margin: 14px 0 0; font-size: 11pt; }
     .meta span { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.6); margin-left: 6px; font-weight: 700; }
     h3 { font-size: 13pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #2c1d27; }
+    h4 { font-size: 11.5pt; font-weight: 800; margin: 14px 0 4px; }
     ul { padding-right: 18px; font-size: 12pt; line-height: 1.7; }
     ol { padding-right: 18px; font-size: 12pt; line-height: 1.65; }
     li { margin-bottom: 6px; }
@@ -551,17 +584,19 @@ function recipesToWordHTML(recipes) {
           <h2>${escapeHTML(r.title)}</h2>
           ${r.description ? `<div class="desc">${escapeHTML(r.description)}</div>` : ''}
           <div class="meta">
-            <span>⏱️ ${(r.prepTime||0)+(r.cookTime||0)} דקות</span>
-            <span>👥 ${r.servings || ''} מנות</span>
+            ${recipeMinutes(r) ? `<span>⏱️ ${formatMinutes(recipeMinutes(r))}</span>` : ''}
+            ${+r.servings > 0 ? `<span>👥 ${countLabel(r.servings, 'מנה אחת', 'מנות')}</span>` : ''}
             ${r.cuisine ? `<span>🍽 ${escapeHTML(r.cuisine)}</span>` : ''}
           </div>
         </div>
         ${(r.ingredients||[]).length ? `
           <h3>מצרכים</h3>
-          <ul>
-            ${(r.ingredients||[]).map(i =>
-              `<li>${i.qty ? `<strong>${escapeHTML(i.qty)}</strong> · ` : ''}${escapeHTML(i.name)}</li>`).join('')}
-          </ul>
+          ${ingredientGroups(r.ingredients).map(g => `
+            ${g.name ? `<h4>${escapeHTML(g.name)}</h4>` : ''}
+            <ul>
+              ${g.items.map(({ ing: i }) =>
+                `<li>${i.qty ? `<strong>${escapeHTML(i.qty)}</strong> · ` : ''}${escapeHTML(i.name)}</li>`).join('')}
+            </ul>`).join('')}
         ` : ''}
         ${(r.steps||[]).length ? `
           <h3>הוראות הכנה</h3>

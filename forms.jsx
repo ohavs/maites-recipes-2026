@@ -548,37 +548,47 @@ function Radio({ on }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// NStepper — a count. Two big targets and the number between
-// them, on one row with its label.
+// NStepper — a count. The label on one side and a small pill
+// of − n + on the other: the same control the recipe screen
+// scales its quantities with, so the two read as one thing.
 // ───────────────────────────────────────────────────────────
 function NStepper({ label, hint, value, onChange, min = 0, max = 99, empty = 'לא צוין' }) {
   const n = parseInt(value, 10) || 0;
-  const set = (v) => onChange(v <= 0 ? '' : String(Math.min(max, Math.max(min, v))));
+  const set = (v) => {
+    onChange(v <= 0 ? '' : String(Math.min(max, Math.max(min, v))));
+    if (typeof hapticTap === 'function') hapticTap();
+  };
   const btn = (dis) => ({
-    width: 52, height: 52, borderRadius: 'var(--r-md)', border: 'none', flexShrink: 0,
-    background: 'var(--field-fill)', color: dis ? 'var(--ink-faint)' : 'var(--ink)',
-    cursor: dis ? 'default' : 'pointer', opacity: dis ? .4 : 1,
+    width: 44, height: 44, borderRadius: 'var(--r-pill)', border: 'none', flexShrink: 0,
+    background: dis ? 'transparent' : 'var(--surface-raised)',
+    color: dis ? 'var(--ink-faint)' : 'var(--ink)',
+    cursor: dis ? 'default' : 'pointer', opacity: dis ? .45 : 1,
     display: 'grid', placeItems: 'center', fontFamily: 'inherit',
-    fontSize: 26, fontWeight: 500, lineHeight: 1,
+    fontSize: 22, fontWeight: 600, lineHeight: 1, padding: 0,
+    transition: 'background var(--dur-fast), opacity var(--dur-fast)',
   });
   return (
     <div style={{
-      background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: '14px 18px',
+      background: 'var(--surface-raised)', borderRadius: 'var(--r-lg)', padding: '12px 12px 12px 18px',
+      display: 'flex', alignItems: 'center', gap: 14,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0, ...TYPE.body, fontWeight: 600, color: 'var(--ink)' }}>{label}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button type="button" aria-label="פחות" onClick={() => set(n - 1)} disabled={n <= min} style={btn(n <= min)}>−</button>
-          <div style={{
-            minWidth: 72, textAlign: 'center', fontFamily: 'var(--font-display)',
-            fontSize: n > 0 ? 'var(--t-title)' : 'var(--t-caption)',
-            fontWeight: n > 0 ? 800 : 600,
-            color: n > 0 ? 'var(--ink)' : 'var(--ink-faint)',
-          }}>{n > 0 ? n : empty}</div>
-          <button type="button" aria-label="עוד" onClick={() => set(n + 1)} disabled={n >= max} style={btn(n >= max)}>+</button>
-        </div>
+      <div style={{ flex: 1, minWidth: 0, paddingInlineStart: 6 }}>
+        <div style={{ ...TYPE.body, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3 }}>{label}</div>
+        {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 2 }}>{hint}</div>}
       </div>
-      {hint && <div style={{ ...TYPE.caption, color: 'var(--ink-faint)', fontWeight: 500, marginTop: 10, lineHeight: 1.5 }}>{hint}</div>}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,
+        background: 'var(--field-fill)', borderRadius: 'var(--r-pill)', padding: 3,
+      }}>
+        <button type="button" aria-label="פחות" onClick={() => set(n - 1)} disabled={n <= min} style={btn(n <= min)}>−</button>
+        <div aria-live="polite" style={{
+          minWidth: 48, textAlign: 'center', fontFamily: n > 0 ? 'var(--font-display)' : 'inherit',
+          fontSize: n > 0 ? 'var(--t-heading)' : 'var(--t-caption)', fontWeight: n > 0 ? 800 : 600,
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+          color: n > 0 ? 'var(--ink)' : 'var(--ink-faint)',
+        }}>{n > 0 ? n : empty}</div>
+        <button type="button" aria-label="עוד" onClick={() => set(n + 1)} disabled={n >= max} style={btn(n >= max)}>+</button>
+      </div>
     </div>
   );
 }
@@ -1036,19 +1046,23 @@ function PhotoStage({ recipeId, gallery, setGallery, mainSlot, setMainSlot, pale
   );
 }
 
-function PhotoAction({ icon, label, onClick, danger }) {
+// One line in an action sheet: an icon and what it does. Used for the
+// photo's sheet and for an ingredient's, so the two read as one menu.
+function SheetAction({ icon, label, onClick, danger, disabled }) {
   return (
-    <button type="button" onClick={onClick}
+    <button type="button" onClick={onClick} disabled={disabled}
       style={{
-        border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+        border: 'none', background: 'transparent', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
         display: 'flex', alignItems: 'center', gap: 16, textAlign: 'right',
         padding: '16px 18px', minHeight: 60, borderRadius: 'var(--r-md)',
         color: danger ? 'var(--danger)' : 'var(--ink)',
+        opacity: disabled ? .35 : 1,
       }}>
       <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center' }}>{icon}</span>
       <span style={{ ...TYPE.body, fontWeight: 600 }}>{label}</span>
     </button>
   );
 }
+const PhotoAction = SheetAction;
 
-Object.assign(window, { PhotoStage, PhotoAction, readImageToSlot, storeImageDataUrl });
+Object.assign(window, { PhotoStage, PhotoAction, SheetAction, readImageToSlot, storeImageDataUrl });
